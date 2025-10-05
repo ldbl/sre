@@ -10,5 +10,5 @@ spec:
   type: OCIArtifactTag
   url: oci://ghcr.io/ldbl/backend
   filter:
-    semver: '>=0.1.0'
+    includeTag: "staging"
     limit: 1

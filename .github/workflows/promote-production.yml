@@ -3,15 +3,11 @@ name: Promote to Production
 on:
   workflow_dispatch:
     inputs:
-      staging_tag:
-        description: 'Staging stable tag to promote (e.g., v1.2.3)'
-        required: true
-        type: string
       create_release:
-        description: 'Create GitHub release'
-        required: true
+        description: 'Create GitHub release with commit SHA'
+        required: false
         type: boolean
-        default: true
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -32,20 +28,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate input
-        id: validate
+      - name: Extract metadata
+        id: meta
         run: |
-          STAGING_TAG="${{ github.event.inputs.staging_tag }}"
-
-          # Validate stable tag format
-          if ! echo "$STAGING_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Error: Invalid stable tag format. Expected: v1.2.3"
-            exit 1
-          fi
-
-          # Production uses the same tag as staging
-          echo "prod_tag=${STAGING_TAG}" >> $GITHUB_OUTPUT
-          echo "staging_tag=${STAGING_TAG}" >> $GITHUB_OUTPUT
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -56,54 +43,21 @@ jobs:
 
       - name: Pull staging image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.validate.outputs.staging_tag }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
 
-      - name: Tag production-latest
+      - name: Tag production
         run: |
-          # Tag the staging image as production-latest
+          # Tag the staging image as production
           docker tag \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.validate.outputs.staging_tag }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production-latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
 
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production-latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
 
-      - name: Update production ResourceSetInputProvider
+      - name: Production promoted
         run: |
-          # Update to track the specific production tag
-          PROD_TAG="${{ steps.validate.outputs.prod_tag }}"
-
-          # This will be managed by ResourceSet in Flux Operator
-          # No manual manifest update needed - ResourceSet will handle it
-          echo "Production will use tag: ${PROD_TAG}"
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: promote backend to production ${{ steps.validate.outputs.prod_tag }}"
-          title: "Promote backend to production ${{ steps.validate.outputs.prod_tag }}"
-          body: |
-            ## Production Promotion
-
-            Promoting backend from staging to production.
-
-            **Staging Tag:** `${{ steps.validate.outputs.staging_tag }}`
-            **Production Tag:** `${{ steps.validate.outputs.prod_tag }}` (same as staging)
-
-            ### Pre-merge Checklist
-            - [ ] Staging deployment successful
-            - [ ] Integration tests passed in staging
-            - [ ] Manual QA completed
-            - [ ] Changelog updated
-            - [ ] Stakeholders notified
-
-            ### Deployment
-            After merge, Flux ResourceSet will automatically deploy to production namespace using the same image.
-          branch: promote-${{ steps.validate.outputs.prod_tag }}
-          delete-branch: true
-          labels: |
-            production
-            automated-pr
+          echo "Production image promoted from staging"
+          echo "Flux will automatically deploy the 'production' tag"
 
       - name: Create GitHub Release
         if: ${{ github.event.inputs.create_release == 'true' }}
@@ -111,19 +65,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.validate.outputs.prod_tag }}
-          release_name: Release ${{ steps.validate.outputs.prod_tag }}
+          tag_name: prod-${{ steps.meta.outputs.short_sha }}
+          release_name: Production Release - ${{ steps.meta.outputs.short_sha }}
           body: |
-            ## Backend Release ${{ steps.validate.outputs.prod_tag }}
+            ## Backend Production Release
 
-            Promoted from staging (stable release).
+            Promoted staging image to production.
 
-            ### Docker Images
-            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.validate.outputs.prod_tag }}`
-            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production-latest`
-
-            ### Deployment
-            This release is running in staging and ready for production deployment.
+            **Docker Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production`
+            **Commit:** ${{ steps.meta.outputs.short_sha }}
           draft: false
           prerelease: false
 
@@ -131,8 +81,8 @@ jobs:
         run: |
           echo "### Production Promotion Complete :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Staging Tag:** \`${{ steps.validate.outputs.staging_tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Production Tag:** \`${{ steps.validate.outputs.prod_tag }}\` (same image)" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.validate.outputs.prod_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Source:** \`staging\` tag" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** \`production\` tag" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Tagged as production-latest. Flux ResourceSet will deploy to production." >> $GITHUB_STEP_SUMMARY
+          echo "Flux will automatically deploy to production namespace." >> $GITHUB_STEP_SUMMARY

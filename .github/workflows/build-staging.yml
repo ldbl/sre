@@ -35,21 +35,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version
-        id: version
+      - name: Extract metadata
+        id: meta
         run: |
-          # Get latest version tag or default
-          LATEST_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "v0.0.0")
-          VERSION=${LATEST_TAG#v}
-
-          # Increment patch version for new stable release
-          IFS='.' read -r major minor patch <<< "$VERSION"
-          NEXT_PATCH=$((patch + 1))
-          STABLE_VERSION="${major}.${minor}.${NEXT_PATCH}"
-          STABLE_TAG="v${STABLE_VERSION}"
-
-          echo "stable_tag=${STABLE_TAG}" >> $GITHUB_OUTPUT
-          echo "version=${STABLE_VERSION}" >> $GITHUB_OUTPUT
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "image_tag=staging" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -58,8 +49,7 @@ jobs:
           file: ./src/backend/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.stable_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -75,6 +65,6 @@ jobs:
         run: |
           echo "### Docker Image Built :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.stable_tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** Staging (Stable)" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ steps.meta.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY

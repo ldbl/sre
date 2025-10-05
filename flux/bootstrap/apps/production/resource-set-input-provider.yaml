@@ -10,5 +10,5 @@ spec:
   type: OCIArtifactTag
   url: oci://ghcr.io/ldbl/backend
   filter:
-    includeTag: "production-latest"
+    includeTag: "production"
     limit: 1
