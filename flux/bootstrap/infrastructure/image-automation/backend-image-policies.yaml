@@ -1,0 +1,42 @@
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: backend-develop
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: backend
+  policy:
+    semver:
+      range: '>=0.0.0-rc'
+  filterTags:
+    pattern: '^.*-rc-.*$'
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: backend-staging
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: backend
+  policy:
+    semver:
+      range: '>=0.0.0'
+  filterTags:
+    pattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: backend-production
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: backend
+  policy:
+    alphabetical:
+      order: asc
+  filterTags:
+    pattern: '^production$'

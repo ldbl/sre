@@ -8,7 +8,7 @@ resources:
   - ../base
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: production
+    newTag: production # {"$imagepolicy": "flux-system:backend-production:tag"}
 patches:
   - patch: |-
       - op: replace
