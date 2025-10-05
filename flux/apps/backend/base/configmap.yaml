@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: backend
+    app.kubernetes.io/name: backend
+data:
+  ENVIRONMENT: "development"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"

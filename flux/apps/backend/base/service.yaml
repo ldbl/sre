@@ -5,8 +5,11 @@ metadata:
   name: backend
   labels:
     app: backend
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
 spec:
   type: ClusterIP
+  sessionAffinity: None
   ports:
   - port: 80
     targetPort: http
