@@ -11,6 +11,7 @@ ARG APP_VERSION
 ARG APP_COMMIT
 ARG APP_COMMIT_SHORT
 ARG BUILD_DATE
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -23,7 +24,7 @@ RUN go mod download
 
 # Copy source and build binary
 COPY . ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -ldflags "-s -w -X github.com/ldbl/sre/backend/pkg/version.Version=${APP_VERSION} -X github.com/ldbl/sre/backend/pkg/version.Commit=${APP_COMMIT} -X github.com/ldbl/sre/backend/pkg/version.ShortCommit=${APP_COMMIT_SHORT} -X github.com/ldbl/sre/backend/pkg/version.BuildDate=${BUILD_DATE}" \
     -o /out/backend ./cmd/api
 
