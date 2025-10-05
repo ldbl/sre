@@ -6,9 +6,10 @@ commonLabels:
   environment: staging
 resources:
   - ../base
+  - image-policy.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: staging # {"$imagepolicy": "flux-system:backend-staging:tag"}
+    newTag: staging # {"$imagepolicy": "staging:backend:tag"}
 patches:
   - patch: |-
       - op: replace

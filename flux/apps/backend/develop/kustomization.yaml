@@ -6,9 +6,10 @@ commonLabels:
   environment: develop
 resources:
   - ../base
+  - image-policy.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: develop # {"$imagepolicy": "flux-system:backend-develop:tag"}
+    newTag: develop # {"$imagepolicy": "develop:backend:tag"}
 patches:
   - patch: |-
       - op: replace

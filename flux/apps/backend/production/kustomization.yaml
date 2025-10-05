@@ -6,9 +6,10 @@ commonLabels:
   environment: production
 resources:
   - ../base
+  - image-policy.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: production # {"$imagepolicy": "flux-system:backend-production:tag"}
+    newTag: production # {"$imagepolicy": "production:backend:tag"}
 patches:
   - patch: |-
       - op: replace
