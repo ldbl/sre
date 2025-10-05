@@ -54,16 +54,12 @@ spec:
         env:
         - name: PORT
           value: "8080"
+        - name: NAMESPACE
+          value: "${NAMESPACE}"
         - name: ENVIRONMENT
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: ENVIRONMENT
+          value: "${ENVIRONMENT}"
         - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: LOG_LEVEL
+          value: "${LOG_LEVEL}"
         livenessProbe:
           httpGet:
             path: /health

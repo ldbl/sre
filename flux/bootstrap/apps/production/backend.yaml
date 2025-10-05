@@ -28,5 +28,10 @@ spec:
           - name: ghcr.io/ldbl/backend
             newName: ghcr.io/ldbl/backend
             newTag: "<< inputs.backend_production.tag >>"
+        postBuild:
+          substitute:
+            NAMESPACE: "production"
+            ENVIRONMENT: "production"
+            LOG_LEVEL: "warn"
         dependsOn:
           - name: flux-system

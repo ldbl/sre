@@ -28,5 +28,10 @@ spec:
           - name: ghcr.io/ldbl/backend
             newName: ghcr.io/ldbl/backend
             newTag: "<< inputs.backend_develop.tag >>"
+        postBuild:
+          substitute:
+            NAMESPACE: "develop"
+            ENVIRONMENT: "development"
+            LOG_LEVEL: "debug"
         dependsOn:
           - name: flux-system

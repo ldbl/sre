@@ -6,12 +6,6 @@ commonLabels:
   environment: production
 resources:
   - ../base
-configMapGenerator:
-  - name: backend-config
-    behavior: merge
-    literals:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=warn
 patches:
   - patch: |-
       - op: replace

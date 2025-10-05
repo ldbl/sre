@@ -28,5 +28,10 @@ spec:
           - name: ghcr.io/ldbl/backend
             newName: ghcr.io/ldbl/backend
             newTag: "<< inputs.backend_staging.tag >>"
+        postBuild:
+          substitute:
+            NAMESPACE: "staging"
+            ENVIRONMENT: "staging"
+            LOG_LEVEL: "info"
         dependsOn:
           - name: flux-system
