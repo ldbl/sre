@@ -5,26 +5,29 @@ ARG APP_VERSION=dev
 ARG APP_COMMIT=dev
 ARG APP_COMMIT_SHORT=dev
 ARG BUILD_DATE=unknown
-FROM golang:${GO_VERSION}-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
 
 ARG APP_VERSION
 ARG APP_COMMIT
 ARG APP_COMMIT_SHORT
 ARG BUILD_DATE
-ARG TARGETARCH
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache ca-certificates build-base
 
-# Cache module downloads
+# Cache module downloads (before declaring TARGETARCH to avoid re-downloading for each platform)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source and build binary
+# Declare target platform arguments for cross-compilation
+ARG TARGETOS
+ARG TARGETARCH
+
+# Copy source and build binary using Go cross-compilation
 COPY . ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags "-s -w -X github.com/ldbl/sre/backend/pkg/version.Version=${APP_VERSION} -X github.com/ldbl/sre/backend/pkg/version.Commit=${APP_COMMIT} -X github.com/ldbl/sre/backend/pkg/version.ShortCommit=${APP_COMMIT_SHORT} -X github.com/ldbl/sre/backend/pkg/version.BuildDate=${BUILD_DATE}" \
     -o /out/backend ./cmd/api
 
