@@ -1,0 +1,16 @@
+---
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: backend-staging
+  namespace: flux-system
+  annotations:
+    fluxcd.controlplane.io/reconcileEvery: "5m"
+spec:
+  type: OCIArtifactTag
+  url: oci://ghcr.io/ldbl/backend
+  secretRef:
+    name: ghcr-credentials
+  filter:
+    pattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+    limit: 1
