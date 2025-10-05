@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flux-test
+  labels:
+    managed-by: flux
+    environment: development
