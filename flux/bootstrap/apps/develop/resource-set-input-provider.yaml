@@ -12,5 +12,5 @@ spec:
   secretRef:
     name: ghcr-credentials
   filter:
-    pattern: '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[a-f0-9]+$'
+    includeTag: '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[a-f0-9]+$'
     limit: 1
