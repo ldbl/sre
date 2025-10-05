@@ -9,8 +9,6 @@ metadata:
 spec:
   type: OCIArtifactTag
   url: oci://ghcr.io/ldbl/backend
-  secretRef:
-    name: ghcr-credentials
   filter:
     semver: '>=0.1.0'
     limit: 1

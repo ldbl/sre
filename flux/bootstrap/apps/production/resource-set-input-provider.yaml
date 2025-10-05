@@ -9,8 +9,6 @@ metadata:
 spec:
   type: OCIArtifactTag
   url: oci://ghcr.io/ldbl/backend
-  secretRef:
-    name: ghcr-credentials
   filter:
     includeTag: "production-latest"
     limit: 1
