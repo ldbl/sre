@@ -9,3 +9,11 @@ spec:
   interval: 1m0s
   secretRef:
     name: ghcr-credentials
+  accessFrom:
+    namespaceSelectors:
+      - matchLabels:
+          environment: development
+      - matchLabels:
+          environment: staging
+      - matchLabels:
+          environment: production

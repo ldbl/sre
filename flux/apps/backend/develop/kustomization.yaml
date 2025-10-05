@@ -7,6 +7,7 @@ commonLabels:
 resources:
   - ../base
   - image-policy.yaml
+  - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/backend
     newTag: develop # {"$imagepolicy": "develop:backend:tag"}
