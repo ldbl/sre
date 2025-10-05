@@ -200,7 +200,7 @@ resource "kubernetes_secret" "flux_github_app" {
 
 # Create imagePullSecret for GHCR in each namespace
 resource "kubernetes_secret" "ghcr_credentials" {
-  for_each   = toset(["develop", "staging", "production"])
+  for_each   = toset(["flux-system", "develop", "staging", "production"])
   depends_on = [null_resource.flux_instance]
 
   metadata {
