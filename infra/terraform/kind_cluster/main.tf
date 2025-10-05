@@ -190,9 +190,9 @@ resource "kubernetes_secret" "flux_github_app" {
   }
 
   data = {
-    "app-id"          = var.github_app_id
-    "installation-id" = var.github_app_installation_id
-    "private-key"     = file(var.github_app_private_key_file)
+    "githubAppID"              = var.github_app_id
+    "githubAppInstallationID"  = var.github_app_installation_id
+    "githubAppPrivateKey"      = file(var.github_app_private_key_file)
   }
 
   type = "Opaque"
