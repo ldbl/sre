@@ -59,3 +59,10 @@ variable "github_app_private_key_file" {
   type        = string
   default     = ""
 }
+
+variable "ghcr_token" {
+  description = "GitHub Personal Access Token for pulling images from GitHub Container Registry (GHCR)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

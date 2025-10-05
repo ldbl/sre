@@ -198,6 +198,31 @@ resource "kubernetes_secret" "flux_github_app" {
   type = "Opaque"
 }
 
+# Create imagePullSecret for GHCR in each namespace
+resource "kubernetes_secret" "ghcr_credentials" {
+  for_each   = toset(["develop", "staging", "production"])
+  depends_on = [null_resource.flux_instance]
+
+  metadata {
+    name      = "ghcr-credentials"
+    namespace = each.key
+  }
+
+  type = "kubernetes.io/dockerconfigjson"
+
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "ghcr.io" = {
+          username = "ldbl"
+          password = var.ghcr_token
+          auth     = base64encode("ldbl:${var.ghcr_token}")
+        }
+      }
+    })
+  }
+}
+
 output "flux_operator_installed" {
   description = "Indicates that Flux Operator has been installed"
   value       = helm_release.flux_operator.status == "deployed"
