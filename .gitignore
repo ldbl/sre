@@ -1,0 +1,11 @@
+/bin/
+/node_modules/
+/src/frontend/node_modules/
+/src/backend/bin/
+/.venv/
+/dist/
+__pycache__/
+*.tfstate
+*.tfstate.backup
+terraform.tfstate.d/
+infra/terraform/kind_cluster/kubeconfig.yaml

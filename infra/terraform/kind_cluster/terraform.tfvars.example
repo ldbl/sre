@@ -1,0 +1,47 @@
+# Example Terraform variables
+# Copy this file to terraform.tfvars and uncomment the values you want to use
+
+# ============================================================================
+# Version Configuration
+# ============================================================================
+
+# Version of the Flux Operator Helm chart
+# Check latest: https://github.com/controlplaneio-fluxcd/flux-operator/releases
+# flux_operator_version = "0.30.0"
+
+# Version of Flux to install
+# Use "2.x" for automatic latest 2.x version, or specific version like "v2.7.0"
+# flux_version = "2.x"
+
+# ============================================================================
+# GitHub App Configuration (for Flux authentication)
+# ============================================================================
+
+# GitHub App ID (get from https://github.com/settings/apps)
+# github_app_id = "123456"
+
+# GitHub App Installation ID (get from app installation URL)
+# github_app_installation_id = "12345678"
+
+# Path to GitHub App private key PEM file
+# github_app_private_key_file = "~/.ssh/flux-github-app.pem"
+
+# ============================================================================
+# GitOps Bootstrap Configuration
+# ============================================================================
+
+# Git repository URL to sync with Flux
+# Leave empty to skip GitOps bootstrap
+# flux_git_repository_url = "https://github.com/your-org/your-repo"
+
+# Git branch Flux should track
+# flux_git_repository_branch = "main"
+
+# Path within the Git repository to reconcile (relative to repository root)
+# flux_kustomization_path = "./infra/kubernetes/clusters/sre"
+
+# Interval at which Flux reconciles sources and kustomizations
+# flux_sync_interval = "1m"
+
+# Name for the primary Flux Kustomization resource
+# flux_kustomization_name = "cluster-sync"
