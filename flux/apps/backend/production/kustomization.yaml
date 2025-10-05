@@ -6,6 +6,9 @@ commonLabels:
   environment: production
 resources:
   - ../base
+images:
+  - name: ghcr.io/ldbl/backend
+    newTag: production
 patches:
   - patch: |-
       - op: replace

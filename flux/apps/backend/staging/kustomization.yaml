@@ -6,6 +6,9 @@ commonLabels:
   environment: staging
 resources:
   - ../base
+images:
+  - name: ghcr.io/ldbl/backend
+    newTag: staging
 patches:
   - patch: |-
       - op: replace

@@ -6,6 +6,9 @@ commonLabels:
   environment: develop
 resources:
   - ../base
+images:
+  - name: ghcr.io/ldbl/backend
+    newTag: develop
 patches:
   - patch: |-
       - op: replace
