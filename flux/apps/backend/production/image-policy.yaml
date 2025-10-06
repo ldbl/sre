@@ -9,7 +9,7 @@ spec:
     name: backend
     namespace: flux-system
   filterTags:
-    pattern: '^v\d+\.\d+\.\d+$'
+    pattern: '^v\d+\.\d+\.\d+-[a-f0-9]+$'
   policy:
     semver:
       range: '>=0.0.1'
