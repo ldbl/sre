@@ -21,23 +21,6 @@ spec:
       messageTemplate: |
         Update staging backend image
 
-        Automation name: {{ .AutomationObject }}
-
-        Files:
-        {{ range $filename, $_ := .Changed.Files -}}
-        - {{ $filename }}
-        {{ end -}}
-
-        Objects:
-        {{ range $resource, $_ := .Changed.Objects -}}
-        - {{ $resource.Kind }} {{ $resource.Name }}
-        {{ end -}}
-
-        Images:
-        {{ range .Changed.Images -}}
-        - {{.}} ({{.Policy.Name}})
-        {{ end -}}
-
         [ci skip]
     push:
       branch: main
