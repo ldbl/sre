@@ -1,0 +1,14 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-system-image-automation
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  provider: github
+  ref:
+    branch: main
+  secretRef:
+    name: github-image-automation
+  url: https://github.com/ldbl/sre.git

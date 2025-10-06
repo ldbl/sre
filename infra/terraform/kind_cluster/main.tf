@@ -223,6 +223,24 @@ resource "kubernetes_secret" "ghcr_credentials" {
   }
 }
 
+# Create GitHub token secret for ImageUpdateAutomation
+resource "kubernetes_secret" "github_image_automation" {
+  count      = var.github_token != "" ? 1 : 0
+  depends_on = [null_resource.flux_instance]
+
+  metadata {
+    name      = "github-image-automation"
+    namespace = "flux-system"
+  }
+
+  type = "Opaque"
+
+  data = {
+    username = "git"
+    password = var.github_token
+  }
+}
+
 output "flux_operator_installed" {
   description = "Indicates that Flux Operator has been installed"
   value       = helm_release.flux_operator.status == "deployed"

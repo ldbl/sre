@@ -66,3 +66,10 @@ variable "ghcr_token" {
   default     = ""
   sensitive   = true
 }
+
+variable "github_token" {
+  description = "GitHub Personal Access Token for ImageUpdateAutomation git push operations (requires repo scope)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
