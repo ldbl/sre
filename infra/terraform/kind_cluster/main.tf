@@ -204,7 +204,7 @@ resource "kubernetes_secret" "ghcr_credentials" {
   depends_on = [null_resource.flux_instance]
 
   metadata {
-    name      = "ghcr-credentials"
+    name      = "ghcr-credentials-docker"
     namespace = each.key
   }
 

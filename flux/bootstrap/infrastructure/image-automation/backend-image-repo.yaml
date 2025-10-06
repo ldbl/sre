@@ -8,7 +8,7 @@ spec:
   image: ghcr.io/ldbl/backend
   interval: 1m0s
   secretRef:
-    name: ghcr-credentials
+    name: ghcr-credentials-docker
   accessFrom:
     namespaceSelectors:
       - matchLabels:
