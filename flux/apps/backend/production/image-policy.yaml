@@ -8,8 +8,8 @@ spec:
   imageRepositoryRef:
     name: backend
     namespace: flux-system
-  policy:
-    alphabetical:
-      order: asc
   filterTags:
-    pattern: '^production$'
+    pattern: '^v\d+\.\d+\.\d+$'
+  policy:
+    semver:
+      range: '>=0.0.1'
