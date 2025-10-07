@@ -9,7 +9,7 @@ spec:
     name: backend
     namespace: flux-system
   filterTags:
-    pattern: '^main-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    pattern: '^main-v[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]+-(?P<ts>[0-9]+)$'
     extract: '$ts'
   policy:
     numerical:
