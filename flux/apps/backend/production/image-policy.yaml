@@ -9,7 +9,8 @@ spec:
     name: backend
     namespace: flux-system
   filterTags:
-    pattern: '^v\d+\.\d+\.\d+-[a-f0-9]+$'
+    pattern: '^production-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    extract: '$ts'
   policy:
-    semver:
-      range: '>=0.0.1'
+    numerical:
+      order: asc

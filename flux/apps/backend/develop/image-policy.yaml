@@ -8,8 +8,9 @@ spec:
   imageRepositoryRef:
     name: backend
     namespace: flux-system
-  policy:
-    semver:
-      range: '>=0.0.0-rc'
   filterTags:
-    pattern: '^.*-rc-.*$'
+    pattern: '^develop-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
