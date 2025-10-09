@@ -5,14 +5,14 @@ creation_rules:
   # Development environment secrets
   - path_regex: flux/secrets/develop/.*\.yaml
     encrypted_regex: ^(data|stringData)$
-    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0lfvik474cvzjpn6s4ppwn4
+    age: age160c2nksz88e50qtaywm0qu3x4ms9lxzyt4ym9tv8n803fl979gdsruuy0s
 
   # Staging environment secrets
   - path_regex: flux/secrets/staging/.*\.yaml
     encrypted_regex: ^(data|stringData)$
-    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0lfvik474cvzjpn6s4ppwn4
+    age: age160c2nksz88e50qtaywm0qu3x4ms9lxzyt4ym9tv8n803fl979gdsruuy0s
 
   # Production environment secrets
   - path_regex: flux/secrets/production/.*\.yaml
     encrypted_regex: ^(data|stringData)$
-    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0lfvik474cvzjpn6s4ppwn4
+    age: age160c2nksz88e50qtaywm0qu3x4ms9lxzyt4ym9tv8n803fl979gdsruuy0s

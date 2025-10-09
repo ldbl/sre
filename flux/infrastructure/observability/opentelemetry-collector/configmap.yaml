@@ -1,0 +1,123 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: observability
+data:
+  config.yaml: |
+    receivers:
+      # OTLP receiver for traces, metrics, and logs from applications
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+      # Prometheus receiver to scrape metrics from ServiceMonitors
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'kubernetes-pods'
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: true
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+                  action: replace
+                  target_label: __metrics_path__
+                  regex: (.+)
+                - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $$1:$$2
+                  target_label: __address__
+
+      # Filelog receiver for collecting logs from Kubernetes pods
+      filelog:
+        include:
+          - /var/log/pods/*/*/*.log
+        start_at: beginning
+        include_file_path: true
+        include_file_name: false
+        operators:
+          # Parse JSON logs
+          - type: json_parser
+            id: parser-json
+            if: 'body matches "^{\".*}$"'
+            timestamp:
+              parse_from: attributes.time
+              layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+          # Extract severity
+          - type: severity_parser
+            parse_from: attributes.level
+            if: 'attributes.level != nil'
+          # Add resource attributes
+          - type: add
+            field: resource.service.name
+            value: EXPR(body.service)
+
+    processors:
+      # Batch processor groups data before sending (improves performance)
+      batch:
+        send_batch_size: 1000
+        timeout: 10s
+
+      # Memory limiter prevents OOM by dropping data when memory limit is reached
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 512
+        spike_limit_mib: 128
+
+      # Resource processor adds resource attributes
+      resource:
+        attributes:
+          - key: deployment.environment
+            value: ${DEPLOYMENT_ENVIRONMENT}
+            action: upsert
+          - key: service.namespace
+            value: ${K8S_NAMESPACE}
+            action: upsert
+
+      # Attributes processor for filtering/transforming attributes
+      attributes:
+        actions:
+          - key: uptrace.dsn
+            action: delete  # Don't send DSN in telemetry data
+
+    exporters:
+      # Uptrace exporter (uses OTLP protocol)
+      otlp/uptrace:
+        endpoint: api.uptrace.dev:4317
+        headers:
+          uptrace-dsn: ${UPTRACE_DSN}
+        compression: gzip
+
+      # Debug exporter for troubleshooting (logs to stdout)
+      logging:
+        verbosity: basic
+        sampling_initial: 5
+        sampling_thereafter: 200
+
+    service:
+      pipelines:
+        # Traces pipeline
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource, attributes]
+          exporters: [otlp/uptrace]
+
+        # Metrics pipeline
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, batch, resource]
+          exporters: [otlp/uptrace]
+
+        # Logs pipeline
+        logs:
+          receivers: [otlp, filelog]
+          processors: [memory_limiter, batch, resource, attributes]
+          exporters: [otlp/uptrace]
