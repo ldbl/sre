@@ -1,0 +1,18 @@
+# SOPS configuration for encrypting Kubernetes secrets with age
+# See: https://fluxcd.io/flux/guides/mozilla-sops/
+
+creation_rules:
+  # Development environment secrets
+  - path_regex: flux/secrets/develop/.*\.yaml
+    encrypted_regex: ^(data|stringData)$
+    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0lfvik474cvzjpn6s4ppwn4
+
+  # Staging environment secrets
+  - path_regex: flux/secrets/staging/.*\.yaml
+    encrypted_regex: ^(data|stringData)$
+    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0lfvik474cvzjpn6s4ppwn4
+
+  # Production environment secrets
+  - path_regex: flux/secrets/production/.*\.yaml
+    encrypted_regex: ^(data|stringData)$
+    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0lfvik474cvzjpn6s4ppwn4
