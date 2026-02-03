@@ -33,6 +33,7 @@ provider "kubernetes" {
 
 locals {
   kubeconfig_path = pathexpand("${path.module}/kubeconfig.yaml")
+  flux_pull_secret_yaml = var.github_app_id != "" ? "    pullSecret: \"flux-system\"\n" : ""
 }
 
 resource "kind_cluster" "sre" {
@@ -162,11 +163,10 @@ spec:
     type: kubernetes
   sync:
     kind: GitRepository
-    provider: github
     url: "${var.flux_git_repository_url}"
     ref: "refs/heads/${var.flux_git_repository_branch}"
     path: "${var.flux_kustomization_path}"
-    pullSecret: "flux-system"
+${local.flux_pull_secret_yaml}
 EOF
     EOC
     interpreter = ["/bin/bash", "-c"]
@@ -198,10 +198,19 @@ resource "kubernetes_secret" "flux_github_app" {
   type = "Opaque"
 }
 
+# Bootstrap namespaces early so Terraform can safely create cross-namespace secrets.
+resource "kubernetes_namespace" "bootstrap" {
+  for_each = toset(["develop", "staging", "production", "observability"])
+
+  metadata {
+    name = each.key
+  }
+}
+
 # Create imagePullSecret for GHCR in each namespace
 resource "kubernetes_secret" "ghcr_credentials" {
-  for_each   = toset(["flux-system", "develop", "staging", "production"])
-  depends_on = [null_resource.flux_instance]
+  for_each   = var.ghcr_token != "" ? toset(["flux-system", "develop", "staging", "production"]) : toset([])
+  depends_on = [null_resource.flux_instance, kubernetes_namespace.bootstrap]
 
   metadata {
     name      = "ghcr-credentials-docker"

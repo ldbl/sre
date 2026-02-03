@@ -72,7 +72,7 @@ github_app_private_key_file = "~/.ssh/flux-github-app.pem"
 # GitOps Configuration (already set)
 flux_git_repository_url    = "https://github.com/ldbl/sre.git"
 flux_git_repository_branch = "main"
-flux_kustomization_path    = "./flux/clusters/sre-kind"
+flux_kustomization_path    = "./flux/bootstrap/flux-system"
 ```
 
 The Kubernetes secret will be created automatically by Terraform.
@@ -85,7 +85,7 @@ terraform apply
 
 This will create a FluxInstance with built-in sync configured to:
 - Monitor the `ldbl/sre` repository
-- Sync from `./flux/clusters/sre-kind` path
+- Sync from `./flux/bootstrap/flux-system` path
 - Use GitHub App authentication
 
 ## Configuration Variables
@@ -94,7 +94,7 @@ This will create a FluxInstance with built-in sync configured to:
 |----------|-------------|---------|
 | `flux_git_repository_url` | Git repository URL to sync with Flux | `""` (disabled) |
 | `flux_git_repository_branch` | Git branch Flux should track | `"main"` |
-| `flux_kustomization_path` | Path within the Git repository to reconcile | `"./infra/kubernetes/clusters/sre"` |
+| `flux_kustomization_path` | Path within the Git repository to reconcile | `"./flux/bootstrap/flux-system"` |
 | `flux_sync_interval` | Interval at which Flux reconciles | `"1m"` |
 | `flux_kustomization_name` | Name for the Kustomization resource | `"cluster-sync"` |
 

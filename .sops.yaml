@@ -2,6 +2,11 @@
 # See: https://fluxcd.io/flux/guides/mozilla-sops/
 
 creation_rules:
+  # Observability secrets (shared)
+  - path_regex: flux/secrets/observability/.*\.yaml
+    encrypted_regex: ^(data|stringData)$
+    age: age160c2nksz88e50qtaywm0qu3x4ms9lxzyt4ym9tv8n803fl979gdsruuy0s
+
   # Development environment secrets
   - path_regex: flux/secrets/develop/.*\.yaml
     encrypted_regex: ^(data|stringData)$

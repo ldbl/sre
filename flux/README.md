@@ -7,11 +7,9 @@ This directory contains Flux GitOps manifests for the SRE infrastructure.
 ```
 flux/
 ├── apps/                    # Application deployments
+├── bootstrap/               # Cluster bootstrap (namespaces, kustomizations, infra wiring)
 ├── infrastructure/          # Infrastructure components (monitoring, ingress, etc.)
-└── clusters/               # Cluster-specific configurations
-    └── sre-kind/           # Kind cluster configuration
-        ├── flux-system/    # Flux system resources
-        └── apps.yaml       # Application kustomizations
+└── secrets/                 # SOPS-encrypted secrets (examples/templates)
 ```
 
 ## Flux Reconciliation
@@ -19,7 +17,7 @@ flux/
 The Flux controllers in the `sre-kind` cluster are configured to reconcile from:
 - **Repository:** `git@github.com:ldbl/sre.git`
 - **Branch:** `main`
-- **Path:** `./flux/clusters/sre-kind`
+- **Path:** `./flux/bootstrap/flux-system`
 
 ## How it works
 
@@ -30,7 +28,7 @@ The Flux controllers in the `sre-kind` cluster are configured to reconcile from:
 ## Adding new applications
 
 1. Create manifests in `flux/apps/<app-name>/`
-2. Create a Kustomization in `flux/clusters/sre-kind/` to reference the app
+2. Wire it in via a Kustomization under `flux/bootstrap/apps/<environment>/`
 3. Commit and push changes
 4. Flux will automatically deploy the application
 

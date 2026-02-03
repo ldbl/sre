@@ -38,7 +38,7 @@
 # flux_git_repository_branch = "main"
 
 # Path within the Git repository to reconcile (relative to repository root)
-# flux_kustomization_path = "./infra/kubernetes/clusters/sre"
+# flux_kustomization_path = "./flux/bootstrap/flux-system"
 
 # Interval at which Flux reconciles sources and kustomizations
 # flux_sync_interval = "1m"

@@ -23,7 +23,7 @@ To enable GitOps reconciliation of this repository, set the following environmen
 ```bash
 export TF_VAR_flux_git_repository_url="https://github.com/ldbl/sre.git"
 export TF_VAR_flux_git_repository_branch="main"
-export TF_VAR_flux_kustomization_path="./infra/kubernetes/clusters/sre"
+export TF_VAR_flux_kustomization_path="./flux/bootstrap/flux-system"
 ```
 Terraform will create a `GitRepository` and `Kustomization` in `flux-system` pointing to the specified path. Adjust the URL/path to match your desired GitOps layout.
 
@@ -36,7 +36,7 @@ flux check --context sre-control-plane
 Controllers may take up to a minute to settle in a fresh kind cluster.
 
 ## Apply GitOps Sources
-After Flux components are running, declare GitRepository/Kustomization resources under `infra/kubernetes/` (examples forthcoming) and let Flux reconcile them.
+After Flux components are running, declare GitRepository/Kustomization resources under `flux/` and let Flux reconcile them.
 
 ## Uninstall
 `terraform destroy` tears down the kind cluster and automatically removes both Helm releases, cleaning up the `flux-system` namespace.

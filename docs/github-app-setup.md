@@ -71,7 +71,7 @@ github_app_private_key_file = "~/.ssh/flux-github-app.pem" # Path to downloaded 
 # GitOps Configuration (already configured)
 flux_git_repository_url    = "https://github.com/ldbl/sre.git"
 flux_git_repository_branch = "main"
-flux_kustomization_path    = "./flux/clusters/sre-kind"
+flux_kustomization_path    = "./flux/bootstrap/flux-system"
 ```
 
 **Important:** Terraform will automatically create the Kubernetes secret from these variables.

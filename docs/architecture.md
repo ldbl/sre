@@ -11,8 +11,8 @@
 > Tooling versions for cluster/IaC utilities are pinned in the `Makefile`; run `make versions` to confirm local binaries match expectations.
 
 ## Repository Modules
-- `src/backend/` – Go HTTP API with Podinfo-style health probes, chaos endpoints, Prometheus metrics, and HTML landing page
-- `src/frontend/` – Vue SPA consuming backend APIs and exposing dashboards/forms for demos
+- `backend/` – Go HTTP API with Podinfo-style health probes, chaos endpoints, Prometheus metrics, and HTML landing page
+- `frontend/` – Vue SPA consuming backend APIs and exposing dashboards/forms for demos
 - `infra/terraform/` – Environment workspaces (`environments/dev`, `stage`, `prod`) and reusable modules under `infra/modules`
 - `infra/kubernetes/` – Base manifests plus environment overlays (`base/`, `overlays/dev|stage|prod`), kind-specific config under `kind/`
 - `docs/runbooks/` – Incident guides, SLO playbooks, and testing notes
@@ -24,7 +24,7 @@
 - Chaos engineering knobs: `RANDOM_DELAY_MAX` (milliseconds) and `RANDOM_ERROR_RATE` (0–1) for request delay/error injection
 - Prometheus registry with process/go collectors and request instrumentation for SLO dashboards; OpenAPI 3 spec served at `/openapi` with Swagger UI at `/swagger`
 - Build metadata (SemVer version by default, commit full & short, build timestamp via `build_time`) injected via ldflags and surfaced on `/version`, `/swagger`, and the landing page
-- Container image produced via `src/backend/Dockerfile` (multi-stage, distroless-style Alpine runtime) and `make -C src/backend image`
+- Container image produced via `backend/Dockerfile` (multi-stage, distroless-style Alpine runtime) and `make -C backend image`
 
 ## Delivery Pipeline
 1. **Pre-commit (planned):** format, lint, security scan hooks

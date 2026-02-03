@@ -13,7 +13,7 @@ variable "flux_git_repository_branch" {
 variable "flux_kustomization_path" {
   description = "Path within the Git repository to reconcile (relative to repository root)."
   type        = string
-  default     = "./infra/kubernetes/clusters/sre"
+  default     = "./flux/bootstrap/flux-system"
 }
 
 variable "flux_sync_interval" {

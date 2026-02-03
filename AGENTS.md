@@ -1,8 +1,8 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Treat the repo as the SRE control plane: keep IaC modules in `infra/terraform` and Kubernetes manifests in `infra/kubernetes`, with shared components under `infra/modules`.
-- Place automation code in `src/`; mirror tests in `tests/<component>` and reusable helpers in `scripts/`.
+- Treat the repo as the SRE control plane: keep IaC modules in `infra/terraform` and GitOps manifests in `flux/`.
+- Keep reference services in `backend/` and `frontend/`; mirror tests in `tests/<component>` and reusable helpers in `scripts/`.
 - Maintain living documentation in `docs/` (architecture notes, runbooks) and commit only redacted samples in `config/examples/`; secrets stay in the vault.
 
 ## Build, Test, and Development Commands

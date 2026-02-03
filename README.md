@@ -1,29 +1,43 @@
-# SRE Control Plane
+# SRE Control Plane (Guardrails-First)
 
-This repository contains the SRE/DevOps infrastructure and GitOps configuration. It illustrates infrastructure-as-code, GitOps automation, observability, and security best practices across multiple environments.
+This repository is a production-grade demo control plane plus two reference services. It is designed to teach how to use AI in DevOps / SysOps / SRE **without increasing risk or blast radius**.
+
+The point is not “how to use AI” or “how to prompt”. The point is how to build workflows where AI behaves like a fast, confident junior engineer (low context, no fear) while the surrounding system stays safe.
 
 ## Current Decisions
-- Application repositories: Separate repos for [backend](https://github.com/ldbl/backend) and [frontend](https://github.com/ldbl/frontend)
+- Repository model: Monorepo (this repo contains `backend/`, `frontend/`, and the GitOps control plane under `flux/` and `infra/terraform/`)
 - Local Kubernetes: kind
 - GitOps operator: FluxCD
-- IaC layout: Terraform under `infra/terraform`, Kubernetes manifests under `infra/kubernetes`, shared modules in `infra/modules`
+- IaC layout: Terraform under `infra/terraform`; GitOps manifests under `flux/`
 - Automation: `scripts/` for reusable tooling, `tests/` for infrastructure tests
 
 ## Repository Layout
-- `docs/` – living documentation, runbooks, and course material
-- `infra/` – Terraform, Kubernetes manifests, and shared modules
-- `infra/terraform/kind_cluster/` – Terraform module (tehcyx/kind) defining the multi-node kind cluster
+- `backend/` – Go HTTP API reference service (logging baseline, Prometheus metrics, OpenTelemetry traces, chaos endpoints)
+- `frontend/` – Vue 3 SPA demo UI (dashboard, API explorer, chaos controls, web tracing)
+- `docs/` – living docs + course material
+- `infra/` – Terraform
+- `infra/terraform/kind_cluster/` – Terraform module (tehcyx/kind) defining the local multi-node kind cluster + Flux install
 - `flux/` – FluxCD GitOps configuration
 - `config/` – shared configuration files
 - `tests/` – infrastructure and system test suites
 - `scripts/` – helper scripts, automation wrappers
 
-## Getting Started
+## Quick Start
+1. Hetzner cluster (recommended): follow `docs/hetzner.md`.
+2. Local cluster (optional): follow `docs/local-dev.md` to provision kind via Terraform.
+
+## Local kind (Optional)
 1. Install system prerequisites: Docker (running), `curl`, `tar`, `unzip`.
 2. Install the Kubernetes/IaC CLIs manually (recommended versions): Terraform 1.13.3, kubectl 1.34.1, kind 0.30.0, flux 2.7.0.
 3. Provision the local kind cluster via Terraform (`infra/terraform/kind_cluster`) – this also installs Flux controllers automatically.
 4. Follow `docs/local-dev.md` for extra tips (Terraform workflow, local registry, manual commands) and advanced workflows.
 
-To enable GitOps reconciliation of this repository, set `TF_VAR_flux_git_repository_url` (and optional branch/path variables) before running Terraform. See `docs/gitops/flux.md` for details.
+To enable GitOps reconciliation of this repository, set `TF_VAR_flux_git_repository_url` (and optional branch/path variables) before running Terraform. The default sync path is `./flux/bootstrap/flux-system`. See `docs/gitops/flux.md` for details.
+
+## Where To Start Reading
+- Course overview: `docs/course/README.md`
+- Hetzner cluster: `docs/hetzner.md`
+- Local bootstrap: `docs/local-dev.md`
+- Flux/GitOps: `docs/gitops/flux.md`
 
 Track build-out progress in `PLAN.md`.

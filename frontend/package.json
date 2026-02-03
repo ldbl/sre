@@ -1,0 +1,36 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.206.0",
+    "@opentelemetry/instrumentation": "^0.206.0",
+    "@opentelemetry/instrumentation-document-load": "^0.52.0",
+    "@opentelemetry/instrumentation-fetch": "^0.206.0",
+    "@opentelemetry/instrumentation-user-interaction": "^0.51.0",
+    "@opentelemetry/instrumentation-xml-http-request": "^0.206.0",
+    "@opentelemetry/resources": "^2.1.0",
+    "@opentelemetry/sdk-trace-web": "^2.1.0",
+    "@opentelemetry/semantic-conventions": "^1.37.0",
+    "apexcharts": "^5.3.5",
+    "axios": "^1.12.2",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.22",
+    "vue-router": "^4.5.1",
+    "vue3-apexcharts": "^1.8.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14",
+    "vite": "^7.1.7"
+  }
+}

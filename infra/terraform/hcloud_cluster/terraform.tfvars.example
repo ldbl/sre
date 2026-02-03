@@ -1,0 +1,33 @@
+# Hetzner
+hcloud_token = "REDACTED"
+
+# SSH key used by kube-hetzner to bootstrap nodes
+ssh_public_key = "ssh-ed25519 AAAA... user@host"
+ssh_private_key = <<EOF
+-----BEGIN OPENSSH PRIVATE KEY-----
+REDACTED
+-----END OPENSSH PRIVATE KEY-----
+EOF
+
+# Cluster sizing
+cluster_name              = "sre"
+location                  = "nbg1"
+control_plane_server_type = "cx23"
+agent_server_type         = "cx23"
+load_balancer_type        = "lb11"
+
+# Flux sync
+flux_git_repository_url    = "https://github.com/<owner>/<repo>.git"
+flux_git_repository_branch = "main"
+flux_kustomization_path    = "./flux/bootstrap/flux-system"
+
+# Optional (private repo): token for Flux to read the repo over HTTPS
+# flux_git_token = "REDACTED"
+
+# Optional (private images): GHCR pull secret for workloads
+# ghcr_username = "<github-username>"
+# ghcr_token    = "REDACTED"
+
+# Optional (SOPS): age private key for Flux decryption
+# sops_age_key = "AGE-SECRET-KEY-1..."
+
