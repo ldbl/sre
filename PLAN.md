@@ -1,415 +1,124 @@
-# DevOps & SRE Blueprint Plan
+# SRE Control Plane Plan (Guardrails-First)
 
-## Vision & Outcomes
-- Build a demonstrative SRE/DevOps repository that showcases production-grade practices from local development to GitOps-driven operations.
-- Reuse the repository as the primary artifact for an Udemy course, with clear handoffs to slides, demos, and labs.
+## Core Concept
 
-## Current Status (as of 2025-10-08)
+This is not a beginner DevOps course and not a prompting course.
 
-### ✅ Completed Components
+This repo/course is about using AI in DevOps / SysOps / SRE **without increasing risk or blast radius**. AI is treated like a very fast junior engineer: good with tooling, low context, confident, and indifferent to prod vs dev.
 
-#### 1. Foundation & Tooling ✅
-- ✅ Repository structure defined (`docs/`, `infra/`, `flux/`, `scripts/`, `tests/`, `config/`)
-- ✅ Makefile with version pinning and helper targets
-- ✅ KIND cluster provisioning via Terraform
-- ⚠️ Docker Compose for local dev (pending)
-- ⚠️ Dev container configuration (pending)
+The goal is to build workflows where AI is a reviewer/simulator/second brain, not an executor.
 
-#### 2. Reference Applications
-- ✅ Go HTTP API backend with comprehensive endpoints:
-  - Health probes: `/healthz`, `/readyz`, `/livez`
-  - Chaos engineering: `/panic`, `/delay/{seconds}`, `/status/{code}`, random error injection
-  - Observability: `/metrics` (Prometheus), `/version`, `/env`, `/headers`
-  - Documentation: `/swagger`, `/openapi`
-- ✅ Graceful shutdown implementation
-- ✅ Prometheus metrics instrumentation
-- ⚠️ Frontend application (Vue 3 SPA - pending)
-- ⚠️ Python worker service (pending)
+## Repo Goals
 
-#### 3. Containerization Best Practices ✅
-- ✅ Multi-stage Dockerfile with BuildKit syntax
-- ✅ Security: non-root user, minimal Alpine base
-- ✅ Build argument injection for versioning
-- ✅ Multi-platform builds (linux/amd64, linux/arm64)
-- ✅ Image tagging strategy: `{branch}-{version}-{sha}-{timestamp}`
-- ⚠️ SBOM generation (pending)
-- ⚠️ Vulnerability scanning integration (pending)
+- Provide a realistic, production-ish demo repo with `backend/`, `frontend/`, Terraform, Flux GitOps, and observability.
+- Teach guardrails-first workflows: environment separation, plan-before-apply, context checks, blast radius control, rollback-first.
+- Keep everything evergreen and workflow-oriented (not tool-hype or tool-churn).
 
-#### 4. Kubernetes Deployment Patterns ✅
-- ✅ Kustomize base + overlays for dev/staging/production
-- ✅ Environment-specific patches for:
-  - Replicas scaling
-  - Resource requests/limits
-  - Ingress hostnames
-- ✅ Namespace isolation per environment
-- ⚠️ Policy enforcement (OPA/Kyverno - pending)
-- ⚠️ Progressive delivery (Flagger canary - pending)
+## End-to-End Scope (What We Must Demonstrate)
 
-#### 5. CI/CD & GitOps Integration ✅
-- ✅ GitHub Actions workflows:
-  - `build-develop.yml` - Auto-build from develop branch
-  - `build-staging.yml` - Auto-build from main branch
-  - `promote-production.yml` - Manual production promotion with version bumping
-- ✅ FluxCD GitOps setup:
-  - ImageRepository for container registry scanning
-  - ImagePolicy per environment with tag filtering
-  - ImageUpdateAutomation for automatic deployments
-- ✅ Automated image updates to Kustomization manifests
-- ⚠️ Rollback playbooks (pending)
-- ⚠️ DR drills (pending)
+1. IaC / Terraform (cluster provisioning + best practices): remote state, locking, plan/apply split, least privilege, predictable outputs.
+2. Kubernetes deploy best practices: namespaces per env, safe rollouts, resource limits, health probes, ingress, RBAC, config separation.
+3. Microservices for Kubernetes best practices: containerization, health endpoints, graceful shutdown, structured logs, metrics, traces.
+4. Observability: Prometheus metrics, central logging, Uptrace tracing (or equivalent), plus a realistic “debug the incident” workflow.
+5. Versions & releases: traceability from commit → image tag → deployment; promotion to production with approvals and audit trail.
+6. Agent Skills (agentskills.io): package repeatable, auditable AI workflows as skills (review-only, checklists, generators).
+7. AI-assisted GitOps/DevOps: a cluster service that reviews state and reports (read-only), reacts to events/questions, and reduces toil safely.
+8. Anti-patterns: show what not to do (unsafe automation, wrong context, correlated changes) and how guardrails prevent incidents.
 
-#### 6. Observability Stack
-- ✅ Backend instrumented with Prometheus metrics
-- ✅ OpenTelemetry-ready architecture
-- ⚠️ Prometheus deployment (pending)
-- ⚠️ Grafana dashboards (pending)
-- ⚠️ Loki log aggregation (pending)
-- ⚠️ Alertmanager (pending)
-- ⚠️ Distributed tracing (pending)
-- ⚠️ SLO dashboards (pending)
+## Platform Decisions (As Of 2026-02-03)
 
-#### 7. Testing & Quality Gates
-- ⚠️ Unit tests (pending)
-- ⚠️ Integration tests (pending)
-- ⚠️ E2E tests (pending)
-- ⚠️ Pre-commit hooks (pending)
-- ⚠️ Coverage reporting (pending)
+- Primary runtime: Hetzner Cloud Kubernetes (k3s via `kube-hetzner`).
+- Cluster topology: 1x `cx23` control-plane + 1x `cx23` worker.
+- Environments: single cluster with namespaces `develop`, `staging`, `production`.
+- GitOps: Flux (deploy is pull-based; CI builds/pushes images).
+- IaC: Terraform.
+- Terraform remote state: Cloudflare R2 (S3 backend + `use_lockfile`).
+- CI: GitHub Actions.
+- Local option: kind (kept for fast feedback, but not the main path).
 
-#### 8. Security & Compliance
-- ✅ GitHub Container Registry with access control
-- ⚠️ Secrets management (External Secrets / Sealed Secrets - pending)
-- ⚠️ Image signing (Cosign - pending)
-- ⚠️ SBOM generation (Syft - pending)
-- ⚠️ Vulnerability scanning (Trivy/Grype - pending)
-- ⚠️ Network Policies (pending)
-- ⚠️ Pod Security Standards (pending)
+## Current Status (As Of 2026-02-03)
 
-#### 9. Course Enablement ✅
-- ✅ Course structure created in `docs/course/`
-- ✅ 17 chapters defined with clear objectives
-- ✅ Learning path recommendations
-- ⚠️ Lab instructions per chapter (pending)
-- ⚠️ Knowledge checks/quizzes (pending)
-- ⚠️ Demo scripts (pending)
-- ⚠️ Slide deck content (pending)
+Completed:
+- Monorepo structure under `sre/` (single git repo).
+- Reference services: `backend/` (metrics/tracing/chaos endpoints) and `frontend/` (demo UI + web tracing).
+- Flux manifests for apps + environments under `flux/`.
+- GitHub Actions for backend/frontend build and push.
+- Terraform skeleton for Hetzner under `infra/terraform/hcloud_cluster/` with R2 backend.
+- Terraform GitHub Actions workflows: plan (PR) and manual apply/destroy.
 
----
+Pending / Needs hardening:
+- Decide Flux auth model for repo sync (public repo vs private repo token vs GitHub App).
+- Ingress controller strategy for Hetzner and DNS/TLS story (currently Ingress hosts default to `*.local`).
+- Secrets workflow finalization (SOPS/age key management + when to wire `flux/secrets/**`).
+- Observability stack end-to-end (Prometheus/Grafana/Loki/traces) as a cohesive demo with runbooks.
 
-## Udemy Course Structure (35-45 hours)
+## Milestones
 
-### Part 1: Foundations (8-11 hours)
+### Milestone 1: Hetzner Bootstrap (MVP)
 
-#### Chapter 1: Introduction to DevOps & SRE (1-1.5h)
-**Status:** 📝 Content needed
-- DevOps vs SRE principles
-- Course overview and prerequisites
-- Repository walkthrough
-- **Lab:** Environment setup and verification
+Definition of done:
+- `Terraform - Apply (Hetzner)` creates cluster reliably and produces kubeconfig.
+- Flux installed and syncing `./flux/bootstrap/flux-system`.
+- Namespaces exist and app deployments reconcile via Flux.
+- A simple ingress path works (even if Host-header based), so demos are reachable.
 
-#### Chapter 2: Containerization Best Practices (2-3h)
-**Status:** ✅ Reference implementation available
-- Multi-stage Docker builds
-- Security hardening (non-root, minimal images)
-- Build optimization and caching
-- Multi-platform builds
-- **Labs:**
-  - Build backend with multi-stage Dockerfile
-  - Analyze image layers and size optimization
-  - Implement security best practices
+### Milestone 2: Lesson 01 (Guardrails Story)
 
-#### Chapter 3: Kubernetes Fundamentals (3-4h)
-**Status:** ✅ Reference implementation available
-- Pods, Deployments, Services, Ingress
-- ConfigMaps and Secrets
-- Health probes (liveness, readiness, startup)
-- Resource management
-- **Labs:**
-  - Deploy backend to KIND cluster
-  - Configure health probes
-  - Expose service via Ingress
-  - Test rolling updates
+Definition of done:
+- One incident-style lesson demonstrating “AI breaks more than one thing at a time”.
+- Demo includes a failure path and a safe path.
+- Repo artifacts: scripts/commands, expected outputs, and a checklist students follow.
 
-#### Chapter 4: Infrastructure as Code with Terraform (2-3h)
-**Status:** ✅ Reference implementation available
-- Terraform basics and state management
-- KIND cluster provisioning
-- Flux installation automation
-- **Labs:**
-  - Provision KIND cluster with Terraform
-  - Bootstrap Flux via Terraform
-  - Manage cluster lifecycle
+### Milestone 3: Guardrails Library (Reusable)
 
-### Part 2: GitOps & CI/CD (7-10 hours)
+Definition of done:
+- Guard scripts that enforce:
+- plan/apply split
+- context checks (cluster/namespace/environment)
+- diff-only workflows
+- locking/concurrency limits
+- read-only AI access patterns
+- Each guardrail is demonstrated in a lab and backed by a test or a deterministic check.
 
-#### Chapter 5: GitOps with FluxCD (3-4h)
-**Status:** ✅ Reference implementation available
-- GitOps principles and benefits
-- Flux architecture and components
-- Image automation workflow
-- Multi-environment management
-- **Labs:**
-  - Install Flux controllers
-  - Configure GitRepository and Kustomization
-  - Setup ImagePolicy and ImageUpdateAutomation
-  - Verify automatic deployments
+### Milestone 4: Observability Demos (Pain-Driven)
 
-#### Chapter 6: CI/CD Pipeline Design (3-4h)
-**Status:** ✅ Reference implementation available
-- GitHub Actions fundamentals
-- Docker image tagging strategies
-- Build workflows for multiple environments
-- Promotion and versioning workflows
-- **Labs:**
-  - Create build workflow for develop branch
-  - Create staging build workflow
-  - Implement production promotion workflow
-  - Test full CI/CD pipeline
+Definition of done:
+- Metrics: dashboards + a handful of meaningful alerts.
+- Logs: a central pipeline with a realistic query workflow.
+- Traces: end-to-end trace from frontend → backend.
+- Each has a “false sense of safety” anti-pattern example and a “safe workflow” example.
 
-#### Chapter 7: Configuration Management with Kustomize (2-3h)
-**Status:** ✅ Reference implementation available
-- Kustomize vs Helm
-- Base and overlay pattern
-- Patches and transformations
-- Environment-specific configs
-- **Labs:**
-  - Create Kustomize base manifests
-  - Build environment overlays
-  - Apply patches for resources and ingress
-  - Validate with kustomize build
+### Milestone 5: Promotion & Versioning (Last)
 
-### Part 3: Observability (9-13 hours)
+Definition of done:
+- Clear promotion path to production (manual gate).
+- Optional: Flux ImageUpdateAutomation Git write-back with separate credentials (least privilege).
+- Releases/versioning added only after guardrails are in place.
 
-#### Chapter 8: Observability - Metrics (3-4h)
-**Status:** ⚠️ Backend instrumented, deployment needed
-- Prometheus architecture and data model
-- Service instrumentation patterns
-- PromQL query language
-- Grafana dashboard creation
-- **Labs:**
-  - Deploy Prometheus Operator
-  - Configure ServiceMonitor
-  - Write PromQL queries
-  - Build Grafana dashboards
+## Priority Backlog (Next 1-2 Weeks)
 
-#### Chapter 9: Observability - Logging (2-3h)
-**Status:** 📝 Implementation needed
-- Centralized logging architecture
-- Loki deployment and configuration
-- Log aggregation from Kubernetes
-- LogQL query language
-- **Labs:**
-  - Deploy Loki stack
-  - Configure Promtail for log collection
-  - Query logs with LogQL
-  - Create log-based alerts
+1. Make Hetzner workflow truly runnable end-to-end (credentials checklist + apply + Flux sync verification).
+2. Add ingress-nginx (or confirm `kube-hetzner` provisions it) and document access method.
+3. Choose and document Flux Git auth model (public repo recommended for training).
+4. Write Lesson 01 as markdown under `docs/course/` and implement the demo commands/scripts.
+5. Add safety-focused “golden paths”:
+6. Terraform: `plan` output review checklist.
+7. Kubernetes: context/namespace checks before any change.
+8. CI/CD: concurrency controls and change batching guidance.
 
-#### Chapter 10: Observability - Tracing (2-3h)
-**Status:** ⚠️ OpenTelemetry-ready, collector needed
-- Distributed tracing concepts
-- OpenTelemetry instrumentation
-- Trace collection and storage
-- Trace analysis and debugging
-- **Labs:**
-  - Deploy OpenTelemetry Collector
-  - Instrument backend with OTEL SDK
-  - Visualize traces (Jaeger/Tempo)
-  - Debug request flow issues
+## Suggested Implementation Order (So It Lands Cleanly)
 
-#### Chapter 11: Alerting & Incident Response (2-3h)
-**Status:** 📝 Implementation needed
-- Alertmanager configuration
-- Alert routing and silencing
-- SLIs, SLOs, and error budgets
-- Runbook creation
-- **Labs:**
-  - Configure Alertmanager
-  - Create alert rules
-  - Setup alert routing
-  - Write incident runbooks
-
-### Part 4: Security & Quality (5-7 hours)
-
-#### Chapter 12: Security Best Practices (3-4h)
-**Status:** 📝 Implementation needed
-- Secrets management (External Secrets / Sealed Secrets)
-- Image scanning and vulnerability management
-- SBOM generation and attestation
-- Image signing with Cosign
-- Pod Security Standards
-- Network Policies
-- **Labs:**
-  - Deploy External Secrets Operator
-  - Scan images with Trivy
-  - Generate SBOM with Syft
-  - Sign images with Cosign
-  - Apply Pod Security Standards
-  - Create Network Policies
-
-#### Chapter 13: Testing & Quality Gates (2-3h)
-**Status:** 📝 Implementation needed
-- Unit testing strategies
-- Integration testing with test containers
-- E2E testing in Kubernetes
-- Pre-commit hooks and linting
-- Coverage reporting
-- **Labs:**
-  - Write unit tests for backend
-  - Create integration test suite
-  - Implement E2E tests
-  - Configure pre-commit hooks
-  - Generate coverage reports
-
-### Part 5: Advanced Topics (6-8 hours)
-
-#### Chapter 14: Advanced Deployment Strategies (2-3h)
-**Status:** 📝 Implementation needed
-- Canary deployments with Flagger
-- Blue/Green deployment patterns
-- Progressive delivery
-- Automated rollback
-- **Labs:**
-  - Deploy Flagger
-  - Configure canary deployment
-  - Test progressive rollout
-  - Trigger automated rollback
-
-#### Chapter 15: Disaster Recovery & Backup (2h)
-**Status:** 📝 Implementation needed
-- Backup strategies for Kubernetes
-- Velero setup and configuration
-- DR testing procedures
-- **Labs:**
-  - Install Velero
-  - Backup cluster resources
-  - Simulate disaster scenario
-  - Restore from backup
-
-#### Chapter 16: Production Readiness & Best Practices (2h)
-**Status:** 📝 Content needed
-- Production readiness checklist
-- Cost optimization strategies
-- Performance tuning
-- Capacity planning
-- On-call procedures
-- **Labs:**
-  - Conduct production readiness review
-  - Implement cost optimization
-  - Perform load testing
-
-### Part 6: Capstone Project (3-4 hours)
-
-#### Chapter 17: Final Project (3-4h)
-**Status:** 📝 Design needed
-- Deploy complete production-grade stack
-- Configure full observability
-- Implement all security controls
-- Run chaos experiments
-- Simulate and recover from incidents
-- **Labs:**
-  - Build complete platform from scratch
-  - Deploy all components
-  - Configure monitoring and alerting
-  - Run disaster recovery drill
-  - Document architecture
-
----
-
-## Milestones & Deliverables
-
-### ✅ Milestone 1: Foundation Complete
-- [x] Repository structure
-- [x] Makefile and tooling
-- [x] Backend service implementation
-- [x] Basic documentation
-
-### ⚠️ Milestone 2: Core Platform (In Progress)
-- [x] Containerization pipeline
-- [x] CI/CD workflows
-- [x] Kubernetes manifests
-- [x] FluxCD GitOps
-- [ ] Observability stack deployment
-- [ ] Testing infrastructure
-
-### 📝 Milestone 3: Security & Reliability (Planned)
-- [ ] Secrets management
-- [ ] Image scanning and signing
-- [ ] Backup and DR procedures
-- [ ] Advanced deployment patterns
-- [ ] Policy enforcement
-
-### 📝 Milestone 4: Course Materials (Planned)
-- [x] Course structure
-- [ ] Lab instructions (17 chapters)
-- [ ] Demo scripts
-- [ ] Knowledge checks/quizzes
-- [ ] Final polish and review
-
----
-
-## Priority Backlog
-
-### High Priority (Week 1-2)
-1. Deploy Prometheus + Grafana stack
-2. Create first 3 chapter lab instructions
-3. Implement basic unit tests for backend
-4. Add Trivy scanning to CI/CD pipeline
-
-### Medium Priority (Week 3-4)
-5. Deploy Loki logging stack
-6. Implement External Secrets Operator
-7. Create remaining lab instructions (chapters 4-8)
-8. Add pre-commit hooks and linting
-
-### Lower Priority (Week 5-6)
-9. OpenTelemetry Collector and tracing
-10. Flagger for canary deployments
-11. Velero backup solution
-12. Frontend application (Vue 3)
-13. Complete all lab instructions and quizzes
-
----
-
-## Technical Stack Decisions
-
-### Confirmed ✅
-- **Kubernetes:** KIND (local), concepts apply to EKS/GKE/AKS
-- **GitOps:** FluxCD
-- **IaC:** Terraform
-- **Config Management:** Kustomize
-- **CI/CD:** GitHub Actions
-- **Container Registry:** GitHub Container Registry (GHCR)
-- **Backend Language:** Go 1.23
-- **Metrics:** Prometheus + Grafana
-- **Logs:** Loki + Promtail
-
-### To Decide 📝
-- **Tracing Backend:** Jaeger vs Tempo
-- **Secrets:** External Secrets Operator vs Sealed Secrets
-- **Frontend:** Vue 3 (confirmed in architecture.md, needs implementation)
-- **Cloud Provider:** AWS examples vs multi-cloud
-- **Python Worker:** Celery vs custom implementation
-
----
-
-## Next Immediate Actions
-
-1. ✅ Create course structure in `docs/course/`
-2. Update PLAN.md with current status (this document)
-3. Deploy observability stack (Prometheus, Grafana, Loki)
-4. Write lab instructions for Chapters 1-3
-5. Implement unit tests for backend
-6. Add Trivy scanning to GitHub Actions
-7. Deploy External Secrets Operator
-8. Create demo scripts for each chapter
-
----
+1. IaC: finish `infra/terraform/hcloud_cluster/` + workflows, then make Flux reconcile successfully.
+2. Kubernetes: make `flux/` deploy backend+frontend reliably to `develop` first, then stage/prod.
+3. Services: tighten `backend/` and `frontend/` as “reference implementations” (logging/metrics/tracing knobs).
+4. Observability: ship dashboards + a small number of actionable alerts + a single tracing story.
+5. Release/promotion: add versioning and promotion only after guardrails exist (avoid early “automation without rollback”).
+6. Agent skills: add a `skills/` directory with SKILL.md modules for safe review/checklist/report workflows.
+7. AI-assisted GitOps service: add a read-only “advisor” that produces reports, never executes changes.
 
 ## Success Metrics
 
-- [ ] All 17 chapters have complete lab instructions
-- [ ] All core infrastructure components deployed and documented
-- [ ] Full observability stack operational
-- [ ] Security scanning integrated into CI/CD
-- [ ] At least 80% test coverage on backend
-- [ ] All labs tested end-to-end
-- [ ] Course ready for student enrollment
+- Students can use AI to propose changes, but the workflow prevents unsafe execution by default.
+- Students can demonstrate safe promotion and safe rollback.
+- Students can explain correlated failures and how guardrails reduce blast radius.
+- The demo repo can be spun up from scratch in < 60 minutes with predictable results.
