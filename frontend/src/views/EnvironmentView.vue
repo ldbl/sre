@@ -6,6 +6,11 @@ import { api } from '../services/api'
 const backendStore = useBackendStore()
 const headers = ref(null)
 const loading = ref(true)
+const frontendConfig = {
+  apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  mode: import.meta.env.MODE,
+  baseUrl: import.meta.env.BASE_URL,
+}
 
 onMounted(async () => {
   try {
@@ -75,19 +80,19 @@ onMounted(async () => {
           <div class="flex gap-4 py-2 border-b border-slate-700">
             <span class="text-slate-400 font-mono text-sm w-1/3">API Base URL</span>
             <span class="text-white font-mono text-sm flex-1">
-              {{ import.meta.env.VITE_API_URL || 'http://localhost:8080' }}
+              {{ frontendConfig.apiBaseUrl }}
             </span>
           </div>
           <div class="flex gap-4 py-2 border-b border-slate-700">
             <span class="text-slate-400 font-mono text-sm w-1/3">Mode</span>
             <span class="text-white font-mono text-sm flex-1">
-              {{ import.meta.env.MODE }}
+              {{ frontendConfig.mode }}
             </span>
           </div>
           <div class="flex gap-4 py-2">
             <span class="text-slate-400 font-mono text-sm w-1/3">Base URL</span>
             <span class="text-white font-mono text-sm flex-1">
-              {{ import.meta.env.BASE_URL }}
+              {{ frontendConfig.baseUrl }}
             </span>
           </div>
         </div>
