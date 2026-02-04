@@ -29,7 +29,7 @@ func Init(ctx context.Context) func() {
 	)
 
 	// Set additional resource attributes
-	res, err := resource.New(ctx,
+	_, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName(serviceName),
 			semconv.ServiceVersion(serviceVersion),
