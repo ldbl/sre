@@ -4,12 +4,12 @@ Vue 3 single-page application for monitoring and controlling the backend API.
 
 ## Features
 
-- 📊 **Real-time Dashboard** - Health status, metrics, and version info
-- 💥 **Chaos Engineering** - Control probes, inject delays, trigger failures
-- 🔍 **API Explorer** - Interactive endpoint testing
-- ⚙️ **Environment Viewer** - Runtime configuration and headers
-- 🎨 **Modern UI** - Tailwind CSS with dark theme
-- 📈 **Live Metrics** - Auto-refreshing every 5 seconds
+- Real-time dashboard: health status, metrics, version info
+- Chaos controls: toggle probes, inject delays, trigger failures
+- API explorer for endpoint testing
+- Environment viewer (runtime config + headers)
+- Tailwind-based UI
+- Live metrics refresh
 
 ## Tech Stack
 
@@ -40,10 +40,11 @@ npm run preview
 
 ## Environment Variables
 
-Create `.env` file:
+Create a `.env` file for local dev:
 
 ```env
 VITE_API_URL=http://localhost:8080
+VITE_OTEL_COLLECTOR_URL=http://localhost:4318/v1/traces
 ```
 
 ## Docker Build
@@ -64,9 +65,7 @@ docker run -p 8080:8080 \
 Manifests are located in `flux/apps/frontend/`:
 
 - `base/` - Common resources (deployment, service, ingress)
-- `overlays/develop/` - Development environment
-- `overlays/staging/` - Staging environment
-- `overlays/production/` - Production environment
+- `overlays/develop/` - Development environment (current)
 
 Deploy with Flux CD or kubectl:
 
@@ -82,11 +81,12 @@ kubectl -n frontend get ingress
 
 ## CI/CD
 
-GitHub Actions workflows:
+GitHub Actions workflows (monorepo):
 
-- `.github/workflows/build-develop.yml` - Auto-build from develop branch
+- `frontend-build-develop.yml` (develop)
+- `frontend-build-staging.yml` (main)
+- `frontend-promote-production.yml` (manual promotion)
 - Multi-platform builds (amd64, arm64)
-- Trivy security scanning
 - Push to GitHub Container Registry
 
 ## Architecture
@@ -108,11 +108,18 @@ Kubernetes Services
 - **API Explorer** (`/api-explorer`) - Interactive endpoint testing
 - **Environment** (`/environment`) - Runtime configuration
 
+## Backend Endpoints Used
+
+- Dashboard: `GET /healthz`, `GET /readyz`, `GET /livez`, `GET /metrics`, `GET /version`
+- Chaos: `PUT /readyz/enable|disable`, `PUT /livez/enable|disable`, `GET /delay/{seconds}`, `GET /status/{code}`, `GET /panic`
+- API Explorer: any backend endpoint (user-selected)
+- Environment: `GET /env`, `GET /headers`
+
 ## Production Build
 
 The production build uses a multi-stage Dockerfile:
 
-1. **Builder stage:** npm install + build with Vite
+1. **Builder stage:** npm install (dev deps) + build with Vite
 2. **Runtime stage:** nginx serving static files
 
 Features:
@@ -121,9 +128,8 @@ Features:
 - Security headers
 - Gzip compression
 - Health check endpoint (`/health`)
-- Runtime environment injection
+- Runtime environment injection via `config.js`
 
 ## License
 
 Part of the SRE DevOps blueprint for Udemy course.
-
