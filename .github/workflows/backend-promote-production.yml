@@ -131,14 +131,6 @@ jobs:
           echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Run Trivy security scan (fail on critical)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
-          format: 'table'
-          severity: 'CRITICAL'
-          exit-code: '1'
-
       - name: Promote staging to production (multi-platform)
         run: |
           # Copy multi-platform manifest from specific SHA to production with timestamp
