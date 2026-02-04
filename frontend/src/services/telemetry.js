@@ -1,7 +1,7 @@
 import { WebTracerProvider } from '@opentelemetry/sdk-trace-web'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { trace } from '@opentelemetry/api'
-import { Resource } from '@opentelemetry/resources'
+import { resourceFromAttributes } from '@opentelemetry/resources'
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION, ATTR_DEPLOYMENT_ENVIRONMENT } from '@opentelemetry/semantic-conventions'
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-web'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
@@ -32,7 +32,7 @@ export function initTelemetry() {
   })
 
   // Create resource with service metadata
-  const resource = new Resource({
+  const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: config.serviceName,
     [ATTR_SERVICE_VERSION]: config.serviceVersion,
     [ATTR_DEPLOYMENT_ENVIRONMENT]: config.environment,
