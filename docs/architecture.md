@@ -2,7 +2,7 @@
 
 ## Technical Stack Decisions
 - **Frontend:** Vue 3 SPA (Vite toolchain) communicating with backend via REST/JSON
-- **Backend:** Go 1.23 HTTP API providing health checks, metrics, and business endpoints
+- **Backend:** Go 1.24 HTTP API providing health checks, metrics, and business endpoints
 - **Kubernetes Distribution:** kind for local development; managed Kubernetes (TBD) for stage/prod scenarios
 - **GitOps Operator:** FluxCD for reconciliation, image automation, and policy enforcement
 - **Infrastructure as Code:** Terraform for cloud resources, Kubernetes manifests via Kustomize overlays

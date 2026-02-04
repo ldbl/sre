@@ -36,6 +36,7 @@ To enable GitOps reconciliation of this repository, set `TF_VAR_flux_git_reposit
 
 ## Where To Start Reading
 - Course overview: `docs/course/README.md`
+- AI guardrails: `docs/ai-code-of-conduct.md`
 - Hetzner cluster: `docs/hetzner.md`
 - Local bootstrap: `docs/local-dev.md`
 - Flux/GitOps: `docs/gitops/flux.md`

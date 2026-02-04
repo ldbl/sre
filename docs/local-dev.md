@@ -11,7 +11,7 @@ Use Terraform to provision a local multi-node kind cluster. Terraform manages li
 ## Prerequisites
 - Docker Engine running with adequate CPU/RAM for at least three nodes
 - `curl`, `tar`, and `unzip` available on your workstation
-- Go 1.23+ and Node.js 20+ with npm for backend/frontend development
+- Go 1.24+ and Node.js 20+ with npm for backend/frontend development
 - `make` (GNU make recommended)
 - Terraform 1.3+ and `kubectl`
 
