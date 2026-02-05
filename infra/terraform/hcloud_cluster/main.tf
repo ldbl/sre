@@ -91,6 +91,12 @@ resource "kubernetes_namespace" "bootstrap" {
   }
 
   depends_on = [local_sensitive_file.kubeconfig]
+
+  lifecycle {
+    ignore_changes = [
+      metadata[0].labels,
+    ]
+  }
 }
 
 # Optional: credentials for syncing a private Git repository over HTTPS.

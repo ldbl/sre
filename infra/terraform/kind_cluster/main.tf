@@ -224,6 +224,12 @@ resource "kubernetes_namespace" "bootstrap" {
   }
 
   depends_on = [time_sleep.wait_for_cluster]
+
+  lifecycle {
+    ignore_changes = [
+      metadata[0].labels,
+    ]
+  }
 }
 
 # Create imagePullSecret for GHCR in each namespace

@@ -76,7 +76,7 @@ variable "ghcr_username" {
 variable "enable_ghcr" {
   description = "Whether to create GHCR imagePullSecrets (must be true when ghcr_token is set)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "github_token" {
