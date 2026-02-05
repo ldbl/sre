@@ -67,6 +67,18 @@ variable "ghcr_token" {
   sensitive   = true
 }
 
+variable "ghcr_username" {
+  description = "GitHub username for authenticating to GHCR (used for pull secrets and Helm OCI auth)."
+  type        = string
+  default     = ""
+}
+
+variable "enable_ghcr" {
+  description = "Whether to create GHCR imagePullSecrets (must be true when ghcr_token is set)."
+  type        = bool
+  default     = false
+}
+
 variable "github_token" {
   description = "GitHub Personal Access Token for ImageUpdateAutomation git push operations (requires repo scope)."
   type        = string

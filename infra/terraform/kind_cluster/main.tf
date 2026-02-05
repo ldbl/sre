@@ -106,32 +106,48 @@ resource "null_resource" "merge_kubeconfig" {
   }
 }
 
+resource "time_sleep" "wait_for_cluster" {
+  depends_on      = [null_resource.merge_kubeconfig]
+  create_duration = "30s"
+}
+
 output "kubeconfig" {
   description = "Path to the generated kubeconfig for the kind cluster"
   value       = local.kubeconfig_path
 }
 
-resource "helm_release" "flux_operator" {
-  depends_on = [null_resource.merge_kubeconfig]
+output "kubeconfig_load_instructions" {
+  description = "How to use the generated kubeconfig"
+  value = <<-EOT
+    export KUBECONFIG="${local.kubeconfig_path}"
+    kubectl get nodes
+    # Optional: merge into your default kubeconfig
+    ${path.module}/scripts/merge-kubeconfig.sh "${local.kubeconfig_path}"
+    kubectl config use-context kind-sre
+  EOT
+}
 
-  name             = "flux-operator"
-  repository       = "oci://ghcr.io/controlplaneio-fluxcd/charts"
-  chart            = "flux-operator"
-  version          = var.flux_operator_version
-  namespace        = "flux-system"
-  create_namespace = true
-  wait             = true
-  timeout          = 300
+resource "null_resource" "flux_operator_install" {
+  depends_on = [time_sleep.wait_for_cluster]
 
-  set {
-    name  = "installCRDs"
-    value = "true"
+  triggers = {
+    kubeconfig_path = local.kubeconfig_path
+    repo_url        = var.flux_git_repository_url
+    repo_branch     = var.flux_git_repository_branch
+    repo_path       = var.flux_kustomization_path
+    provider        = "github"
+  }
+
+  provisioner "local-exec" {
+    when        = create
+    interpreter = ["/bin/bash", "-c"]
+    command     = "kubectl --kubeconfig=\"${local.kubeconfig_path}\" apply -f https://github.com/controlplaneio-fluxcd/flux-operator/releases/latest/download/install.yaml"
   }
 }
 
 resource "null_resource" "flux_instance" {
   depends_on = [
-    helm_release.flux_operator,
+    null_resource.flux_operator_install,
     kubernetes_secret.flux_github_app
   ]
 
@@ -165,6 +181,7 @@ spec:
     kind: GitRepository
     url: "${var.flux_git_repository_url}"
     ref: "refs/heads/${var.flux_git_repository_branch}"
+    provider: github
     path: "${var.flux_kustomization_path}"
 ${local.flux_pull_secret_yaml}
 EOF
@@ -182,7 +199,7 @@ EOF
 # Create GitHub App secret for Flux authentication
 resource "kubernetes_secret" "flux_github_app" {
   count      = var.github_app_id != "" ? 1 : 0
-  depends_on = [helm_release.flux_operator]
+  depends_on = [null_resource.flux_operator_install]
 
   metadata {
     name      = "flux-system"
@@ -205,11 +222,13 @@ resource "kubernetes_namespace" "bootstrap" {
   metadata {
     name = each.key
   }
+
+  depends_on = [time_sleep.wait_for_cluster]
 }
 
 # Create imagePullSecret for GHCR in each namespace
 resource "kubernetes_secret" "ghcr_credentials" {
-  for_each   = var.ghcr_token != "" ? toset(["flux-system", "develop", "staging", "production"]) : toset([])
+  for_each   = var.enable_ghcr ? toset(["flux-system", "develop", "staging", "production"]) : toset([])
   depends_on = [null_resource.flux_instance, kubernetes_namespace.bootstrap]
 
   metadata {
@@ -223,9 +242,9 @@ resource "kubernetes_secret" "ghcr_credentials" {
     ".dockerconfigjson" = jsonencode({
       auths = {
         "ghcr.io" = {
-          username = "ldbl"
+          username = var.ghcr_username
           password = var.ghcr_token
-          auth     = base64encode("ldbl:${var.ghcr_token}")
+          auth     = base64encode("${var.ghcr_username}:${var.ghcr_token}")
         }
       }
     })
@@ -252,7 +271,7 @@ resource "kubernetes_secret" "github_image_automation" {
 
 output "flux_operator_installed" {
   description = "Indicates that Flux Operator has been installed"
-  value       = helm_release.flux_operator.status == "deployed"
+  value       = null_resource.flux_operator_install.id != ""
 }
 
 output "flux_instance_created" {

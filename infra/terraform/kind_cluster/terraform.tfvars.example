@@ -45,3 +45,11 @@
 
 # Name for the primary Flux Kustomization resource
 # flux_kustomization_name = "cluster-sync"
+
+# ============================================================================
+# Optional: GHCR Credentials (private images + Helm OCI auth)
+# ============================================================================
+
+# ghcr_username = "<github-username>"
+# ghcr_token    = "REDACTED"
+# enable_ghcr   = true

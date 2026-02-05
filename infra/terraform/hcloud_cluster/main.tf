@@ -55,7 +55,6 @@ locals {
   flux_pull_secret_yaml = var.flux_git_token != "" ? "    pullSecret: flux-system\n" : ""
 
   flux_git_secret_enabled = var.flux_git_token != ""
-  ghcr_secret_enabled     = var.ghcr_username != "" && var.ghcr_token != ""
   sops_age_secret_enabled = var.sops_age_key != ""
 }
 
@@ -113,27 +112,23 @@ resource "kubernetes_secret" "flux_git_credentials" {
   depends_on = [kubernetes_namespace.bootstrap]
 }
 
-resource "helm_release" "flux_operator" {
+resource "null_resource" "flux_operator_install" {
   depends_on = [kubernetes_namespace.bootstrap]
 
-  name             = "flux-operator"
-  repository       = "oci://ghcr.io/controlplaneio-fluxcd/charts"
-  chart            = "flux-operator"
-  version          = var.flux_operator_version
-  namespace        = "flux-system"
-  create_namespace = true
-  wait             = true
-  timeout          = 600
+  triggers = {
+    kubeconfig_path = local.kubeconfig_path
+  }
 
-  set {
-    name  = "installCRDs"
-    value = "true"
+  provisioner "local-exec" {
+    when        = create
+    interpreter = ["/bin/bash", "-c"]
+    command     = "kubectl --kubeconfig=\"${local.kubeconfig_path}\" apply -f https://github.com/controlplaneio-fluxcd/flux-operator/releases/latest/download/install.yaml"
   }
 }
 
 resource "null_resource" "flux_instance" {
   depends_on = [
-    helm_release.flux_operator,
+    null_resource.flux_operator_install,
     kubernetes_secret.flux_git_credentials,
   ]
 
@@ -143,6 +138,7 @@ resource "null_resource" "flux_instance" {
     repo_branch     = var.flux_git_repository_branch
     repo_path       = var.flux_kustomization_path
     flux_version    = var.flux_version
+    provider        = "github"
   }
 
   provisioner "local-exec" {
@@ -172,6 +168,7 @@ spec:
     kind: GitRepository
     url: "${var.flux_git_repository_url}"
     ref: "refs/heads/${var.flux_git_repository_branch}"
+    provider: github
     path: "${var.flux_kustomization_path}"
 ${local.flux_pull_secret_yaml}
 EOF
@@ -187,7 +184,7 @@ EOF
 
 # Optional: GHCR imagePullSecret in every namespace used by workloads.
 resource "kubernetes_secret" "ghcr_credentials" {
-  for_each = local.ghcr_secret_enabled ? toset(["flux-system", "develop", "staging", "production"]) : toset([])
+  for_each = var.enable_ghcr ? toset(["flux-system", "develop", "staging", "production"]) : toset([])
 
   metadata {
     name      = "ghcr-credentials-docker"

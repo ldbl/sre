@@ -93,6 +93,12 @@ variable "ghcr_username" {
   default     = ""
 }
 
+variable "enable_ghcr" {
+  description = "Whether to create GHCR imagePullSecrets (must be true when ghcr_token is set)."
+  type        = bool
+  default     = false
+}
+
 variable "ghcr_token" {
   description = "Optional GHCR token for pulling private images (read:packages). Leave empty if images are public."
   type        = string

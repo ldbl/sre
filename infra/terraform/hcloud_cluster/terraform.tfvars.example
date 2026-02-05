@@ -27,7 +27,7 @@ flux_kustomization_path    = "./flux/bootstrap/flux-system"
 # Optional (private images): GHCR pull secret for workloads
 # ghcr_username = "<github-username>"
 # ghcr_token    = "REDACTED"
+# enable_ghcr   = true
 
 # Optional (SOPS): age private key for Flux decryption
 # sops_age_key = "AGE-SECRET-KEY-1..."
-
