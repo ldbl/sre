@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - git-repository.yaml
   - backend-image-repo.yaml
+  - frontend-image-repo.yaml

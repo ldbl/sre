@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - resource-set-input-provider.yaml
   - backend.yaml
+  - frontend.yaml
