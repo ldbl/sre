@@ -39,12 +39,27 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./flux/infrastructure/observability/kube-prometheus-stack
+  path: ./flux/infrastructure/observability/kube-prometheus-stack/base
   prune: true
   wait: false
-  validation: none
   dependsOn:
     - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: observability-resources
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/observability/kube-prometheus-stack/monitoring
+  prune: true
+  wait: false
+  dependsOn:
+    - name: observability
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -59,6 +74,5 @@ spec:
   path: ./flux/infrastructure/observability/opentelemetry-collector
   prune: true
   wait: false
-  validation: none
   dependsOn:
     - name: observability
