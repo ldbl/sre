@@ -52,6 +52,7 @@ spec:
                 secretKeyRef:
                   name: uptrace-secrets
                   key: dsn
+                  optional: true
           resources:
             requests:
               cpu: 100m

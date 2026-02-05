@@ -7,4 +7,3 @@ resources:
   - configmap.yaml
   - daemonset.yaml
   - service.yaml
-  - ../../../secrets/develop/uptrace-secrets.yaml
