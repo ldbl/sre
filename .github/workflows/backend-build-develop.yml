@@ -44,7 +44,7 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           TIMESTAMP=$(date +%s)
           BUILD_DATE=$(date -u +%Y%m%d-%H%M%S)
-          VERSION="v0.0.0"
+          VERSION="0.0.0"
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
           echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
