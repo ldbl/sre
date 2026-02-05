@@ -59,3 +59,4 @@ spec:
       LOG_LEVEL: "debug"
   dependsOn:
     - name: flux-system
+    - name: observability
