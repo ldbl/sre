@@ -47,7 +47,7 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
 
           # Get timestamp
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          TIMESTAMP=$(date +%s)
           echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
 
           # Get version from package.json
@@ -55,8 +55,8 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           # Generate tags
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop-${VERSION}-${SHORT_SHA}-${TIMESTAMP}"
-          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop-latest"
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
+          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop-v${VERSION}-${SHORT_SHA}-${TIMESTAMP}"
           TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
@@ -84,8 +84,8 @@ jobs:
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "- \`develop-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`develop-latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`develop\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`develop-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ steps.meta.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY

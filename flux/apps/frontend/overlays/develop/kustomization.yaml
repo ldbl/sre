@@ -10,6 +10,7 @@ resources:
 images:
   - name: ghcr.io/ldbl/frontend
     newTag: develop-v0.0.0-0000000-0000000000 # {"$imagepolicy": "develop:frontend:tag"}
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000 # {"$imagepolicy": "develop:frontend:digest"}
 patches:
   - path: patches/deployment.yaml
   - path: patches/ingress.yaml

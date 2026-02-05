@@ -44,14 +44,14 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
 
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          TIMESTAMP=$(date +%s)
           echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
 
           VERSION=$(cat package.json | grep '"version"' | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"
-          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${VERSION}-${SHORT_SHA}-${TIMESTAMP}"
+          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-v${VERSION}-${SHORT_SHA}-${TIMESTAMP}"
           TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
@@ -80,7 +80,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
           echo "- \`staging\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`main-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`staging-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ steps.meta.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY

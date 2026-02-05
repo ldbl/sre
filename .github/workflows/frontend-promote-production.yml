@@ -3,11 +3,10 @@ name: Frontend - Promote to Production
 on:
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 'Create GitHub release with commit SHA'
-        required: false
-        type: boolean
-        default: false
+      staging_tag:
+        description: 'Staging tag to promote (e.g., staging-v0.0.0-abc1234-1700000000)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -17,17 +16,10 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
       packages: write
-      pull-requests: write
+      contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -38,50 +30,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata from staging image
-        id: build_meta
+      - name: Validate staging tag
+        id: tags
         run: |
-          echo "Inspecting staging image for metadata..."
+          STAGING_TAG="${{ inputs.staging_tag }}"
 
-          LABELS=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging --format '{{ json .Manifest.Config.Labels }}' 2>/dev/null || echo "{}")
-
-          if [ "$LABELS" = "{}" ] || [ -z "$LABELS" ]; then
-            echo "Trying alternative inspection method..."
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging --platform linux/amd64
-            LABELS=$(docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging --format '{{ json .Config.Labels }}')
+          if [[ ! "$STAGING_TAG" =~ ^staging-v[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]+-[0-9]+$ ]]; then
+            echo "❌ Invalid staging tag: $STAGING_TAG"
+            echo "Expected: staging-v<semver>-<sha>-<timestamp>"
+            exit 1
           fi
 
-          echo "Labels found: $LABELS"
+          SUFFIX=${STAGING_TAG#staging-}
+          PRODUCTION_TAG="production-${SUFFIX}"
 
-          VERSION=$(echo "$LABELS" | jq -r '."org.opencontainers.image.version" // empty')
-          FULL_SHA=$(echo "$LABELS" | jq -r '."org.opencontainers.image.revision" // empty')
+          echo "staging_tag=$STAGING_TAG" >> $GITHUB_OUTPUT
+          echo "production_tag=$PRODUCTION_TAG" >> $GITHUB_OUTPUT
 
-          if [ -z "$FULL_SHA" ]; then
-            FULL_SHA=$(git rev-parse HEAD)
-          fi
-
-          SHORT_SHA=$(echo "$FULL_SHA" | cut -c1-7)
-
-          if [ -z "$VERSION" ]; then
-            VERSION="v0.0.0"
-          fi
-
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-          echo "Promoting staging image:"
-          echo "  Version: ${VERSION}"
-          echo "  Short SHA: ${SHORT_SHA}"
-
-      - name: Promote staging to production (multi-platform)
+      - name: Promote staging tag to production
         run: |
-          TIMESTAMP=$(date +%s)
-
           docker buildx imagetools create \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production \
-            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production-${{ steps.build_meta.outputs.version }}-${{ steps.build_meta.outputs.short_sha }}-${TIMESTAMP} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.production_tag }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.staging_tag }}
 
-          echo "Promoted image to production"
-          echo "Created tags: production, production-${{ steps.build_meta.outputs.version }}-${{ steps.build_meta.outputs.short_sha }}-${TIMESTAMP}"
+      - name: Verify promoted image
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.production_tag }}
 
+      - name: Summary
+        run: |
+          echo "### Frontend Production Promotion" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**From:** \
+            \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.staging_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**To:** \
+            \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.production_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Alias:** \
+            \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production\`" >> $GITHUB_STEP_SUMMARY

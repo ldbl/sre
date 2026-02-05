@@ -59,11 +59,11 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}
           labels: |
             org.opencontainers.image.title=backend
-            org.opencontainers.image.version=main-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}
+            org.opencontainers.image.version=staging-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
             build.short_sha=${{ steps.meta.outputs.short_sha }}
@@ -72,7 +72,7 @@ jobs:
             build.environment=staging
             build.branch=${{ github.ref_name }}
           build-args: |
-            APP_VERSION=main-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}
+            APP_VERSION=staging-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}
             APP_COMMIT=${{ github.sha }}
             APP_COMMIT_SHORT=${{ steps.meta.outputs.short_sha }}
             BUILD_DATE=${{ steps.meta.outputs.build_date }}
@@ -97,5 +97,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-v${{ steps.meta.outputs.version }}-${{ steps.meta.outputs.short_sha }}-${{ steps.meta.outputs.timestamp }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY

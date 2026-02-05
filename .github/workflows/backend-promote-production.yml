@@ -3,11 +3,10 @@ name: Backend - Promote to Production
 on:
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 'Create GitHub release with commit SHA'
-        required: false
-        type: boolean
-        default: true
+      staging_tag:
+        description: 'Staging tag to promote (e.g., staging-v0.0.0-abc1234-1700000000)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -17,19 +16,10 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     permissions:
-      actions: read
-      contents: write
       packages: write
-      pull-requests: write
-      security-events: write
+      contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -40,152 +30,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata from staging image
-        id: build_meta
+      - name: Validate staging tag
+        id: tags
         run: |
-          echo "Inspecting staging image for metadata..."
+          STAGING_TAG="${{ inputs.staging_tag }}"
 
-          # Get image labels using buildx imagetools inspect
-          LABELS=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging --format '{{ json .Manifest.Config.Labels }}' 2>/dev/null || echo "{}")
-
-          # If labels are empty, try alternative format
-          if [ "$LABELS" = "{}" ] || [ -z "$LABELS" ]; then
-            echo "Trying alternative inspection method..."
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging --platform linux/amd64
-            LABELS=$(docker inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging --format '{{ json .Config.Labels }}')
-          fi
-
-          echo "Labels found: $LABELS"
-
-          # Extract labels
-          SHORT_SHA=$(echo "$LABELS" | jq -r '."build.short_sha" // empty')
-          STAGING_VERSION=$(echo "$LABELS" | jq -r '."org.opencontainers.image.version" // empty')
-          BUILD_DATE=$(echo "$LABELS" | jq -r '."org.opencontainers.image.created" // empty')
-          FULL_SHA=$(echo "$LABELS" | jq -r '."org.opencontainers.image.revision" // empty')
-          ENVIRONMENT=$(echo "$LABELS" | jq -r '."build.environment" // empty')
-          BRANCH=$(echo "$LABELS" | jq -r '."build.branch" // empty')
-
-          # Validation checks
-          if [ -z "$SHORT_SHA" ]; then
-            echo "⚠️  WARNING: Could not extract metadata from staging image labels"
-            echo "This is expected for images built before labels were added"
-            echo "Falling back to using staging tag directly (legacy mode)"
-
-            # Fallback: use staging tag and current git metadata
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            STAGING_VERSION="v0.0.0-legacy"
-            BUILD_DATE=$(date -u +%Y%m%d-%H%M%S)
-            FULL_SHA=$(git rev-parse HEAD)
-            ENVIRONMENT="staging"
-            BRANCH="main"
-
-            echo "Using fallback metadata:"
-            echo "  SHORT_SHA: $SHORT_SHA"
-            echo "  Note: Next build will have proper labels"
-          fi
-
-          if [ "$ENVIRONMENT" != "staging" ]; then
-            echo "❌ ERROR: Image environment is '$ENVIRONMENT', expected 'staging'"
-            echo "Cannot promote non-staging image to production!"
+          if [[ ! "$STAGING_TAG" =~ ^staging-v[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]+-[0-9]+$ ]]; then
+            echo "❌ Invalid staging tag: $STAGING_TAG"
+            echo "Expected: staging-v<semver>-<sha>-<timestamp>"
             exit 1
           fi
 
-          if [ "$BRANCH" != "main" ]; then
-            echo "⚠️  WARNING: Image was built from branch '$BRANCH', expected 'main'"
-            echo "Proceeding with caution..."
-          fi
+          SUFFIX=${STAGING_TAG#staging-}
+          PRODUCTION_TAG="production-${SUFFIX}"
 
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "staging_version=${STAGING_VERSION}" >> $GITHUB_OUTPUT
-          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
-          echo "full_sha=${FULL_SHA}" >> $GITHUB_OUTPUT
-          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
-          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+          echo "staging_tag=$STAGING_TAG" >> $GITHUB_OUTPUT
+          echo "production_tag=$PRODUCTION_TAG" >> $GITHUB_OUTPUT
 
-          echo "✅ Validation passed - promoting staging build to production:"
-          echo "  Environment: ${ENVIRONMENT}"
-          echo "  Branch: ${BRANCH}"
-          echo "  Short SHA: ${SHORT_SHA}"
-          echo "  Full SHA: ${FULL_SHA}"
-          echo "  Version: ${STAGING_VERSION}"
-          echo "  Build Date: ${BUILD_DATE}"
-
-      - name: Calculate new version
-        id: meta
+      - name: Promote staging tag to production
         run: |
-          # Get current version tag
-          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-
-          # Parse and bump patch version (v0.0.1 -> v0.0.2)
-          if [[ $CURRENT_VERSION =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            MAJOR="${BASH_REMATCH[1]}"
-            MINOR="${BASH_REMATCH[2]}"
-            PATCH="${BASH_REMATCH[3]}"
-            NEW_PATCH=$((PATCH + 1))
-            NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
-          else
-            NEW_VERSION="v0.0.1"
-          fi
-
-          echo "short_sha=${{ steps.build_meta.outputs.short_sha }}" >> $GITHUB_OUTPUT
-          echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
-          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Promote staging to production (multi-platform)
-        run: |
-          # Copy multi-platform manifest from specific SHA to production with timestamp
-          TIMESTAMP=$(date +%s)
-
           docker buildx imagetools create \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production \
-            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production-${{ steps.meta.outputs.new_version }}-${{ steps.meta.outputs.short_sha }}-${TIMESTAMP} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.production_tag }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.staging_tag }}
 
-          echo "Promoted image with SHA ${{ steps.meta.outputs.short_sha }} to production"
-          echo "Created tags: production, production-${{ steps.meta.outputs.new_version }}-${{ steps.meta.outputs.short_sha }}-${TIMESTAMP}"
-
-      - name: Verify image exists
+      - name: Verify promoted image
         run: |
-          echo "Verifying that image exists with SHA ${{ steps.meta.outputs.short_sha }}"
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}
-
-      - name: Create and push new version tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a ${{ steps.meta.outputs.new_version }} -m "Release ${{ steps.meta.outputs.new_version }}"
-          git push origin ${{ steps.meta.outputs.new_version }}
-
-      - name: Create GitHub Release
-        if: ${{ github.event.inputs.create_release == 'true' }}
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.meta.outputs.new_version }}
-          name: Release ${{ steps.meta.outputs.new_version }}
-          body: |
-            ## Backend Production Release
-
-            Promoted staging image to production.
-
-            **Version:** ${{ steps.meta.outputs.new_version }}
-            **Previous Version:** ${{ steps.meta.outputs.current_version }}
-            **Promoted Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}`
-            **Production Tag:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production`
-            **Commit:** ${{ steps.meta.outputs.short_sha }}
-          draft: true
-          prerelease: false
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.production_tag }}
 
       - name: Summary
         run: |
-          echo "### Production Promotion Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend Production Promotion" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version Bump:** ${{ steps.meta.outputs.current_version }} → ${{ steps.meta.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Promoted Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build_meta.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**New Tag:** \`production\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit SHA:** ${{ steps.build_meta.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Staging Version:** ${{ steps.build_meta.outputs.staging_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Date:** ${{ steps.build_meta.outputs.build_date }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Next develop build will use version: **${{ steps.meta.outputs.new_version }}-rc**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Flux will automatically deploy to production namespace." >> $GITHUB_STEP_SUMMARY
+          echo "**From:** \
+            \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.staging_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**To:** \
+            \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.production_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Alias:** \
+            \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production\`" >> $GITHUB_STEP_SUMMARY

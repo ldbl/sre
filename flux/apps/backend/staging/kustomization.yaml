@@ -10,7 +10,8 @@ resources:
   - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: main-e6f184c-1759875626 # {"$imagepolicy": "staging:backend:tag"}
+    newTag: staging-v0.0.0-0000000-0000000000 # {"$imagepolicy": "staging:backend:tag"}
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000 # {"$imagepolicy": "staging:backend:digest"}
 patches:
   - patch: |-
       - op: replace
