@@ -4,3 +4,4 @@ resources:
   - gotk-sync.yaml
   - apps.yaml
   - infrastructure.yaml
+  - secrets.yaml
