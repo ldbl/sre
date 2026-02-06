@@ -10,8 +10,8 @@ resources:
   - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: develop-v0.0.0-c398558-1759876237 # {"$imagepolicy": "develop:backend:tag"}
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000 # {"$imagepolicy": "develop:backend:digest"}
+    newTag: develop-v0.0.0-c9fc726-1770365203 # {"$imagepolicy": "develop:backend:tag"}
+    digest: "" # {"$imagepolicy": "develop:backend:digest"}
 patches:
   - patch: |-
       - op: replace
