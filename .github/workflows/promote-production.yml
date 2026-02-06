@@ -11,8 +11,8 @@ on:
           - backend
         required: true
       staging_tag:
-        description: 'Staging tag to promote (e.g., staging-v0.0.0-abc1234-1700000000)'
-        required: true
+        description: 'Staging tag (leave empty for latest)'
+        required: false
         type: string
 
 env:
@@ -36,14 +36,43 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate staging tag
+      - name: Get staging tag
         id: tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          STAGING_TAG="${{ inputs.staging_tag }}"
+          COMPONENT="${{ inputs.component }}"
+          INPUT_TAG="${{ inputs.staging_tag }}"
 
+          if [[ -n "$INPUT_TAG" ]]; then
+            # Use provided tag
+            STAGING_TAG="$INPUT_TAG"
+            echo "Using provided tag: $STAGING_TAG"
+          else
+            # Fetch latest staging tag from GHCR
+            echo "Fetching latest staging tag for $COMPONENT..."
+
+            # Query GitHub Packages API for versions
+            LATEST_TAG=$(gh api \
+              "/users/${{ github.repository_owner }}/packages/container/${COMPONENT}/versions" \
+              --jq '.[].metadata.container.tags[]' 2>/dev/null | \
+              grep -E '^staging-v[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]+-[0-9]+$' | \
+              sort -t'-' -k4 -n -r | \
+              head -1)
+
+            if [[ -z "$LATEST_TAG" ]]; then
+              echo "No staging tags found for $COMPONENT"
+              exit 1
+            fi
+
+            STAGING_TAG="$LATEST_TAG"
+            echo "Found latest staging tag: $STAGING_TAG"
+          fi
+
+          # Validate tag format
           if [[ ! "$STAGING_TAG" =~ ^staging-v[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]+-[0-9]+$ ]]; then
-            echo "Invalid staging tag: $STAGING_TAG"
-            echo "Expected format: staging-v<semver>-<sha>-<timestamp>"
+            echo "Invalid staging tag format: $STAGING_TAG"
+            echo "Expected: staging-v<semver>-<sha>-<timestamp>"
             exit 1
           fi
 
@@ -55,6 +84,10 @@ jobs:
 
       - name: Promote staging tag to production
         run: |
+          echo "Promoting ${{ inputs.component }}..."
+          echo "  From: ${{ steps.tags.outputs.staging_tag }}"
+          echo "  To:   ${{ steps.tags.outputs.production_tag }}"
+
           docker buildx imagetools create \
             --tag ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.component }}:production \
             --tag ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.component }}:${{ steps.tags.outputs.production_tag }} \
