@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: frontend
     app.kubernetes.io/component: web
 spec:
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate
