@@ -1,0 +1,27 @@
+name: Build Backend
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-backend.yml'
+      - '.github/workflows/_build-component.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        options:
+          - develop
+          - staging
+        default: develop
+
+jobs:
+  build:
+    uses: ./.github/workflows/_build-component.yml
+    with:
+      component: backend
+      environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref_name == 'main' && 'staging' || 'develop') }}
