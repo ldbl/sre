@@ -75,7 +75,7 @@ jobs:
             VERSION=${{ steps.meta.outputs.version }}
             COMMIT=${{ github.sha }}
             BUILD_DATE=${{ steps.meta.outputs.timestamp }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
 
       - name: Output summary
         run: |
