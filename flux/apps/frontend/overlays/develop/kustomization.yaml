@@ -1,4 +1,3 @@
----
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: develop
@@ -9,7 +8,7 @@ resources:
   - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/frontend
-    newTag: develop-v0.0.0-0000000-0000000000 # {"$imagepolicy": "develop:frontend:tag"}
+    newTag: develop-v0.0.0-c9fc726-1770365200 # {"$imagepolicy": "develop:frontend:tag"}
 patches:
   - path: patches/deployment.yaml
   - path: patches/ingress.yaml
