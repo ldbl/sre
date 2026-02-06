@@ -10,7 +10,7 @@ resources:
   - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: production-v0.0.0-0000000-0000000000 # {"$imagepolicy": "production:backend:tag"}
+    newTag: production-v0.0.1-35b2828-1770380555 # {"$imagepolicy": "production:backend:tag"}
 patches:
   - patch: |-
       - op: replace
