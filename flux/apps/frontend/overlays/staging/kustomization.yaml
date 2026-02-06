@@ -1,4 +1,3 @@
----
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: staging
@@ -9,8 +8,8 @@ resources:
   - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/frontend
-    newTag: staging-v0.0.0-0000000-0000000000 # {"$imagepolicy": "staging:frontend:tag"}
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000 # {"$imagepolicy": "staging:frontend:digest"}
+    newTag: staging-v0.0.0-f025044-1770308200 # {"$imagepolicy": "staging:frontend:tag"}
+    digest: "" # {"$imagepolicy": "staging:frontend:digest"}
 patches:
   - path: patches/deployment.yaml
   - path: patches/ingress.yaml
