@@ -79,8 +79,8 @@ variable "enable_ghcr" {
   default     = true
 }
 
-variable "github_token" {
-  description = "GitHub Personal Access Token for ImageUpdateAutomation git push operations (requires repo scope)."
+variable "flux_git_token" {
+  description = "GitHub Personal Access Token for ImageUpdateAutomation git push operations (requires Contents:Write scope)."
   type        = string
   default     = ""
   sensitive   = true

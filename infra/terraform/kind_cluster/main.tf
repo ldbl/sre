@@ -259,7 +259,7 @@ resource "kubernetes_secret" "ghcr_credentials" {
 
 # Create GitHub token secret for ImageUpdateAutomation
 resource "kubernetes_secret" "github_image_automation" {
-  count      = var.github_token != "" ? 1 : 0
+  count      = var.flux_git_token != "" ? 1 : 0
   depends_on = [null_resource.flux_instance]
 
   metadata {
@@ -271,7 +271,7 @@ resource "kubernetes_secret" "github_image_automation" {
 
   data = {
     username = "git"
-    password = var.github_token
+    password = var.flux_git_token
   }
 }
 
