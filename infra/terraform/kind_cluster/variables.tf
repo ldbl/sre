@@ -85,3 +85,10 @@ variable "flux_git_token" {
   default     = ""
   sensitive   = true
 }
+
+variable "sops_age_key" {
+  description = "Age private key contents for SOPS decryption in Flux. Leave empty to skip sops-age secret creation."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

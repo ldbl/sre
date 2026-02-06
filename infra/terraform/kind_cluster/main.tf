@@ -275,6 +275,23 @@ resource "kubernetes_secret" "github_image_automation" {
   }
 }
 
+# Create SOPS age secret for Flux decryption
+resource "kubernetes_secret" "sops_age" {
+  count      = var.sops_age_key != "" ? 1 : 0
+  depends_on = [null_resource.flux_instance]
+
+  metadata {
+    name      = "sops-age"
+    namespace = "flux-system"
+  }
+
+  type = "Opaque"
+
+  data = {
+    "age.agekey" = var.sops_age_key
+  }
+}
+
 output "flux_operator_installed" {
   description = "Indicates that Flux Operator has been installed"
   value       = null_resource.flux_operator_install.id != ""
