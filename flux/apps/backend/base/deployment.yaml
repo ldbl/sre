@@ -68,13 +68,16 @@ spec:
           value: "v1.0.0"
         - name: DEPLOYMENT_ENVIRONMENT
           value: "${ENVIRONMENT}"
-        - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: "http://otel-collector.observability.svc.cluster.local:4317"
         - name: UPTRACE_DSN
           valueFrom:
             secretKeyRef:
               name: uptrace-secrets
               key: dsn
+        - name: OTEL_EXPORTER_OTLP_HEADERS
+          valueFrom:
+            secretKeyRef:
+              name: uptrace-secrets
+              key: headers
         livenessProbe:
           httpGet:
             path: /livez
