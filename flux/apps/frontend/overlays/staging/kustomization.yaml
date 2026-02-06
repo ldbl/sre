@@ -8,7 +8,7 @@ resources:
   - image-automation.yaml
 images:
   - name: ghcr.io/ldbl/frontend
-    newTag: staging-v0.0.0-f025044-1770308200 # {"$imagepolicy": "staging:frontend:tag"}
+    newTag: staging-v0.0.2-857701d-1770396165 # {"$imagepolicy": "staging:frontend:tag"}
 patches:
   - path: patches/deployment.yaml
   - path: patches/ingress.yaml
