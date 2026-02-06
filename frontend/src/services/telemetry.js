@@ -12,12 +12,28 @@ import { UserInteractionInstrumentation } from '@opentelemetry/instrumentation-u
 
 // Get configuration from environment
 const getConfig = () => {
+  // Uptrace DSN format: https://TOKEN@api.uptrace.dev
+  const uptraceDsn = window.__ENV__?.VITE_UPTRACE_DSN || import.meta.env.VITE_UPTRACE_DSN || ''
+
+  let collectorUrl = window.__ENV__?.VITE_OTEL_COLLECTOR_URL || import.meta.env.VITE_OTEL_COLLECTOR_URL || 'http://localhost:4318/v1/traces'
+  let headers = {}
+
+  // If Uptrace DSN is set, use Uptrace directly
+  if (uptraceDsn) {
+    collectorUrl = 'https://api.uptrace.dev/v1/traces'
+    // Extract token from DSN (format: https://TOKEN@api.uptrace.dev)
+    const match = uptraceDsn.match(/https:\/\/([^@]+)@/)
+    if (match) {
+      headers['uptrace-dsn'] = uptraceDsn
+    }
+  }
+
   return {
     serviceName: 'frontend',
     serviceVersion: '1.0.0',
     environment: window.__ENV__?.ENVIRONMENT || import.meta.env.MODE || 'development',
-    // OTel Collector endpoint (will be set via K8s env var in production)
-    collectorUrl: window.__ENV__?.VITE_OTEL_COLLECTOR_URL || import.meta.env.VITE_OTEL_COLLECTOR_URL || 'http://localhost:4318/v1/traces',
+    collectorUrl,
+    headers,
   }
 }
 
@@ -46,7 +62,7 @@ export function initTelemetry() {
   // Configure OTLP HTTP exporter
   const exporter = new OTLPTraceExporter({
     url: config.collectorUrl,
-    headers: {},
+    headers: config.headers,
   })
 
   // Add batch span processor

@@ -40,7 +40,7 @@ RUN echo '#!/bin/sh' > /docker-entrypoint.d/40-generate-env-config.sh && \
     echo 'cat <<EOF > /usr/share/nginx/html/config.js' >> /docker-entrypoint.d/40-generate-env-config.sh && \
     echo 'window.__ENV__ = {' >> /docker-entrypoint.d/40-generate-env-config.sh && \
     echo '  VITE_API_URL: "${VITE_API_URL}",' >> /docker-entrypoint.d/40-generate-env-config.sh && \
-    echo '  VITE_OTEL_COLLECTOR_URL: "${VITE_OTEL_COLLECTOR_URL}",' >> /docker-entrypoint.d/40-generate-env-config.sh && \
+    echo '  VITE_UPTRACE_DSN: "${VITE_UPTRACE_DSN}",' >> /docker-entrypoint.d/40-generate-env-config.sh && \
     echo '  ENVIRONMENT: "${ENVIRONMENT}",' >> /docker-entrypoint.d/40-generate-env-config.sh && \
     echo '  VERSION: "${VERSION}",' >> /docker-entrypoint.d/40-generate-env-config.sh && \
     echo '  COMMIT: "${COMMIT}",' >> /docker-entrypoint.d/40-generate-env-config.sh && \

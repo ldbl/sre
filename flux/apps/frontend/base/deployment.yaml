@@ -52,8 +52,11 @@ spec:
         env:
         - name: VITE_API_URL
           value: "http://backend.${NAMESPACE}.svc.cluster.local:8080"
-        - name: VITE_OTEL_COLLECTOR_URL
-          value: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+        - name: VITE_UPTRACE_DSN
+          valueFrom:
+            secretKeyRef:
+              name: uptrace-secrets
+              key: dsn
         - name: ENVIRONMENT
           value: "${ENVIRONMENT}"
         - name: VERSION
