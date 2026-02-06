@@ -9,7 +9,6 @@ resources:
 images:
   - name: ghcr.io/ldbl/frontend
     newTag: staging-v0.0.0-f025044-1770308200 # {"$imagepolicy": "staging:frontend:tag"}
-    digest: "" # {"$imagepolicy": "staging:frontend:digest"}
 patches:
   - path: patches/deployment.yaml
   - path: patches/ingress.yaml
