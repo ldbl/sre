@@ -39,7 +39,6 @@ jobs:
 
       - name: Generate version metadata
         id: meta
-        working-directory: frontend
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
@@ -47,7 +46,8 @@ jobs:
           TIMESTAMP=$(date +%s)
           echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
 
-          VERSION=$(cat package.json | grep '"version"' | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          VERSION="${VERSION#v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging"

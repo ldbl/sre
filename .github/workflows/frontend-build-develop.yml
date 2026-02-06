@@ -40,7 +40,6 @@ jobs:
 
       - name: Generate version metadata
         id: meta
-        working-directory: frontend
         run: |
           # Get short SHA
           SHORT_SHA=$(git rev-parse --short HEAD)
@@ -50,8 +49,9 @@ jobs:
           TIMESTAMP=$(date +%s)
           echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
 
-          # Get version from package.json
-          VERSION=$(cat package.json | grep '"version"' | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+          # Get version from git tags
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          VERSION="${VERSION#v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           # Generate tags
