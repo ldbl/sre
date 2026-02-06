@@ -11,7 +11,6 @@ resources:
 images:
   - name: ghcr.io/ldbl/backend
     newTag: staging-v0.0.0-0000000-0000000000 # {"$imagepolicy": "staging:backend:tag"}
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000 # {"$imagepolicy": "staging:backend:digest"}
 patches:
   - patch: |-
       - op: replace
