@@ -16,7 +16,7 @@ Use Terraform to provision a local multi-node kind cluster. Terraform manages li
 - Terraform 1.3+ and `kubectl`
 
 ## Provision the Cluster with Terraform
-Use the Terraform module under `infra/terraform/kind_cluster/` to create (or destroy) the local kind cluster. The module codifies the multi-node topology directly in Terraform, automatically merges the generated kubeconfig into `~/.kube/config`, and installs Flux via Helm.
+Use the Terraform module under `infra/terraform/kind_cluster/` to create (or destroy) the local kind cluster. The module codifies the multi-node topology directly in Terraform, automatically merges the generated kubeconfig into `~/.kube/config`, and bootstraps Flux via Flux Operator + `FluxInstance`.
 Optionally, configure GitOps reconciliation by setting:
 ```bash
 export TF_VAR_flux_git_repository_url="https://github.com/ldbl/sre.git"
@@ -55,7 +55,7 @@ terraform destroy
 
 ## Next Steps
 - Review `docs/gitops/flux.md` for Flux usage; controllers are installed automatically by Terraform.
-- Apply baseline namespaces, network policies, and observability stack from `infra/kubernetes/` as they are introduced.
+- Apply baseline namespaces and infrastructure from `flux/bootstrap/infrastructure/base/` and observability from `flux/infrastructure/observability/`.
 - Build and run the backend locally: `cd backend && go run ./cmd/api`, then curl `http://localhost:8080/healthz` or scrape `http://localhost:8080/metrics`.
 - Build the container image via `make -C backend image` and push it to your preferred registry (kind can use the local mirror at `localhost:5001`).
 - Publish the production-ready image to GitHub Container Registry with `make backend-publish` (or `make -C backend publish`). Export `DOCKER_PAT` (PAT with `write:packages`) and optionally `DOCKER_USER` beforehand; override `REGISTRY_HOST`/`REGISTRY_NAMESPACE`/`IMAGE_NAME`/`TAG` as needed.

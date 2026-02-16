@@ -14,8 +14,8 @@ flux/
 
 ## Flux Reconciliation
 
-The Flux controllers in the `sre-kind` cluster are configured to reconcile from:
-- **Repository:** `git@github.com:ldbl/sre.git`
+The Flux controllers bootstrapped by Terraform reconcile from:
+- **Repository:** configured via Terraform (`TF_VAR_flux_git_repository_url`, typically `https://github.com/<owner>/<repo>.git`)
 - **Branch:** `main`
 - **Path:** `./flux/bootstrap/flux-system`
 

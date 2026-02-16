@@ -28,7 +28,7 @@ Recommended (but depends on your setup):
 
 If your GitHub org/user is not `ldbl` (the current placeholder), run `scripts/configure-repo.sh --github-owner <owner> --github-repo <repo>`. This updates hardcoded `ghcr.io/<owner>` and `https://github.com/<owner>/<repo>.git` references in `docs/` and `flux/`.
 
-Secrets under `flux/secrets/**` are currently opt-in. When you are ready, wire them by adding `flux/bootstrap/flux-system/secrets.yaml` to `flux/bootstrap/flux-system/kustomization.yaml` and ensure `sops-age` exists in `flux-system`.
+Secrets under `flux/secrets/**` are currently wired by default through `flux/bootstrap/flux-system/kustomization.yaml`. Ensure `sops-age` exists in `flux-system` (Terraform creates it when `SOPS_AGE_KEY` is provided). If you are not using SOPS yet, remove `secrets.yaml` from the bootstrap kustomization to avoid reconciliation failures.
 
 Ingress hostnames in this repo default to `backend.local` / `frontend.local`. For demos you can hit the load balancer IP and set the Host header (or add `/etc/hosts` entries).
 

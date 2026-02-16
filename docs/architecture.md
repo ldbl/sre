@@ -1,47 +1,54 @@
 # Architecture Overview
 
 ## Technical Stack Decisions
-- **Frontend:** Vue 3 SPA (Vite toolchain) communicating with backend via REST/JSON
-- **Backend:** Go 1.24 HTTP API providing health checks, metrics, and business endpoints
-- **Kubernetes Distribution:** kind for local development; managed Kubernetes (TBD) for stage/prod scenarios
-- **GitOps Operator:** FluxCD for reconciliation, image automation, and policy enforcement
-- **Infrastructure as Code:** Terraform for cloud resources, Kubernetes manifests via Kustomize overlays
-- **Observability:** Prometheus + Alertmanager, Grafana dashboards, Loki for logs, OpenTelemetry instrumentation
+- **Frontend:** Vue 3 SPA (Vite) served by nginx in containerized deployments.
+- **Backend:** Go 1.24 HTTP API with health probes, metrics, OpenAPI/Swagger, chaos endpoints, and tracing hooks.
+- **Kubernetes runtime:** Hetzner Cloud k3s is the primary path; kind remains the local/dev path.
+- **GitOps operator:** Flux (installed via Flux Operator + `FluxInstance` in Terraform).
+- **Infrastructure as code:** Terraform under `infra/terraform/`.
+- **Manifests:** Flux + Kustomize under `flux/`.
+- **Observability:** kube-prometheus-stack (Prometheus, Alertmanager, Grafana) with optional OpenTelemetry collector manifests.
 
-> Tooling versions for cluster/IaC utilities are pinned in the `Makefile`; run `make versions` to confirm local binaries match expectations.
+## Current Repository Scope
+This repository (`sre/`) is the control plane and GitOps source of truth.
 
-## Repository Modules
-- `backend/` – Go HTTP API with Podinfo-style health probes, chaos endpoints, Prometheus metrics, and HTML landing page
-- `frontend/` – Vue SPA consuming backend APIs and exposing dashboards/forms for demos
-- `infra/terraform/` – Environment workspaces (`environments/dev`, `stage`, `prod`) and reusable modules under `infra/modules`
-- `infra/kubernetes/` – Base manifests plus environment overlays (`base/`, `overlays/dev|stage|prod`), kind-specific config under `kind/`
-- `docs/runbooks/` – Incident guides, SLO playbooks, and testing notes
+- `infra/terraform/hcloud_cluster/` - Hetzner cluster provisioning + Flux bootstrap.
+- `infra/terraform/kind_cluster/` - local kind cluster provisioning + Flux bootstrap.
+- `flux/` - GitOps manifests for apps, infrastructure, and secrets.
+- `docs/` - architecture, runbooks, workflow docs, and course material.
+- `scripts/` - helper scripts (repo setup, SOPS setup, encryption helpers).
+- `tests/` - reserved for infra/system tests (currently minimal scaffold).
 
-## Backend Capabilities
-- HTTP surface: `/healthz`, `/readyz`, `/livez`, `/status/{code}`, `/delay/{seconds}`, `/panic`, `/env`, `/headers`, `/echo`, `/version`, `/openapi`, `/swagger`, `/metrics`
-- Toggle readiness/liveness via `PUT /readyz/enable|disable` and `PUT /livez/enable|disable` for probe demonstrations
-- HTML root page renders `UI_MESSAGE`, `UI_COLOR`, `APP_VERSION`, and `APP_COMMIT`
-- Chaos engineering knobs: `RANDOM_DELAY_MAX` (milliseconds) and `RANDOM_ERROR_RATE` (0–1) for request delay/error injection
-- Prometheus registry with process/go collectors and request instrumentation for SLO dashboards; OpenAPI 3 spec served at `/openapi` with Swagger UI at `/swagger`
-- Build metadata (SemVer version by default, commit full & short, build timestamp via `build_time`) injected via ldflags and surfaced on `/version`, `/swagger`, and the landing page
-- Container image produced via `backend/Dockerfile` (multi-stage, distroless-style Alpine runtime) and `make -C backend image`
+Reference services are maintained as companion repos (`backend/`, `frontend/`) in this workspace and publish container images to GHCR, consumed by Flux from this control-plane repo.
 
-## Delivery Pipeline
-1. **Pre-commit (planned):** format, lint, security scan hooks
-2. **CI Pipeline (GitHub Actions):** lint → unit tests → integration tests → build & scan container images → Terraform plan
-3. **GitOps Deployment:** FluxCD applies Kubernetes state to dev/stage clusters; production requires manual approval
+## Flux and Environment Model
+- Namespaces: `develop`, `staging`, `production`, plus `observability` and `flux-system`.
+- Bootstrap path: `flux/bootstrap/flux-system`.
+- App wiring per environment:
+  - `flux/bootstrap/apps/develop/`
+  - `flux/bootstrap/apps/staging/`
+  - `flux/bootstrap/apps/production/`
+- Backend manifests:
+  - base: `flux/apps/backend/base/`
+  - overlays: `flux/apps/backend/develop|staging|production/`
+- Frontend manifests:
+  - base: `flux/apps/frontend/base/`
+  - overlays: `flux/apps/frontend/overlays/develop|staging|production/`
 
-## Observability & SLOs
-- Service-level indicators: request latency (p95), error rate, and frontend availability metrics
-- SLO dashboards stored in `observability/grafana/`
-- Alert routing via Alertmanager to Slack/email (mocked for demo)
+## Delivery and Promotion Flow
+1. `backend` and `frontend` build workflows publish GHCR images on push to `develop`/`main`.
+2. Flux `ImageRepository` + `ImagePolicy` objects discover newest env-specific tags.
+3. Flux `ImageUpdateAutomation` writes new tags back to this repo (`main`) using setters.
+4. Flux reconciles updated manifests into `develop`/`staging`/`production`.
+5. Production image promotion is manual (`workflow_dispatch`) in service repos and re-tags staging images to `production-*`, which Flux then deploys.
 
-## Security & Compliance
-- Secrets managed via External Secrets Operator bridged to demo vault backend
-- Supply chain hardening using Cosign signing and SBOM generation (Syft/Grype)
-- Quarterly audit tasks tracked in `docs/security/security-calendar.md`
+## Observability Status
+- Deployed by Flux via `flux/infrastructure/observability/kube-prometheus-stack/`.
+- Includes dashboards and alert rules for backend service metrics.
+- OpenTelemetry collector manifests exist under `flux/infrastructure/observability/opentelemetry-collector/`; bootstrap wiring is currently disabled (commented in `flux/bootstrap/flux-system/infrastructure.yaml`).
 
-## Outstanding Decisions
-- Cloud provider for Terraform resource demonstrations (AWS vs. GCP vs. Azure)
-- Persistent storage solution for local clusters (local-path, rook-ceph, etc.)
-- DR strategy automation tooling (Velero or cloud-native backups)
+## Secrets and Security Model
+- Secrets are committed as SOPS-encrypted manifests under `flux/secrets/**`.
+- Flux decryption uses `sops-age` secret in `flux-system` when provided by Terraform (`TF_VAR_sops_age_key`).
+- GHCR pull credentials are optional and created by Terraform when enabled.
+- Guardrails and AI operating rules are defined in `docs/ai-code-of-conduct.md`.

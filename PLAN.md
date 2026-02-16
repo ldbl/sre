@@ -122,3 +122,73 @@ Definition of done:
 - Students can demonstrate safe promotion and safe rollback.
 - Students can explain correlated failures and how guardrails reduce blast radius.
 - The demo repo can be spun up from scratch in < 60 minutes with predictable results.
+
+## Execution Plan (As Of 2026-02-16)
+
+### Current State Snapshot
+
+Done recently:
+- Core docs are aligned with the active architecture and Flux image-automation flow.
+- Backend unit tests are green after Swagger endpoint test alignment (`/swagger/index.html`).
+- Terraform kind output now references `sre-control-plane` context consistently.
+
+Open gaps:
+- `docs/course/` is still scaffold-only (no full Lesson 01 content yet).
+- `tests/` in `sre/` has no real validation suite yet.
+- Observability is partial: kube-prometheus-stack is wired, but OpenTelemetry collector bootstrap is still disabled.
+- Hetzner production path still needs one reproducible runbook from credentials to successful Flux reconciliation and ingress verification.
+- Flux auth model should be finalized/documented as one canonical option (public repo vs token vs GitHub App).
+
+### Phase 1 (Next 2-3 Days): Stabilize Baseline
+
+Definition of done:
+- Working tree cleaned with focused commits for:
+  - docs consistency updates
+  - backend Swagger test fix
+  - terraform context output fix
+- `sre` branch synced with `origin/main`.
+- Quick verification checklist executed locally:
+  - `go test ./...` in `backend`
+  - `terraform validate` for `infra/terraform/kind_cluster`
+  - `terraform validate` for `infra/terraform/hcloud_cluster`
+
+### Phase 2 (Next 3-5 Days): Close Hetzner MVP Path
+
+Definition of done:
+- Single authoritative runbook in `docs/hetzner.md` for:
+  - required secrets
+  - workflow order (plan -> apply)
+  - post-apply checks (cluster, flux, namespaces, app health)
+  - ingress verification with Host header
+- One explicit decision documented for Flux repo auth model.
+- One explicit DNS/TLS short-term strategy documented for demos.
+
+### Phase 3 (Next 5-7 Days): Lesson 01 + Guardrails
+
+Definition of done:
+- Create first complete lesson under `docs/course/chapter-01-introduction/`:
+  - incident hook
+  - unsafe path
+  - safe path
+  - reproducible demo commands
+  - rollback checklist
+- Add reusable guard scripts under `scripts/` for:
+  - Kubernetes context/namespace pre-check
+  - Terraform plan-before-apply enforcement
+- Link lesson to scripts and expected outputs.
+
+### Phase 4 (Next 7-10 Days): Observability End-to-End
+
+Definition of done:
+- Enable and document OpenTelemetry collector bootstrap in Flux.
+- Demonstrate one trace path frontend -> backend with runbook.
+- Add one incident-debug workflow in docs using metrics + traces.
+
+### Phase 5 (Next 10-14 Days): Minimal Test Harness
+
+Definition of done:
+- Add initial test suite under `tests/`:
+  - docs/manifest sanity checks
+  - deterministic checks for guard scripts
+  - basic Flux object presence assertions (manifest-level)
+- Wire these checks into CI as non-optional for PRs affecting `flux/`, `infra/`, or `docs/`.

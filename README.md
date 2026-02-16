@@ -5,15 +5,13 @@ This repository is a production-grade demo control plane plus two reference serv
 The point is not “how to use AI” or “how to prompt”. The point is how to build workflows where AI behaves like a fast, confident junior engineer (low context, no fear) while the surrounding system stays safe.
 
 ## Current Decisions
-- Repository model: Monorepo (this repo contains `backend/`, `frontend/`, and the GitOps control plane under `flux/` and `infra/terraform/`)
+- Repository model: control-plane repo (`sre/`) plus companion service repos (`backend/`, `frontend/`) in the same workspace
 - Local Kubernetes: kind
 - GitOps operator: FluxCD
 - IaC layout: Terraform under `infra/terraform`; GitOps manifests under `flux/`
 - Automation: `scripts/` for reusable tooling, `tests/` for infrastructure tests
 
 ## Repository Layout
-- `backend/` – Go HTTP API reference service (logging baseline, Prometheus metrics, OpenTelemetry traces, chaos endpoints)
-- `frontend/` – Vue 3 SPA demo UI (dashboard, API explorer, chaos controls, web tracing)
 - `docs/` – living docs + course material
 - `infra/` – Terraform
 - `infra/terraform/kind_cluster/` – Terraform module (tehcyx/kind) defining the local multi-node kind cluster + Flux install
@@ -21,6 +19,10 @@ The point is not “how to use AI” or “how to prompt”. The point is how to
 - `config/` – shared configuration files
 - `tests/` – infrastructure and system test suites
 - `scripts/` – helper scripts, automation wrappers
+
+Companion repos in this workspace:
+- `../backend/` – Go HTTP API reference service (logging baseline, Prometheus metrics, OpenTelemetry traces, chaos endpoints)
+- `../frontend/` – Vue 3 SPA demo UI (dashboard, API explorer, chaos controls, web tracing)
 
 ## Quick Start
 1. Hetzner cluster (recommended): follow `docs/hetzner.md`.

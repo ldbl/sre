@@ -1,6 +1,6 @@
 # Flux Installation & Bootstrap
 
-Flux powers the GitOps control plane. Terraform provisions the controllers using the `tehcyx/kind` cluster module under `infra/terraform/kind_cluster/` and deploys the Flux Operator (`flux-operator`) plus a Flux instance (`flux-instance`) via the Helm provider.
+Flux powers the GitOps control plane. Terraform provisions controllers under `infra/terraform/kind_cluster/` by applying Flux Operator manifests and creating a `FluxInstance` resource.
 
 ## Prerequisites
 - Local kind cluster managed by Terraform (see `docs/local-dev.md`).
@@ -16,8 +16,8 @@ terraform apply
 ```
 Terraform will:
 1. Create/update the kind cluster and merge the kubeconfig into `~/.kube/config`.
-2. Deploy the Flux Operator Helm chart (`oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator`).
-3. Deploy a Flux instance via the `flux-instance` chart with controllers for image automation and cluster-wide reconciliation.
+2. Install Flux Operator from upstream manifests.
+3. Create a `FluxInstance` with source/kustomize/helm/notification/image controllers enabled.
 
 To enable GitOps reconciliation of this repository, set the following environment variables (or add to your Terraform variables file) before running `terraform apply`:
 ```bash
@@ -26,6 +26,7 @@ export TF_VAR_flux_git_repository_branch="main"
 export TF_VAR_flux_kustomization_path="./flux/bootstrap/flux-system"
 ```
 Terraform will create a `GitRepository` and `Kustomization` in `flux-system` pointing to the specified path. Adjust the URL/path to match your desired GitOps layout.
+Terraform sets the `sync` block on `FluxInstance`; Flux then manages `GitRepository`/`Kustomization` resources in-cluster.
 
 ## Verify Installation
 ```bash
@@ -39,6 +40,6 @@ Controllers may take up to a minute to settle in a fresh kind cluster.
 After Flux components are running, declare GitRepository/Kustomization resources under `flux/` and let Flux reconcile them.
 
 ## Uninstall
-`terraform destroy` tears down the kind cluster and automatically removes both Helm releases, cleaning up the `flux-system` namespace.
+`terraform destroy` tears down the kind cluster and removes the `FluxInstance` resource as part of Terraform cleanup.
 
-To upgrade Flux components, bump the `version` fields of `helm_release.flux_operator` and `helm_release.flux_instance` in `infra/terraform/kind_cluster/main.tf`, then re-run `terraform apply`.
+To upgrade Flux components, update `var.flux_version` in `infra/terraform/kind_cluster/variables.tf` (or via `TF_VAR_flux_version`) and re-run `terraform apply`.
