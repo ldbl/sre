@@ -3,6 +3,8 @@ kind: Cluster
 metadata:
   name: app-postgres
   namespace: develop
+  annotations:
+    cnpg.io/validation: "disabled"
 spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:17
