@@ -12,6 +12,9 @@ spec:
   path: ./flux/bootstrap/apps/develop
   prune: true
   wait: false
+  dependsOn:
+    - name: network-policies-develop
+    - name: resource-management-develop
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -26,6 +29,9 @@ spec:
   path: ./flux/bootstrap/apps/staging
   prune: true
   wait: false
+  dependsOn:
+    - name: network-policies-staging
+    - name: resource-management-staging
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -40,3 +46,6 @@ spec:
   path: ./flux/bootstrap/apps/production
   prune: true
   wait: false
+  dependsOn:
+    - name: network-policies-production
+    - name: resource-management-production

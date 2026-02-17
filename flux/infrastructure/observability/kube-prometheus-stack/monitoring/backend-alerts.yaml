@@ -17,8 +17,7 @@ spec:
           expr: |
             (
               sum(rate(app_http_requests_total{job="backend",status=~"5.."}[5m]))
-              /
-              sum(rate(app_http_requests_total{job="backend"}[5m]))
+              / clamp_min(sum(rate(app_http_requests_total{job="backend"}[5m])), 1e-9)
             ) > 0.05
           for: 5m
           labels:
@@ -27,14 +26,14 @@ spec:
           annotations:
             summary: "Backend service has high error rate"
             description: "Backend error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
 
         # Critical error rate alert
         - alert: BackendCriticalErrorRate
           expr: |
             (
               sum(rate(app_http_requests_total{job="backend",status=~"5.."}[5m]))
-              /
-              sum(rate(app_http_requests_total{job="backend"}[5m]))
+              / clamp_min(sum(rate(app_http_requests_total{job="backend"}[5m])), 1e-9)
             ) > 0.10
           for: 2m
           labels:
@@ -43,6 +42,7 @@ spec:
           annotations:
             summary: "Backend service has critical error rate"
             description: "Backend error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
 
         # High latency alert (p95)
         - alert: BackendHighLatency
@@ -57,6 +57,7 @@ spec:
           annotations:
             summary: "Backend service has high latency"
             description: "Backend p95 latency is {{ $value }}s (threshold: 1s)"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
 
         # Service down alert
         - alert: BackendServiceDown
@@ -68,6 +69,7 @@ spec:
           annotations:
             summary: "Backend service is down"
             description: "Backend service {{ $labels.instance }} is down"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
 
         # High memory usage
         - alert: BackendHighMemoryUsage
@@ -84,6 +86,7 @@ spec:
           annotations:
             summary: "Backend service has high memory usage"
             description: "Backend memory usage is {{ $value }}GB (threshold: 0.8GB)"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
 
         # Too many goroutines
         - alert: BackendHighGoroutines
@@ -95,6 +98,7 @@ spec:
           annotations:
             summary: "Backend has too many goroutines"
             description: "Backend has {{ $value }} goroutines (threshold: 10000)"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
 
         # Pod restarts
         - alert: BackendPodRestarting
@@ -110,22 +114,4 @@ spec:
           annotations:
             summary: "Backend pod is restarting frequently"
             description: "Backend pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting"
-
-        # SLO: 99.5% availability (based on 5xx errors)
-        - alert: BackendSLOViolation
-          expr: |
-            (
-              1 - (
-                sum(rate(app_http_requests_total{job="backend",status=~"5.."}[30m]))
-                /
-                sum(rate(app_http_requests_total{job="backend"}[30m]))
-              )
-            ) < 0.995
-          for: 5m
-          labels:
-            severity: critical
-            component: backend
-            slo: availability
-          annotations:
-            summary: "Backend SLO violation - availability below 99.5%"
-            description: "Backend availability is {{ $value | humanizePercentage }} (SLO: 99.5%)"
+            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"

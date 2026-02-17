@@ -118,7 +118,10 @@ Pre-configured dashboard showing:
 
 ### Backend Alert Rules
 
-**File:** `flux/infrastructure/observability/kube-prometheus-stack/backend-alerts.yaml`
+**File:** `flux/infrastructure/observability/kube-prometheus-stack/monitoring/backend-alerts.yaml`
+
+SLO recording and burn-rate rules:
+- `flux/infrastructure/observability/kube-prometheus-stack/monitoring/backend-slo-rules.yaml`
 
 Configured alerts:
 
@@ -131,7 +134,8 @@ Configured alerts:
 | `BackendHighMemoryUsage` | warning | >0.8GB for 5m | Memory usage is high |
 | `BackendHighGoroutines` | warning | >10k for 5m | Too many goroutines (possible leak) |
 | `BackendPodRestarting` | warning | restarts >0 for 5m | Pod is restarting frequently |
-| `BackendSLOViolation` | critical | availability <99.5% | SLO breach - availability below target |
+| `BackendSLOErrorBudgetBurnCritical` | critical | burn rate >14.4x | Fast error-budget burn for 99.5% SLO |
+| `BackendSLOErrorBudgetBurnWarning` | warning | burn rate >6x | Sustained error-budget burn for 99.5% SLO |
 
 ## Metrics Reference
 
@@ -198,7 +202,7 @@ histogram_quantile(0.99,
 1 - (
   sum(rate(app_http_requests_total{job="backend",status=~"5.."}[30m]))
   /
-  sum(rate(app_http_request_total{job="backend"}[30m]))
+  clamp_min(sum(rate(app_http_requests_total{job="backend"}[30m])), 1e-9)
 )
 ```
 

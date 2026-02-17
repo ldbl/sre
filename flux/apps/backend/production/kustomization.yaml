@@ -8,6 +8,8 @@ resources:
   - ../base
   - image-policy.yaml
   - image-automation.yaml
+  - hpa.yaml
+  - pdb.yaml
 images:
   - name: ghcr.io/ldbl/backend
     newTag: production-v0.0.2-025c591-1770392924 # {"$imagepolicy": "production:backend:tag"}
@@ -15,7 +17,7 @@ patches:
   - patch: |-
       - op: replace
         path: /spec/replicas
-        value: 1
+        value: 2
     target:
       kind: Deployment
       name: backend

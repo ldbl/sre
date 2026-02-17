@@ -1,0 +1,36 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: app-postgres
+  namespace: develop
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: app-postgres-app
+  storage:
+    size: 10Gi
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: s3://sre-cnpg-backups/develop/app-postgres
+      endpointURL: https://REPLACE_ME.r2.cloudflarestorage.com
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-backup-s3
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-backup-s3
+          key: ACCESS_SECRET_KEY
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi

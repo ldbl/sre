@@ -14,6 +14,26 @@ The goal is to build workflows where AI is a reviewer/simulator/second brain, no
 - Teach guardrails-first workflows: environment separation, plan-before-apply, context checks, blast radius control, rollback-first.
 - Keep everything evergreen and workflow-oriented (not tool-hype or tool-churn).
 
+## Course Blueprint (Approved)
+
+The course now follows a 13-chapter structure:
+
+1. Production Mindset & Guardrails
+2. Infrastructure as Code (IaC)
+3. Secrets Management (SOPS)
+4. GitOps & Version Promotion
+5. Network Policies (Production Isolation)
+6. Security Context & Pod Hardening
+7. Resource Management & QoS
+8. Availability Engineering (HPA + PDB)
+9. Observability
+10. Backup & Restore Basics
+11. Controlled Chaos
+12. AI-Assisted SRE Guardian
+13. 24/7 Production SRE
+
+Canonical reference: `docs/course/CURRICULUM.md`.
+
 ## End-to-End Scope (What We Must Demonstrate)
 
 1. IaC / Terraform (cluster provisioning + best practices): remote state, locking, plan/apply split, least privilege, predictable outputs.
@@ -176,13 +196,14 @@ Definition of done:
   - Kubernetes context/namespace pre-check
   - Terraform plan-before-apply enforcement
 - Link lesson to scripts and expected outputs.
+- Start migration of chapter placeholders to the approved 13-chapter blueprint.
 
 ### Phase 4 (Next 7-10 Days): Observability End-to-End
 
 Definition of done:
-- Enable and document OpenTelemetry collector bootstrap in Flux.
+- Direct export to Uptrace is documented and used by frontend/backend (no in-cluster OTel collector in MVP).
 - Demonstrate one trace path frontend -> backend with runbook.
-- Add one incident-debug workflow in docs using metrics + traces.
+- Add one incident-debug workflow in docs using metrics + traces (+ logs where available).
 
 ### Phase 5 (Next 10-14 Days): Minimal Test Harness
 
@@ -192,3 +213,11 @@ Definition of done:
   - deterministic checks for guard scripts
   - basic Flux object presence assertions (manifest-level)
 - Wire these checks into CI as non-optional for PRs affecting `flux/`, `infra/`, or `docs/`.
+
+### Phase 6 (Course Productization): Curriculum Execution
+
+Definition of done:
+- Full chapter-by-chapter lab plans aligned to `docs/course/CURRICULUM.md`.
+- Duration estimate finalized (hours).
+- Target learner profile finalized (mid/senior).
+- Strong opening and closing module scripts prepared.

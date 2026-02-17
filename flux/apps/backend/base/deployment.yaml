@@ -34,6 +34,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
+        runAsGroup: 10001
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
@@ -46,6 +47,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 10001
+          runAsGroup: 10001
           capabilities:
             drop:
               - ALL
@@ -111,9 +113,11 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+            ephemeral-storage: 128Mi
           limits:
             cpu: 500m
             memory: 512Mi
+            ephemeral-storage: 512Mi
         volumeMounts:
         - name: tmp
           mountPath: /tmp

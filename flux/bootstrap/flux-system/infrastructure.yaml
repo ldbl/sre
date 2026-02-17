@@ -32,6 +32,172 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: cnpg-operator
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/data/cnpg-operator
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-cluster-develop
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/data/cnpg-clusters/develop
+  prune: true
+  wait: false
+  dependsOn:
+    - name: cnpg-operator
+    - name: network-policies-develop
+    - name: resource-management-develop
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: network-policies-develop
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/network-policies/develop
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: resource-management-develop
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/resource-management/develop
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-cluster-staging
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/data/cnpg-clusters/staging
+  prune: true
+  wait: false
+  dependsOn:
+    - name: cnpg-operator
+    - name: network-policies-staging
+    - name: resource-management-staging
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: network-policies-staging
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/network-policies/staging
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: resource-management-staging
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/resource-management/staging
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-cluster-production
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/data/cnpg-clusters/production
+  prune: true
+  wait: false
+  dependsOn:
+    - name: cnpg-operator
+    - name: network-policies-production
+    - name: resource-management-production
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: network-policies-production
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/network-policies/production
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: resource-management-production
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/resource-management/production
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: observability
   namespace: flux-system
 spec:
@@ -60,6 +226,23 @@ spec:
   wait: false
   dependsOn:
     - name: observability
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: chaos-monkey-develop
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/chaos/develop
+  prune: true
+  wait: false
+  dependsOn:
+    - name: infrastructure
+    - name: resource-management-develop
 # ---
 # apiVersion: kustomize.toolkit.fluxcd.io/v1
 # kind: Kustomization

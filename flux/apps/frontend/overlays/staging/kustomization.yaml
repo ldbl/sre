@@ -6,6 +6,8 @@ resources:
   - namespace.yaml
   - image-policy.yaml
   - image-automation.yaml
+  - hpa.yaml
+  - pdb.yaml
 images:
   - name: ghcr.io/ldbl/frontend
     newTag: staging-v0.0.2-857701d-1770396165 # {"$imagepolicy": "staging:frontend:tag"}

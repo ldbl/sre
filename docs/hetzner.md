@@ -1,35 +1,139 @@
-# Hetzner (hcloud) Cluster
+# Hetzner (hcloud) MVP Runbook
 
-This repository supports a single Hetzner cluster (1x `cx23` control-plane + 1x `cx23` worker) with namespaces `develop`, `staging`, and `production`. Deployments are GitOps-managed by Flux.
+This runbook is the authoritative path for provisioning and validating the Hetzner cluster used in this repo.
 
-Terraform runs from GitHub Actions. Remote state is stored in Cloudflare R2 (S3-compatible backend).
+## MVP Decisions (As Of 2026-02-16)
 
-## Required GitHub Secrets
+- Runtime: `kube-hetzner` (k3s) via Terraform.
+- Topology: `1x cx23` control-plane + `1x cx23` worker.
+- Environments: `develop`, `staging`, `production` namespaces in one cluster.
+- GitOps: Flux with sync path `./flux/bootstrap/flux-system`.
+- Flux Git auth model (MVP): **public GitHub repo over HTTPS** (no Git token required by default).
+- Demo ingress strategy (MVP): HTTP + Host header (`backend.local`, `frontend.local`) against LB IP.
 
-Create these under GitHub → repo → Settings → Secrets and variables → Actions:
+## Required GitHub Actions Secrets
 
-- `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`: Cloudflare R2 access keys for the `sre` bucket (Terraform state backend).
-- `HCLOUD_TOKEN`: Hetzner Cloud API token.
-- `HCLOUD_SSH_PUBLIC_KEY`: SSH public key (ed25519) used to bootstrap nodes.
-- `HCLOUD_SSH_PRIVATE_KEY`: SSH private key (ed25519) used to bootstrap nodes.
+Set these in: GitHub -> Settings -> Secrets and variables -> Actions.
 
-Recommended (but depends on your setup):
+Required:
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `HCLOUD_TOKEN`
+- `HCLOUD_SSH_PUBLIC_KEY`
+- `HCLOUD_SSH_PRIVATE_KEY`
 
-- `FLUX_GIT_TOKEN`: Only needed if the GitHub repo is private. Fine-grained token with repository access and `Contents: Read` permission (classic PAT: `repo` scope).
-- `SOPS_AGE_KEY`: age private key (contents of `age.agekey`) so Flux can decrypt SOPS secrets from `flux/secrets/**`.
-- `GHCR_USERNAME` / `GHCR_TOKEN`: Only needed if container images in GHCR are private (`GHCR_TOKEN` needs `read:packages`).
+Optional (only when needed):
+- `SOPS_AGE_KEY`: needed when using encrypted manifests under `flux/secrets/**`.
+- `GHCR_USERNAME` / `GHCR_TOKEN`: needed when GHCR images are private.
+- `FLUX_GIT_TOKEN`: not required for the default public-repo MVP path.
+- `BACKUP_S3_ACCESS_KEY_ID` / `BACKUP_S3_SECRET_ACCESS_KEY` / `BACKUP_S3_BUCKET`: needed when creating CNPG backup object-store secret via Terraform.
+- `BACKUP_S3_ENDPOINT` / `BACKUP_S3_REGION`: optional, for AWS-compatible providers (for example R2/S3 endpoint tuning).
 
-## Terraform Workflows
+## Preflight Checklist
 
-- `Terraform - Plan (Hetzner)`: runs on PRs that touch `infra/terraform/hcloud_cluster/**` or `flux/**`.
-- `Terraform - Apply (Hetzner)`: manual (`workflow_dispatch`), protected by the GitHub Environment `hcloud` (configure approvals in GitHub).
+1. Confirm repo owner/repo references are correct for your fork/org:
+   - `scripts/configure-repo.sh --github-owner <owner> --github-repo <repo>`
+2. Confirm `infra/terraform/hcloud_cluster/main.tf` validates with your module version.
+3. Confirm GitHub Environment `hcloud` exists and has manual approval policy.
+4. Confirm Hetzner project has required MicroOS snapshots for `kube-hetzner`.
 
-## Notes
+## Provisioning Workflow
 
-If your GitHub org/user is not `ldbl` (the current placeholder), run `scripts/configure-repo.sh --github-owner <owner> --github-repo <repo>`. This updates hardcoded `ghcr.io/<owner>` and `https://github.com/<owner>/<repo>.git` references in `docs/` and `flux/`.
+### 1. Plan on PR
 
-Secrets under `flux/secrets/**` are currently wired by default through `flux/bootstrap/flux-system/kustomization.yaml`. Ensure `sops-age` exists in `flux-system` (Terraform creates it when `SOPS_AGE_KEY` is provided). If you are not using SOPS yet, remove `secrets.yaml` from the bootstrap kustomization to avoid reconciliation failures.
+Trigger `Terraform - Plan (Hetzner)` by opening a PR with changes in:
+- `infra/terraform/hcloud_cluster/**`
+- `flux/**`
 
-Ingress hostnames in this repo default to `backend.local` / `frontend.local`. For demos you can hit the load balancer IP and set the Host header (or add `/etc/hosts` entries).
+Required outcome:
+- workflow completes successfully
+- no unexpected resource drift in plan output
 
-The Hetzner k3s setup from `kube-hetzner` expects MicroOS snapshots to exist in your Hetzner project (created once via their tooling). If you don’t have those snapshots yet, create them before running Terraform.
+### 2. Apply Manually
+
+Run `Terraform - Apply (Hetzner)` via `workflow_dispatch` with:
+- `action=apply`
+
+Required outcome:
+- workflow succeeds
+- no failed Terraform steps
+
+## Post-Apply Verification
+
+Use a workstation with `kubectl` and Terraform backend credentials (R2) to read current state and verify cluster health.
+
+1. Export required env vars:
+```bash
+export AWS_ACCESS_KEY_ID="<R2_ACCESS_KEY_ID>"
+export AWS_SECRET_ACCESS_KEY="<R2_SECRET_ACCESS_KEY>"
+```
+
+2. Fetch kubeconfig from Terraform state:
+```bash
+cd infra/terraform/hcloud_cluster
+terraform init -input=false
+terraform output --raw kubeconfig > kubeconfig.yaml
+export KUBECONFIG="$(pwd)/kubeconfig.yaml"
+kubectl get nodes
+```
+
+3. Verify namespaces:
+```bash
+kubectl get ns | rg "flux-system|develop|staging|production|observability"
+```
+
+4. Verify Flux controllers and sync:
+```bash
+kubectl -n flux-system get pods
+kubectl -n flux-system get gitrepositories.source.toolkit.fluxcd.io
+kubectl -n flux-system get kustomizations.kustomize.toolkit.fluxcd.io
+```
+
+Expected kustomizations include:
+- `flux-system`
+- `apps-develop`
+- `apps-staging`
+- `apps-production`
+- `infrastructure`
+
+5. Verify app rollout per namespace:
+```bash
+kubectl -n develop get deploy,svc,ing
+kubectl -n staging get deploy,svc,ing
+kubectl -n production get deploy,svc,ing
+```
+
+## Ingress Verification (MVP)
+
+1. Discover ingress LB IP:
+```bash
+kubectl get svc -A | rg LoadBalancer
+```
+
+2. Test frontend and backend with Host headers:
+```bash
+LB_IP="<load-balancer-ip>"
+curl -H "Host: frontend.local" "http://${LB_IP}/" -I
+curl -H "Host: backend.local" "http://${LB_IP}/healthz" -i
+```
+
+Optional `/etc/hosts` for browser testing:
+```text
+<LB_IP> frontend.local
+<LB_IP> backend.local
+```
+
+## DNS/TLS Strategy (Short-Term MVP)
+
+- DNS: local hosts file or test DNS entries pointing to LB IP.
+- TLS: intentionally deferred for MVP to keep bootstrap deterministic.
+- When moving beyond MVP: add managed DNS records + cert-manager and switch ingresses to HTTPS.
+
+## Private Repo Variant (Non-MVP)
+
+If the repo is private:
+- set `FLUX_GIT_TOKEN`
+- configure Flux `GitRepository` auth via secret-backed HTTPS credentials
+- re-validate `flux-system` source readiness after reconciliation
+
+Keep this as a deliberate opt-in path; default training path remains public HTTPS.

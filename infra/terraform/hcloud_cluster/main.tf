@@ -5,9 +5,13 @@ provider "hcloud" {
 module "kube_hetzner" {
   source  = "kube-hetzner/kube-hetzner/hcloud"
   version = "2.19.0"
+  providers = {
+    hcloud = hcloud
+  }
 
   # Core
-  cluster_name = var.cluster_name
+  hcloud_token    = var.hcloud_token
+  cluster_name    = var.cluster_name
   ssh_public_key  = var.ssh_public_key
   ssh_private_key = var.ssh_private_key
 
@@ -44,8 +48,8 @@ module "kube_hetzner" {
   load_balancer_type     = var.load_balancer_type
   load_balancer_location = var.location
 
-  # Pin if you want, otherwise module default.
-  k3s_version = var.k3s_version
+  # Pin explicit k3s version if needed; otherwise module default applies.
+  install_k3s_version = var.k3s_version
 }
 
 locals {
@@ -56,6 +60,11 @@ locals {
 
   flux_git_secret_enabled = var.flux_git_token != ""
   sops_age_secret_enabled = var.sops_age_key != ""
+  backup_s3_secret_enabled = (
+    var.backup_s3_access_key_id != "" &&
+    var.backup_s3_secret_access_key != "" &&
+    var.backup_s3_bucket != ""
+  )
 }
 
 resource "local_sensitive_file" "kubeconfig" {
@@ -228,6 +237,30 @@ resource "kubernetes_secret" "sops_age" {
   }
 
   type = "Opaque"
+
+  depends_on = [kubernetes_namespace.bootstrap]
+}
+
+# Optional: backup object-store credentials for CloudNativePG.
+resource "kubernetes_secret" "cnpg_backup_s3" {
+  for_each = local.backup_s3_secret_enabled ? toset(["develop", "staging", "production"]) : toset([])
+
+  metadata {
+    name      = "cnpg-backup-s3"
+    namespace = each.key
+  }
+
+  type = "Opaque"
+
+  data = merge(
+    {
+      ACCESS_KEY_ID     = var.backup_s3_access_key_id
+      ACCESS_SECRET_KEY = var.backup_s3_secret_access_key
+      BUCKET            = var.backup_s3_bucket
+    },
+    var.backup_s3_endpoint != "" ? { ENDPOINT = var.backup_s3_endpoint } : {},
+    var.backup_s3_region != "" ? { REGION = var.backup_s3_region } : {},
+  )
 
   depends_on = [kubernetes_namespace.bootstrap]
 }

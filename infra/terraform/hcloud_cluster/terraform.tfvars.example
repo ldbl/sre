@@ -31,3 +31,10 @@ flux_kustomization_path    = "./flux/bootstrap/flux-system"
 
 # Optional (SOPS): age private key for Flux decryption
 # sops_age_key = "AGE-SECRET-KEY-1..."
+
+# Optional (CNPG backups): object storage credentials and bucket
+# backup_s3_access_key_id     = "REDACTED"
+# backup_s3_secret_access_key = "REDACTED"
+# backup_s3_bucket            = "sre-cnpg-backups"
+# backup_s3_endpoint          = "https://<accountid>.r2.cloudflarestorage.com"
+# backup_s3_region            = "auto"

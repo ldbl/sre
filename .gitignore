@@ -7,3 +7,5 @@ __pycache__/
 *.tfstate.backup
 terraform.tfstate.d/
 infra/terraform/kind_cluster/kubeconfig.yaml
+site/content/course/
+site/public/

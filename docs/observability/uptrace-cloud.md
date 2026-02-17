@@ -2,6 +2,9 @@
 
 This guide covers the Uptrace Cloud integration for unified observability (logs, traces, and metrics).
 
+> Current MVP note (2026-02-16): this repo uses **direct export to Uptrace** from frontend/backend and does **not** require an in-cluster OpenTelemetry Collector.  
+> Execution plan: `docs/observability/uptrace-e2e-plan.md`.
+
 ## Overview
 
 **Uptrace Cloud** is a managed OpenTelemetry-native observability platform that provides:

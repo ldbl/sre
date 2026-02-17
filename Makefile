@@ -9,7 +9,7 @@ KUBECTL_VERSION := 1.34.1
 KIND_VERSION := 0.30.0
 FLUX_VERSION := 2.7.0
 
-.PHONY: help versions plan
+.PHONY: help versions plan course-site-sync course-site-build course-site-serve
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -27,3 +27,14 @@ plan: ## Run Terraform plans for all configured workspaces (pending implementati
 	else \
 		echo "[plan] terraform not available; run make bootstrap"; \
 	fi
+
+course-site-sync: ## Sync docs/course markdown into Hugo content
+	@./scripts/sync-course-to-hugo.sh
+
+course-site-build: course-site-sync ## Build Hugo course site into site/public
+	@command -v hugo >/dev/null || (echo "[course-site-build] hugo not found"; exit 1)
+	@hugo --source site --minify
+
+course-site-serve: course-site-sync ## Run local Hugo dev server
+	@command -v hugo >/dev/null || (echo "[course-site-serve] hugo not found"; exit 1)
+	@hugo server --source site -D

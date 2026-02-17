@@ -6,6 +6,8 @@ resources:
   - namespace.yaml
   - image-policy.yaml
   - image-automation.yaml
+  - hpa.yaml
+  - pdb.yaml
 images:
   - name: ghcr.io/ldbl/frontend
     newTag: production-v0.0.1-35b2828-1770380552 # {"$imagepolicy": "production:frontend:tag"}
