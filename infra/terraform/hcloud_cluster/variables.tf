@@ -1,25 +1,9 @@
+# ─── Secrets (set via TF_VAR_* from load-env.sh) ─────────────────────────────
+
 variable "hcloud_token" {
   description = "Hetzner Cloud API token (HCLOUD_TOKEN)."
   type        = string
   sensitive   = true
-}
-
-variable "cluster_name" {
-  description = "Cluster name (used for resources and kubeconfig context)."
-  type        = string
-  default     = "sre"
-}
-
-variable "location" {
-  description = "Hetzner location for servers and load balancer (e.g. nbg1, fsn1, hel1)."
-  type        = string
-  default     = "nbg1"
-}
-
-variable "k3s_version" {
-  description = "K3s version to install. Leave unset to use module default."
-  type        = string
-  default     = null
 }
 
 variable "ssh_public_key" {
@@ -31,53 +15,6 @@ variable "ssh_private_key" {
   description = "SSH private key for cluster nodes (ed25519). Used by the module to bootstrap nodes."
   type        = string
   sensitive   = true
-}
-
-variable "control_plane_server_type" {
-  description = "Hetzner server type for the control plane."
-  type        = string
-  default     = "cx23"
-}
-
-variable "agent_server_type" {
-  description = "Hetzner server type for worker nodes."
-  type        = string
-  default     = "cx23"
-}
-
-variable "load_balancer_type" {
-  description = "Hetzner load balancer type (e.g. lb11)."
-  type        = string
-  default     = "lb11"
-}
-
-variable "flux_operator_version" {
-  description = "Flux Operator Helm chart version."
-  type        = string
-  default     = "0.30.0"
-}
-
-variable "flux_version" {
-  description = "Flux version to install (e.g., '2.x', '2.4.x', 'v2.4.0')."
-  type        = string
-  default     = "2.x"
-}
-
-variable "flux_git_repository_url" {
-  description = "Git repository URL Flux should sync (e.g. https://github.com/<owner>/<repo>.git)."
-  type        = string
-}
-
-variable "flux_git_repository_branch" {
-  description = "Git branch Flux should track."
-  type        = string
-  default     = "main"
-}
-
-variable "flux_kustomization_path" {
-  description = "Path within the Git repository to reconcile (relative to repository root)."
-  type        = string
-  default     = "./flux/bootstrap/flux-system"
 }
 
 variable "flux_git_token" {
@@ -93,17 +30,17 @@ variable "ghcr_username" {
   default     = ""
 }
 
-variable "enable_ghcr" {
-  description = "Whether to create GHCR imagePullSecrets (must be true when ghcr_token is set)."
-  type        = bool
-  default     = false
-}
-
 variable "ghcr_token" {
   description = "Optional GHCR token for pulling private images (read:packages). Leave empty if images are public."
   type        = string
   default     = ""
   sensitive   = true
+}
+
+variable "enable_ghcr" {
+  description = "Whether to create GHCR imagePullSecrets (must be true when ghcr_token is set)."
+  type        = bool
+  default     = false
 }
 
 variable "sops_age_key" {
@@ -143,4 +80,173 @@ variable "backup_s3_region" {
   description = "Optional S3 region (for AWS-compatible APIs)."
   type        = string
   default     = ""
+}
+
+# ─── Cluster Identity ────────────────────────────────────────────────────────
+
+variable "cluster_name" {
+  description = "Cluster name (used for resources and kubeconfig context)."
+  type        = string
+  default     = "sre"
+}
+
+variable "location" {
+  description = "Hetzner location for servers and load balancer (e.g. nbg1, fsn1, hel1)."
+  type        = string
+  default     = "nbg1"
+}
+
+variable "load_balancer_type" {
+  description = "Hetzner load balancer type (e.g. lb11)."
+  type        = string
+  default     = "lb11"
+}
+
+# ─── Server Types ────────────────────────────────────────────────────────────
+
+variable "control_plane_server_type" {
+  description = "Hetzner server type for the control plane."
+  type        = string
+  default     = "cpx32"
+}
+
+variable "control_plane_count" {
+  description = "Number of control plane nodes (1 for non-HA, 3 for HA)."
+  type        = number
+  default     = 1
+}
+
+variable "workers_server_type" {
+  description = "Hetzner server type for worker nodes."
+  type        = string
+  default     = "cpx32"
+}
+
+variable "workers_count" {
+  description = "Number of static worker nodes (ignored when autoscaling is enabled)."
+  type        = number
+  default     = 1
+}
+
+# ─── Autoscaling ─────────────────────────────────────────────────────────────
+
+variable "autoscaling_enabled" {
+  description = "Enable cluster autoscaler for the workers pool. When true, workers_count is ignored and min/max nodes apply instead."
+  type        = bool
+  default     = false
+}
+
+variable "autoscaling_min_nodes" {
+  description = "Minimum number of autoscaled worker nodes."
+  type        = number
+  default     = 0
+}
+
+variable "autoscaling_max_nodes" {
+  description = "Maximum number of autoscaled worker nodes."
+  type        = number
+  default     = 5
+}
+
+# ─── K3s & OS Upgrades ──────────────────────────────────────────────────────
+
+variable "k3s_channel" {
+  description = "K3s release channel (e.g. v1.34, stable). Used when k3s_version is empty."
+  type        = string
+  default     = "v1.34"
+}
+
+variable "k3s_version" {
+  description = "Pin an exact K3s version (e.g. v1.34.0+k3s1). Overrides k3s_channel when set."
+  type        = string
+  default     = ""
+}
+
+variable "auto_upgrade_k3s" {
+  description = "Automatically upgrade K3s when a new patch appears on the selected channel."
+  type        = bool
+  default     = true
+}
+
+variable "auto_upgrade_os" {
+  description = "Automatically apply OS security updates (requires kured for reboots). Disable for single-node clusters."
+  type        = bool
+  default     = true
+}
+
+# ─── Kured (Kubernetes Reboot Daemon) ───────────────────────────────────────
+
+variable "kured_enabled" {
+  description = "Enable kured for coordinated node reboots after OS updates."
+  type        = bool
+  default     = true
+}
+
+variable "kured_reboot_days" {
+  description = "Days when kured is allowed to reboot nodes (comma-separated, e.g. sat,sun)."
+  type        = string
+  default     = "sat,sun"
+}
+
+variable "kured_start_time" {
+  description = "Start of the kured reboot window (24h format, e.g. 02:00)."
+  type        = string
+  default     = "02:00"
+}
+
+variable "kured_end_time" {
+  description = "End of the kured reboot window (24h format, e.g. 05:00)."
+  type        = string
+  default     = "05:00"
+}
+
+# ─── Ingress ─────────────────────────────────────────────────────────────────
+
+variable "ingress_controller" {
+  description = "Ingress controller to deploy (traefik, nginx, haproxy, none)."
+  type        = string
+  default     = "traefik"
+}
+
+variable "traefik_redirect_to_https" {
+  description = "Redirect HTTP to HTTPS in traefik."
+  type        = bool
+  default     = true
+}
+
+variable "traefik_autoscaling" {
+  description = "Enable HPA for traefik pods."
+  type        = bool
+  default     = true
+}
+
+# ─── Flux ────────────────────────────────────────────────────────────────────
+
+variable "flux_operator_version" {
+  description = "Flux Operator Helm chart version."
+  type        = string
+  default     = "0.30.0"
+}
+
+variable "flux_version" {
+  description = "Flux version to install (e.g., '2.x', '2.4.x', 'v2.4.0')."
+  type        = string
+  default     = "2.x"
+}
+
+variable "flux_git_repository_url" {
+  description = "Git repository URL Flux should sync (e.g. https://github.com/<owner>/<repo>.git)."
+  type        = string
+}
+
+variable "flux_git_repository_branch" {
+  description = "Git branch Flux should track."
+  type        = string
+  default     = "main"
+}
+
+variable "flux_kustomization_path" {
+  description = "Path within the Git repository to reconcile (relative to repository root)."
+  type        = string
+  default     = "./flux/bootstrap/flux-system"
 }

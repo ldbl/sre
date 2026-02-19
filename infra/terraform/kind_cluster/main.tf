@@ -32,8 +32,9 @@ provider "kubernetes" {
 }
 
 locals {
-  kubeconfig_path = pathexpand("${path.module}/kubeconfig.yaml")
-  flux_pull_secret_yaml = var.github_app_id != "" ? "    pullSecret: \"flux-system\"\n" : ""
+  kubeconfig_path          = pathexpand("${path.module}/kubeconfig.yaml")
+  flux_pull_secret_yaml    = var.github_app_id != "" ? "    pullSecret: \"flux-system\"\n" : ""
+  backup_s3_secret_enabled = nonsensitive(var.r2_access_key_id != "" && var.r2_secret_access_key != "")
 }
 
 resource "kind_cluster" "sre" {
@@ -100,8 +101,8 @@ resource "null_resource" "merge_kubeconfig" {
   depends_on = [kind_cluster.sre]
 
   provisioner "local-exec" {
-    when    = create
-    command = "${path.module}/scripts/merge-kubeconfig.sh \"${local.kubeconfig_path}\""
+    when        = create
+    command     = "${path.module}/scripts/merge-kubeconfig.sh \"${local.kubeconfig_path}\""
     interpreter = ["/bin/bash", "-c"]
   }
 }
@@ -118,7 +119,7 @@ output "kubeconfig" {
 
 output "kubeconfig_load_instructions" {
   description = "How to use the generated kubeconfig"
-  value = <<-EOT
+  value       = <<-EOT
     export KUBECONFIG="${local.kubeconfig_path}"
     kubectl get nodes
     # Optional: merge into your default kubeconfig
@@ -156,8 +157,8 @@ resource "null_resource" "flux_instance" {
   }
 
   provisioner "local-exec" {
-    when    = create
-    command = <<-EOC
+    when        = create
+    command     = <<-EOC
       cat <<EOF | kubectl --kubeconfig="${local.kubeconfig_path}" apply -f -
 apiVersion: fluxcd.controlplane.io/v1
 kind: FluxInstance
@@ -190,8 +191,8 @@ EOF
   }
 
   provisioner "local-exec" {
-    when    = destroy
-    command = "kubectl --kubeconfig=\"${self.triggers.kubeconfig_path}\" delete fluxinstance flux -n flux-system --ignore-not-found=true"
+    when        = destroy
+    command     = "kubectl --kubeconfig=\"${self.triggers.kubeconfig_path}\" delete fluxinstance flux -n flux-system --ignore-not-found=true"
     interpreter = ["/bin/bash", "-c"]
   }
 }
@@ -207,9 +208,9 @@ resource "kubernetes_secret" "flux_github_app" {
   }
 
   data = {
-    "githubAppID"              = var.github_app_id
-    "githubAppInstallationID"  = var.github_app_installation_id
-    "githubAppPrivateKey"      = file(var.github_app_private_key_file)
+    "githubAppID"             = var.github_app_id
+    "githubAppInstallationID" = var.github_app_installation_id
+    "githubAppPrivateKey"     = file(var.github_app_private_key_file)
   }
 
   type = "Opaque"
@@ -290,6 +291,30 @@ resource "kubernetes_secret" "sops_age" {
   data = {
     "age.agekey" = var.sops_age_key
   }
+}
+
+# Create CNPG backup S3 secret in each environment namespace
+resource "kubernetes_secret" "cnpg_backup_s3" {
+  for_each = local.backup_s3_secret_enabled ? toset(["develop", "staging", "production"]) : toset([])
+
+  metadata {
+    name      = "cnpg-backup-s3"
+    namespace = each.key
+  }
+
+  type = "Opaque"
+
+  data = merge(
+    {
+      ACCESS_KEY_ID     = var.r2_access_key_id
+      ACCESS_SECRET_KEY = var.r2_secret_access_key
+      BUCKET            = var.r2_bucket
+    },
+    var.r2_endpoint != "" ? { ENDPOINT = var.r2_endpoint } : {},
+    var.r2_region != "" ? { REGION = var.r2_region } : {},
+  )
+
+  depends_on = [kubernetes_namespace.bootstrap]
 }
 
 output "flux_operator_installed" {

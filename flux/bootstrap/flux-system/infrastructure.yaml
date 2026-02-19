@@ -32,6 +32,41 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/security/cert-manager
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: infrastructure
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: external-dns
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/security/external-dns
+  prune: true
+  wait: true
+  timeout: 10m0s
+  dependsOn:
+    - name: infrastructure
+    - name: secrets-cloudflare
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: cnpg-operator
   namespace: flux-system
 spec:
@@ -59,6 +94,9 @@ spec:
   path: ./flux/infrastructure/data/cnpg-clusters/develop
   prune: true
   wait: false
+  postBuild:
+    substitute:
+      R2_ENDPOINT_URL: "https://99c9887cccb1cb265d748f267999af47.r2.cloudflarestorage.com"
   dependsOn:
     - name: cnpg-operator
     - name: network-policies-develop
@@ -109,6 +147,9 @@ spec:
 #   path: ./flux/infrastructure/data/cnpg-clusters/staging
 #   prune: true
 #   wait: false
+#   postBuild:
+#     substitute:
+#       R2_ENDPOINT_URL: "https://99c9887cccb1cb265d748f267999af47.r2.cloudflarestorage.com"
 #   dependsOn:
 #     - name: cnpg-operator
 #     - name: network-policies-staging
@@ -159,6 +200,9 @@ spec:
 #   path: ./flux/infrastructure/data/cnpg-clusters/production
 #   prune: true
 #   wait: false
+#   postBuild:
+#     substitute:
+#       R2_ENDPOINT_URL: "https://99c9887cccb1cb265d748f267999af47.r2.cloudflarestorage.com"
 #   dependsOn:
 #     - name: cnpg-operator
 #     - name: network-policies-production

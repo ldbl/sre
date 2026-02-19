@@ -92,3 +92,35 @@ variable "sops_age_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "r2_access_key_id" {
+  description = "Cloudflare R2 access key ID for CNPG backup storage."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "r2_secret_access_key" {
+  description = "Cloudflare R2 secret access key for CNPG backup storage."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "r2_bucket" {
+  description = "R2 bucket name for CNPG backups."
+  type        = string
+  default     = "sre"
+}
+
+variable "r2_endpoint" {
+  description = "R2 S3-compatible endpoint URL."
+  type        = string
+  default     = "https://99c9887cccb1cb265d748f267999af47.r2.cloudflarestorage.com"
+}
+
+variable "r2_region" {
+  description = "R2 region for backup storage."
+  type        = string
+  default     = "auto"
+}

@@ -4,8 +4,12 @@ kind: Ingress
 metadata:
   name: frontend
 spec:
+  tls:
+    - hosts:
+        - staging.safeops.work
+      secretName: frontend-tls
   rules:
-    - host: frontend.staging.local
+    - host: staging.safeops.work
       http:
         paths:
           - path: /

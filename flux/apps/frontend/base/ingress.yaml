@@ -4,9 +4,9 @@ kind: Ingress
 metadata:
   name: frontend
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   rules:
   - host: frontend.local
     http:

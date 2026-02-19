@@ -2,6 +2,67 @@ provider "hcloud" {
   token = var.hcloud_token
 }
 
+# ─── Pool & feature construction ─────────────────────────────────────────────
+
+locals {
+  # Control plane — always one pool.
+  control_plane_nodepools = [
+    {
+      name        = "cp"
+      server_type = var.control_plane_server_type
+      location    = var.location
+      labels      = ["project=sre", "managed-by=terraform"]
+      taints      = []
+      count       = var.control_plane_count
+    },
+  ]
+
+  # Static workers — used when autoscaling is OFF.
+  # When autoscaling is ON the workers pool moves to autoscaler_nodepools.
+  static_agent_pools = var.autoscaling_enabled ? [] : [
+    {
+      name        = "workers"
+      server_type = var.workers_server_type
+      location    = var.location
+      labels      = ["role=workers", "project=sre", "managed-by=terraform"]
+      taints      = []
+      count       = var.workers_count
+    },
+  ]
+
+  # Autoscaler pool — used when autoscaling is ON.
+  autoscaler_nodepools = var.autoscaling_enabled ? [
+    {
+      name        = "workers"
+      server_type = var.workers_server_type
+      location    = var.location
+      min_nodes   = var.autoscaling_min_nodes
+      max_nodes   = var.autoscaling_max_nodes
+      labels      = { "role" = "workers", "project" = "sre", "managed-by" = "terraform" }
+    },
+  ] : []
+
+  # Kured options — only populated when enabled.
+  kured_options = var.kured_enabled ? {
+    "reboot-days" = var.kured_reboot_days
+    "start-time"  = var.kured_start_time
+    "end-time"    = var.kured_end_time
+  } : {}
+
+  # etcd S3 backup — reuses the R2/S3 credentials already wired through load-env.sh.
+  # k3s expects a bare hostname (no https:// prefix).
+  etcd_s3_endpoint = var.backup_s3_endpoint != "" ? replace(var.backup_s3_endpoint, "https://", "") : ""
+
+  etcd_s3_backup = local.etcd_s3_endpoint != "" ? {
+    "etcd-s3-endpoint"   = local.etcd_s3_endpoint
+    "etcd-s3-access-key" = var.backup_s3_access_key_id
+    "etcd-s3-secret-key" = var.backup_s3_secret_access_key
+    "etcd-s3-bucket"     = var.backup_s3_bucket
+    "etcd-s3-folder"     = "${var.cluster_name}/etcd-snapshots"
+    "etcd-s3-region"     = var.backup_s3_region
+  } : {}
+}
+
 module "kube_hetzner" {
   source  = "kube-hetzner/kube-hetzner/hcloud"
   version = "2.19.0"
@@ -15,41 +76,31 @@ module "kube_hetzner" {
   ssh_public_key  = var.ssh_public_key
   ssh_private_key = var.ssh_private_key
 
-  # We want a stable, provider-backed ingress controller (matches our Ingress manifests).
-  ingress_controller = "nginx"
+  # Node pools
+  control_plane_nodepools = local.control_plane_nodepools
+  agent_nodepools         = local.static_agent_pools
+  autoscaler_nodepools    = local.autoscaler_nodepools
 
-  # Non-HA control plane: keep OS upgrades off by default to avoid surprise reboots.
-  automatically_upgrade_os = false
-
-  # Minimal cluster size for this course: 1x control plane, 1x worker.
-  control_plane_nodepools = [
-    {
-      name        = "cp"
-      server_type = var.control_plane_server_type
-      location    = var.location
-      labels      = []
-      taints      = []
-      count       = 1
-    },
-  ]
-
-  agent_nodepools = [
-    {
-      name        = "agent"
-      server_type = var.agent_server_type
-      location    = var.location
-      labels      = []
-      taints      = []
-      count       = 1
-    },
-  ]
-
-  # Expose the cluster via Hetzner Load Balancer.
+  # Load balancer
   load_balancer_type     = var.load_balancer_type
   load_balancer_location = var.location
 
-  # Pin explicit k3s version if needed; otherwise module default applies.
-  install_k3s_version = var.k3s_version
+  # Ingress
+  ingress_controller        = var.ingress_controller
+  traefik_redirect_to_https = var.traefik_redirect_to_https
+  traefik_autoscaling       = var.traefik_autoscaling
+
+  # K3s versioning
+  initial_k3s_channel       = var.k3s_channel
+  install_k3s_version       = var.k3s_version
+  automatically_upgrade_k3s = var.auto_upgrade_k3s
+  automatically_upgrade_os  = var.auto_upgrade_os
+
+  # Kured
+  kured_options = local.kured_options
+
+  # etcd backup to S3/R2
+  etcd_s3_backup = local.etcd_s3_backup
 }
 
 locals {
@@ -60,7 +111,7 @@ locals {
 
   flux_git_secret_enabled = var.flux_git_token != ""
   sops_age_secret_enabled = var.sops_age_key != ""
-  backup_s3_secret_enabled = (
+  backup_s3_secret_enabled = nonsensitive(
     var.backup_s3_access_key_id != "" &&
     var.backup_s3_secret_access_key != "" &&
     var.backup_s3_bucket != ""
@@ -75,12 +126,12 @@ resource "local_sensitive_file" "kubeconfig" {
 
 provider "helm" {
   kubernetes {
-    config_path = local.kubeconfig_path
+    config_path = fileexists(local.kubeconfig_path) ? local.kubeconfig_path : "/dev/null"
   }
 }
 
 provider "kubernetes" {
-  config_path = local.kubeconfig_path
+  config_path = fileexists(local.kubeconfig_path) ? local.kubeconfig_path : "/dev/null"
 }
 
 resource "kubernetes_namespace" "bootstrap" {
@@ -104,6 +155,7 @@ resource "kubernetes_namespace" "bootstrap" {
   lifecycle {
     ignore_changes = [
       metadata[0].labels,
+      metadata[0].annotations,
     ]
   }
 }

@@ -20,8 +20,8 @@ spec:
   backup:
     retentionPolicy: "30d"
     barmanObjectStore:
-      destinationPath: s3://sre-cnpg-backups/production/app-postgres
-      endpointURL: https://REPLACE_ME.r2.cloudflarestorage.com
+      destinationPath: s3://sre/cnpg-backups/production/app-postgres
+      endpointURL: ${R2_ENDPOINT_URL}
       s3Credentials:
         accessKeyId:
           name: cnpg-backup-s3
