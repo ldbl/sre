@@ -8,6 +8,7 @@ terraform.tfstate.backup
 
 # Kubeconfig (generated locally from outputs)
 kubeconfig.yaml
+*kubeconfig*
 
 # Crash logs
 crash.log
