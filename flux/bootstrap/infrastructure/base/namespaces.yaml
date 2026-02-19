@@ -10,14 +10,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: external-dns
-  labels:
-    name: external-dns
-    managed-by: flux
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: develop
   labels:
     name: develop

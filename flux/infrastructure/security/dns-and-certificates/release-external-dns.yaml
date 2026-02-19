@@ -14,7 +14,7 @@ spec:
         kind: HelmRepository
         name: external-dns
         namespace: flux-system
-  targetNamespace: external-dns
+  targetNamespace: cert-manager
   install:
     createNamespace: false
     remediation:
