@@ -77,9 +77,10 @@ module "kube_hetzner" {
   ssh_private_key = var.ssh_private_key
 
   # Node pools
-  control_plane_nodepools = local.control_plane_nodepools
-  agent_nodepools         = local.static_agent_pools
-  autoscaler_nodepools    = local.autoscaler_nodepools
+  control_plane_nodepools           = local.control_plane_nodepools
+  agent_nodepools                   = local.static_agent_pools
+  autoscaler_nodepools              = local.autoscaler_nodepools
+  allow_scheduling_on_control_plane = var.allow_scheduling_on_control_plane
 
   # Load balancer
   load_balancer_type     = var.load_balancer_type

@@ -116,6 +116,12 @@ variable "control_plane_count" {
   default     = 1
 }
 
+variable "allow_scheduling_on_control_plane" {
+  description = "Allow workloads on control plane nodes (set true for single-node test clusters)."
+  type        = bool
+  default     = false
+}
+
 variable "workers_server_type" {
   description = "Hetzner server type for worker nodes."
   type        = string

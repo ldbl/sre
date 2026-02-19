@@ -5,8 +5,8 @@ metadata:
   namespace: staging
 spec:
   hard:
-    requests.cpu: "3"
-    requests.memory: 3Gi
-    limits.cpu: "6"
-    limits.memory: 6Gi
-    pods: "30"
+    requests.cpu: "500m"
+    requests.memory: 512Mi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "10"
