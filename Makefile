@@ -9,7 +9,7 @@ KUBECTL_VERSION := 1.34.1
 KIND_VERSION := 0.30.0
 FLUX_VERSION := 2.7.0
 
-.PHONY: help versions plan install-hooks pre-commit fmt validate course-site-sync course-site-build course-site-serve
+.PHONY: help versions plan install-hooks pre-commit fmt validate course-site-sync course-site-build course-site-serve terraform-hcloud-init terraform-hcloud-plan terraform-hcloud-apply terraform-hcloud-destroy
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -52,3 +52,18 @@ course-site-build: course-site-sync ## Build Hugo course site into site/public
 course-site-serve: course-site-sync ## Run local Hugo dev server
 	@command -v hugo >/dev/null || (echo "[course-site-serve] hugo not found"; exit 1)
 	@hugo server --source site -D
+
+terraform-hcloud-init: ## Terraform init for Hetzner cluster
+	@$(MAKE) -C infra/terraform/hcloud_cluster init
+
+terraform-hcloud-plan: ## Terraform plan for Hetzner cluster
+	@$(MAKE) -C infra/terraform/hcloud_cluster init
+	@$(MAKE) -C infra/terraform/hcloud_cluster plan
+
+terraform-hcloud-apply: ## Terraform apply for Hetzner cluster
+	@$(MAKE) -C infra/terraform/hcloud_cluster init
+	@$(MAKE) -C infra/terraform/hcloud_cluster apply
+
+terraform-hcloud-destroy: ## Terraform destroy for Hetzner cluster (with state cleanup)
+	@$(MAKE) -C infra/terraform/hcloud_cluster init
+	@$(MAKE) -C infra/terraform/hcloud_cluster destroy

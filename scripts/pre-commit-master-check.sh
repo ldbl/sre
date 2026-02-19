@@ -7,7 +7,13 @@ PROTECTED_PATTERNS=()
 while [[ $# -gt 0 ]]; do
     case $1 in
         --protected=*) PROTECTED_PATTERNS+=("${1#*=}"); shift ;;
-        --protected)   PROTECTED_PATTERNS+=("$2"); shift 2 ;;
+        --protected)
+            if [[ $# -ge 2 ]]; then
+                PROTECTED_PATTERNS+=("$2"); shift 2
+            else
+                echo "Error: --protected requires a value" >&2; exit 1
+            fi
+            ;;
         *) shift ;;
     esac
 done

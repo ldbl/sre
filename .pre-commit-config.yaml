@@ -1,3 +1,9 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+  - pre-merge-commit
+  - prepare-commit-msg
+
 repos:
   - repo: local
     hooks:
@@ -17,14 +23,14 @@ repos:
         entry: scripts/prevent-amend-after-push.sh
         language: script
         always_run: true
-        pass_filenames: true
+        pass_filenames: false
         stages: [prepare-commit-msg]
 
   - repo: local
     hooks:
       - id: terraform-fmt
-        name: Terraform format
-        entry: terraform fmt -recursive -diff
+        name: Terraform format check
+        entry: terraform fmt -recursive -diff -check
         language: system
         files: \.tf$
         pass_filenames: false
@@ -55,4 +61,20 @@ repos:
         entry: scripts/block-secrets.sh
         language: script
         files: (kubeconfig|\.key$|\.pem$|credentials|\.env$)
+        stages: [pre-commit]
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        files: \.sh$
+        args: [--severity=warning]
+        stages: [pre-commit]
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: \.ya?ml$
+        args: [-d, relaxed]
         stages: [pre-commit]

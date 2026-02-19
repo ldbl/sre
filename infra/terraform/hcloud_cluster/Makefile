@@ -2,7 +2,7 @@ SHELL := /bin/bash
 TF    := terraform
 TF_DIR := $(CURDIR)
 
-.PHONY: help init plan apply destroy state-clean state-clean-k8s state-list kubeconfig
+.PHONY: help init plan apply destroy state-clean state-clean-k8s state-list kubeconfig test
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -42,6 +42,10 @@ state-clean: ## Remove ALL resources from state (nuclear option)
 		$(TF) state rm "$$r" 2>/dev/null || true; \
 	done
 	@echo "==> State is now empty. 'terraform plan' will show everything as new."
+
+test: ## Validate Terraform configuration
+	@if [ ! -d .terraform ]; then $(TF) init -input=false -backend=false; fi
+	$(TF) validate
 
 kubeconfig: ## Export KUBECONFIG path
 	@echo "export KUBECONFIG=$(TF_DIR)/kubeconfig.yaml"
