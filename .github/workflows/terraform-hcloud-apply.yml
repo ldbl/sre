@@ -7,7 +7,6 @@ on:
         description: "GitHub users/team slugs (comma-separated) for manual approval"
         required: true
         type: string
-        default: ""
       minimum_approvals:
         description: "Minimum number of approvals"
         required: true
@@ -16,7 +15,7 @@ on:
 
 concurrency:
   group: terraform-hcloud-apply
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -110,7 +109,7 @@ jobs:
       - name: Manual approval gate
         uses: trstringer/manual-approval@v1
         with:
-          secret: ${{ github.TOKEN }}
+          secret: ${{ github.token }}
           approvers: ${{ github.event.inputs.approvers }}
           minimum-approvals: ${{ github.event.inputs.minimum_approvals }}
           issue-title: "Terraform apply approval"

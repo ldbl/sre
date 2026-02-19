@@ -30,8 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Confirm destroy string
+        env:
+          CONFIRM_DESTROY: ${{ github.event.inputs.confirm_destroy }}
         run: |
-          [ "${{ github.event.inputs.confirm_destroy }}" = "DESTROY" ] || {
+          [ "$CONFIRM_DESTROY" = "DESTROY" ] || {
             echo "Invalid confirmation value. You must type DESTROY."
             exit 1
           }
@@ -43,7 +45,7 @@ jobs:
       - name: Manual approval gate
         uses: trstringer/manual-approval@v1
         with:
-          secret: ${{ github.TOKEN }}
+          secret: ${{ github.token }}
           approvers: ${{ github.event.inputs.approvers }}
           minimum-approvals: ${{ github.event.inputs.minimum_approvals }}
           issue-title: "Terraform destroy approval"
