@@ -11,4 +11,5 @@ resources:
   - allow-backend-egress-https.yaml
   - allow-postgres-egress-https.yaml
   - allow-postgres-egress-apiserver.yaml
+  - allow-postgres-ingress-cnpg-operator.yaml
   - allow-backend-metrics-from-observability.yaml
