@@ -8,12 +8,13 @@ locals {
   # Control plane — always one pool.
   control_plane_nodepools = [
     {
-      name        = "cp"
-      server_type = var.control_plane_server_type
-      location    = var.location
-      labels      = ["project=sre", "managed-by=terraform"]
-      taints      = []
-      count       = var.control_plane_count
+      name         = "cp"
+      server_type  = var.control_plane_server_type
+      location     = var.location
+      labels       = ["project=sre", "managed-by=terraform"]
+      taints       = []
+      count        = var.control_plane_count
+      disable_ipv6 = true
     },
   ]
 
@@ -21,12 +22,13 @@ locals {
   # When autoscaling is ON the workers pool moves to autoscaler_nodepools.
   static_agent_pools = var.autoscaling_enabled ? [] : [
     {
-      name        = "workers"
-      server_type = var.workers_server_type
-      location    = var.location
-      labels      = ["role=workers", "project=sre", "managed-by=terraform"]
-      taints      = []
-      count       = var.workers_count
+      name         = "workers"
+      server_type  = var.workers_server_type
+      location     = var.location
+      labels       = ["role=workers", "project=sre", "managed-by=terraform"]
+      taints       = []
+      count        = var.workers_count
+      disable_ipv6 = true
     },
   ]
 
@@ -83,8 +85,9 @@ module "kube_hetzner" {
   allow_scheduling_on_control_plane = var.allow_scheduling_on_control_plane
 
   # Load balancer
-  load_balancer_type     = var.load_balancer_type
-  load_balancer_location = var.location
+  load_balancer_type         = var.load_balancer_type
+  load_balancer_location     = var.location
+  load_balancer_disable_ipv6 = true
 
   # Ingress
   ingress_controller        = var.ingress_controller
