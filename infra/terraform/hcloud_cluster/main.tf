@@ -248,8 +248,9 @@ EOF
 
   provisioner "local-exec" {
     when        = destroy
+    on_failure  = continue
     interpreter = ["/bin/bash", "-c"]
-    command     = "kubectl --kubeconfig=\"${self.triggers.kubeconfig_path}\" delete fluxinstance flux -n flux-system --ignore-not-found=true"
+    command     = "kubectl --kubeconfig=\"${self.triggers.kubeconfig_path}\" delete fluxinstance flux -n flux-system --ignore-not-found=true --timeout=30s 2>/dev/null || true"
   }
 }
 
