@@ -23,8 +23,8 @@ spec:
         retentionSize: "10GB"
         resources:
           requests:
-            cpu: 200m
-            memory: 512Mi
+            cpu: 50m
+            memory: 256Mi
           limits:
             cpu: 1000m
             memory: 2Gi
@@ -50,8 +50,8 @@ spec:
         size: 5Gi
       resources:
         requests:
-          cpu: 100m
-          memory: 256Mi
+          cpu: 25m
+          memory: 128Mi
         limits:
           cpu: 500m
           memory: 512Mi
@@ -90,8 +90,8 @@ spec:
                   storage: 5Gi
         resources:
           requests:
-            cpu: 50m
-            memory: 128Mi
+            cpu: 10m
+            memory: 64Mi
           limits:
             cpu: 200m
             memory: 256Mi
@@ -128,8 +128,8 @@ spec:
     prometheusOperator:
       resources:
         requests:
-          cpu: 100m
-          memory: 128Mi
+          cpu: 25m
+          memory: 100Mi
         limits:
           cpu: 500m
           memory: 256Mi
@@ -146,8 +146,8 @@ spec:
     prometheus-node-exporter:
       resources:
         requests:
-          cpu: 50m
-          memory: 64Mi
+          cpu: 10m
+          memory: 32Mi
         limits:
           cpu: 200m
           memory: 128Mi
