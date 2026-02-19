@@ -205,7 +205,7 @@ resource "null_resource" "flux_instance" {
     repo_branch     = var.flux_git_repository_branch
     repo_path       = var.flux_kustomization_path
     flux_version    = var.flux_version
-    provider        = "github"
+    provider        = "generic"
   }
 
   provisioner "local-exec" {
@@ -235,7 +235,7 @@ spec:
     kind: GitRepository
     url: "${var.flux_git_repository_url}"
     ref: "refs/heads/${var.flux_git_repository_branch}"
-    provider: github
+    provider: generic
     path: "${var.flux_kustomization_path}"
 ${local.flux_pull_secret_yaml}
 EOF
