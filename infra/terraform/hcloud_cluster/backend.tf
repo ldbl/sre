@@ -5,10 +5,12 @@ terraform {
     region = "auto"
 
     # Cloudflare R2 S3-compatible endpoint (account-specific).
-    endpoint = "https://99c9887cccb1cb265d748f267999af47.r2.cloudflarestorage.com"
+    endpoints = {
+      s3 = "https://99c9887cccb1cb265d748f267999af47.r2.cloudflarestorage.com"
+    }
 
     # Required for non-AWS S3 backends.
-    force_path_style            = true
+    use_path_style              = true
     skip_credentials_validation = true
     skip_region_validation      = true
     skip_requesting_account_id  = true
