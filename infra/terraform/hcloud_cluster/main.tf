@@ -66,8 +66,8 @@ locals {
 }
 
 module "kube_hetzner" {
-  source  = "kube-hetzner/kube-hetzner/hcloud"
-  version = "2.19.0"
+  # kube-hetzner v2.19.0
+  source = "git::https://github.com/kube-hetzner/terraform-hcloud-kube-hetzner.git?ref=a52d120bfb9f67d6c1d01add5d202609543df3ab"
   providers = {
     hcloud = hcloud
   }
