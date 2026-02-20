@@ -78,8 +78,9 @@ jobs:
           TF_VAR_backup_s3_region: ${{ secrets.R2_REGION }}
         run: |
           set +e
+          set -o pipefail
           terraform plan -input=false -lock-timeout=5m -no-color -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
-          exit_code=$?
+          exit_code=${PIPESTATUS[0]}
           set -e
           if [ "$exit_code" -eq 1 ]; then
             echo "Terraform plan failed."
