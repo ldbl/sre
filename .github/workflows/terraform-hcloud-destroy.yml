@@ -67,6 +67,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.5"
 
       - name: Destroy infrastructure via Makefile target
         env:
