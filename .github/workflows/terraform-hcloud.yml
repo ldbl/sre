@@ -14,8 +14,8 @@ on:
       - ".github/workflows/terraform-hcloud*.yml"
 
 concurrency:
-  group: terraform-hcloud-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: terraform-hcloud
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -42,6 +42,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Terraform fmt
         run: terraform fmt -check -recursive
