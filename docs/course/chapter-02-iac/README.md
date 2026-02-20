@@ -26,6 +26,10 @@ Relevant paths:
 - `infra/terraform/hcloud_cluster/`
 - `infra/terraform/kind_cluster/`
 - `scripts/guard-terraform-plan.sh`
+- `.pre-commit-config.yaml`
+- `scripts/terraform-validate.sh`
+- `scripts/terraform-security.sh`
+- `scripts/flux-kustomize-validate.sh`
 - `docs/course/chapter-02-iac/review-checklist.md`
 - `docs/course/chapter-02-iac/drift-playbook.md`
 - `docs/hetzner.md`
@@ -60,8 +64,19 @@ Relevant paths:
 ## Chapter Flow
 
 1. Read this chapter and `lab.md`.
-2. Run the lab with guardrail scripts.
-3. Validate expected outputs and complete `quiz.md`.
+2. Install and run local hooks: `make install-hooks && pre-commit run --all-files`.
+3. Run the lab with guardrail scripts.
+4. Validate expected outputs and complete `quiz.md`.
+
+## Pre-Commit Guardrails for IaC
+
+Before Terraform changes are committed, hooks enforce:
+- `terraform fmt -recursive -diff -check`
+- `scripts/terraform-validate.sh`
+- `scripts/terraform-security.sh`
+- `scripts/flux-kustomize-validate.sh` (for any `flux/**` manifest changes in the same PR)
+
+These checks reduce noisy reviews and block unsafe IaC changes before they reach CI/apply workflows.
 
 ## Anti-Patterns to Avoid
 

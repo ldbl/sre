@@ -15,6 +15,7 @@ Execute a safe secrets workflow for `develop`:
 ## Prerequisites
 
 - `sops`, `age`, `kubectl` installed
+- `pre-commit` installed with hooks from this repo (`make install-hooks`)
 - access to a cluster with Flux installed
 - `flux-system` namespace exists
 - `sops-age` secret exists in `flux-system`
@@ -78,6 +79,8 @@ Review expectation:
 Then:
 
 ```bash
+pre-commit run no-secrets --all-files
+pre-commit run flux-kustomize-validate --all-files
 git commit -m "chapter-03: add/update encrypted backend secret for develop"
 git push
 ```

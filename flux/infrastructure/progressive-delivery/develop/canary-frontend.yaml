@@ -1,0 +1,35 @@
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: frontend
+  namespace: develop
+spec:
+  provider: linkerd
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  progressDeadlineSeconds: 120
+  service:
+    port: 8080
+    targetPort: http
+  analysis:
+    interval: 30s
+    threshold: 5
+    iterations: 10
+    match:
+      - headers:
+          x-canary:
+            exact: "always"
+      - headers:
+          cookie:
+            regex: "^(.*?;)?(canary=always)(;.*)?$"
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 30s
+      - name: request-duration
+        thresholdRange:
+          max: 500
+        interval: 30s

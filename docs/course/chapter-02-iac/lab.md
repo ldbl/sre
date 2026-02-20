@@ -15,6 +15,7 @@ Guardrail companion:
 ## Prerequisites
 
 - Terraform installed
+- pre-commit installed and hooks configured (`make install-hooks`)
 - Access to the target Terraform directory
 - Required environment variables/secrets for the selected environment
 - `scripts/guard-terraform-plan.sh` available and executable
@@ -39,6 +40,15 @@ ls -la
 Expected:
 - path ends with `sre/`
 - Terraform target directory exists
+
+Run local IaC guardrails before creating a plan:
+
+```bash
+pre-commit run terraform-fmt --all-files
+pre-commit run terraform-validate --all-files
+pre-commit run terraform-security --all-files
+pre-commit run flux-kustomize-validate --all-files
+```
 
 ## Step 2: Generate a Planfile (Guarded)
 

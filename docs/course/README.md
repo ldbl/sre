@@ -6,7 +6,7 @@ This directory is in an early scaffold stage.
 
 Available now:
 - `00-intro-ai-as-junior.md` - course framing and mental model.
-- `CURRICULUM.md` - approved 13-chapter course structure.
+- `CURRICULUM.md` - approved 12-chapter core structure + advanced track.
 - `_lesson-template.md` - standard lesson structure for guardrails-first labs.
 - `chapter-01-introduction/README.md` - first complete guardrails lesson with demo commands.
 - `chapter-02-iac/{README,lab,quiz}.md` - first IaC chapter draft with guarded Terraform workflow.
@@ -19,8 +19,12 @@ Available now:
 - `chapter-09-observability/{README,lab,runbook-incident-debug,quiz}.md` - metrics/logs/traces workflow with incident debug path.
 - `chapter-10-backup-restore/{README,lab,runbook,quiz}.md` - CNPG backup/restore basics with simulation workflow.
 - `chapter-11-controlled-chaos/{README,lab,runbook-game-day,scorecard,quiz}.md` - deterministic failure drills + guarded Chaos Monkey in `develop`.
-- `chapter-12-ai-assisted-sre-guardian/{README,lab,runbook-guardian,quiz}.md` - draft guardian chapter mapped to `k8s-ai-monitor`.
+- `chapter-12-ai-assisted-sre-guardian/{README,lab,runbook-guardian,quiz}.md` - draft advanced-track guardian chapter mapped to `k8s-ai-monitor`.
 - `chapter-13-24-7-production-sre/{README,lab,runbook-oncall,postmortem-template,quiz}.md` - on-call lifecycle and blameless operations module.
+- `chapter-14-supply-chain-security/{README,lab,runbook-supply-chain,quiz}.md` - advanced supply-chain guardrails pack (SBOM, signing, verification).
+- `chapter-15-admission-policy-guardrails/{README,lab,runbook-admission-policy,quiz}.md` - advanced policy-as-code enforcement pack (deny risky manifests).
+- `chapter-16-rollback-data-migrations/{README,lab,runbook-rollback-migrations,quiz}.md` - advanced rollback-safe schema migration operations pack.
+- `module-linkerd-progressive-delivery/{README,lab,runbook-linkerd-progressive-delivery,quiz}.md` - advanced mesh and progressive delivery module (canary/A-B).
 - chapter directories under `chapter-*` - work-in-progress placeholders and migration targets.
 
 Not available yet:
@@ -41,7 +45,7 @@ See `../ai-code-of-conduct.md` for repository-wide rules.
 
 ## Planned Structure
 
-The canonical structure is now the 13-chapter program in `CURRICULUM.md`:
+The canonical structure is now the 12-chapter core program in `CURRICULUM.md`:
 1. Production Mindset & Guardrails
 2. Infrastructure as Code (IaC)
 3. Secrets Management (SOPS)
@@ -53,8 +57,14 @@ The canonical structure is now the 13-chapter program in `CURRICULUM.md`:
 9. Observability
 10. Backup & Restore Basics
 11. Controlled Chaos
-12. AI-Assisted SRE Guardian
-13. 24/7 Production SRE
+12. 24/7 Production SRE
+
+Advanced track (Part 2):
+1. Supply Chain Security
+2. Admission Policy Guardrails
+3. AI-Assisted SRE Guardian
+4. Linkerd + Progressive Delivery (Canary / A-B)
+5. Rollback and Data Migrations
 
 ## Authoring Workflow
 
@@ -68,11 +78,13 @@ The canonical structure is now the 13-chapter program in `CURRICULUM.md`:
 
 ## Next Recommended Content
 
-1. `chapter-01-introduction`: first full lesson using the template.
-2. `chapter-02-iac`: production IaC lab (plan/review/apply + safe destroy).
-3. `chapter-03-secrets-management`: add review checklist and optional key-rotation drill extension.
-4. `chapter-12-ai-assisted-sre-guardian`: wire Flux deployment + chaos event mapping for guardian MVP.
-5. `chapter-13-24-7-production-sre`: run one full capstone incident and finalize operating metrics.
+1. Core track: finish `chapter-01-introduction` as full lesson from the template.
+2. Core track: finalize `chapter-02-iac` lab and review artifacts.
+3. Core track: extend `chapter-03-secrets-management` with key-rotation drill.
+4. Core track: run one full capstone incident in `chapter-13-24-7-production-sre`.
+5. Advanced track: add dedicated chapter packs for Supply Chain Security and Admission Policy Guardrails.
+6. Advanced track: continue `chapter-12-ai-assisted-sre-guardian` integration with chaos event mapping.
+7. Advanced track: wire `chapter-16-rollback-data-migrations` to real backend DB login flow once implemented.
 
 ## Pending Decisions
 
@@ -84,3 +96,4 @@ The canonical structure is now the 13-chapter program in `CURRICULUM.md`:
 ## Notes
 
 If a chapter folder is present but empty, treat it as planned scope, not completed material.
+Current `chapter-*` directory numbering reflects existing draft files and may lag behind canonical curriculum ordering.

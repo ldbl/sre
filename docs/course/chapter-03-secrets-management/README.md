@@ -36,6 +36,8 @@ Why this sounds reasonable:
 - `sops-age` secret must exist in `flux-system` before relying on encrypted manifests.
 - Only encrypted files are allowed in PRs.
 - Secret rotation plan is mandatory after any exposure.
+- Local `no-secrets` pre-commit hook blocks common sensitive files before commit.
+- Local `flux-kustomize-validate` pre-commit hook catches broken Flux Kustomize wiring before commit.
 
 ## Repo Mapping
 
@@ -117,6 +119,8 @@ kubectl -n develop get secret backend-secrets
 - `secrets-develop` Kustomization is Ready.
 - `backend-secrets` exists in namespace `develop`.
 - No plaintext values appear in committed diff.
+- Local pre-commit `no-secrets` check passes before commit.
+- Local pre-commit `flux-kustomize-validate` check passes before commit.
 
 ## Anti-Patterns
 

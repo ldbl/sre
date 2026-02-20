@@ -36,6 +36,11 @@ Why this sounds reasonable:
 - Immutable env/version tags are required.
 - Flux image automation writes all image updates to Git.
 - GitOps-first rollback via commit revert.
+- Pre-commit branch/history hooks prevent risky Git operations before promotion PRs:
+  - `scripts/pre-commit-master-check.sh`
+  - `scripts/prevent-amend-after-push.sh`
+- Pre-commit manifest hook validates local Flux renders before promotion PRs:
+  - `scripts/flux-kustomize-validate.sh`
 
 ## Repo Mapping
 
