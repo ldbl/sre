@@ -286,6 +286,25 @@ resource "kubernetes_secret" "ghcr_credentials" {
   depends_on = [kubernetes_namespace.bootstrap]
 }
 
+# GitHub token for ImageUpdateAutomation (push commits back to repo).
+resource "kubernetes_secret" "github_image_automation" {
+  count = local.flux_git_secret_enabled ? 1 : 0
+
+  metadata {
+    name      = "github-image-automation"
+    namespace = "flux-system"
+  }
+
+  type = "Opaque"
+
+  data = {
+    username = "git"
+    password = var.flux_git_token
+  }
+
+  depends_on = [kubernetes_namespace.bootstrap]
+}
+
 # Optional: age private key for Flux SOPS decryption.
 resource "kubernetes_secret" "sops_age" {
   count = local.sops_age_secret_enabled ? 1 : 0
