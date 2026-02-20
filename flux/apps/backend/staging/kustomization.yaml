@@ -15,7 +15,7 @@ resources:
   - pdb.yaml
 images:
   - name: ghcr.io/ldbl/backend
-    newTag: staging-v0.0.3-54e7402-1770401510 # {"$imagepolicy": "staging:backend:tag"}
+    newTag: staging-v0.0.3-dd895db-1771579882 # {"$imagepolicy": "staging:backend:tag"}
 patches:
   - patch: |-
       - op: replace
