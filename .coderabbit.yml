@@ -69,15 +69,7 @@ reviews:
         - Repository guidelines for AI agents — learn and apply these principles
         - Reference these guidelines when reviewing other files
   path_filters:
-    - "**/*.tf"
-    - "**/*.tfvars"
-    - "flux/**/*.yaml"
-    - "**/*.sh"
-    - "**/*.py"
-    - "**/.pre-commit-config.yaml"
-    - "**/CLAUDE.md"
-    - "**/Makefile"
-    - "**/.github/workflows/*.yml"
+    - "**"
     - "!**/.terraform/**"
     - "!**/.terraform.lock.hcl"
     - "!**/node_modules/**"
