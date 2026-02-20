@@ -61,6 +61,7 @@ jobs:
           TF_VAR_flux_git_repository_branch: main
           TF_VAR_flux_kustomization_path: ./flux/bootstrap/flux-system
           TF_VAR_flux_git_token: ${{ secrets.FLUX_GIT_TOKEN }}
+          TF_VAR_enable_ghcr: "true"
           TF_VAR_ghcr_username: ${{ secrets.GHCR_USERNAME }}
           TF_VAR_ghcr_token: ${{ secrets.GHCR_TOKEN }}
           TF_VAR_sops_age_key: ${{ secrets.SOPS_AGE_KEY }}
