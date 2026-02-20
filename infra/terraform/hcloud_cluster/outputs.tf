@@ -6,6 +6,6 @@ output "kubeconfig" {
 
 output "kubeconfig_export" {
   description = "Run this command to set your KUBECONFIG."
-  value       = "export KUBECONFIG=${abspath("${path.module}/kubeconfig.yaml")}"
+  value       = "export KUBECONFIG=$(pwd)/kubeconfig.yaml"
 }
 

@@ -121,6 +121,11 @@ spec:
         volumeMounts:
         - name: tmp
           mountPath: /tmp
+        - name: cache
+          mountPath: /home/app/.cache
       volumes:
       - name: tmp
         emptyDir: {}
+      - name: cache
+        emptyDir:
+          sizeLimit: 10Mi

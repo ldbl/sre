@@ -107,7 +107,7 @@ variable "load_balancer_type" {
 variable "control_plane_server_type" {
   description = "Hetzner server type for the control plane."
   type        = string
-  default     = "cpx32"
+  default     = "cx23"
 }
 
 variable "control_plane_count" {
@@ -125,7 +125,7 @@ variable "allow_scheduling_on_control_plane" {
 variable "workers_server_type" {
   description = "Hetzner server type for worker nodes."
   type        = string
-  default     = "cpx32"
+  default     = "cx23"
 }
 
 variable "workers_count" {

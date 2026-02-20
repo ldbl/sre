@@ -66,8 +66,8 @@ locals {
 }
 
 module "kube_hetzner" {
-  source  = "kube-hetzner/kube-hetzner/hcloud"
-  version = "2.19.0"
+  # kube-hetzner v2.19.0
+  source = "git::https://github.com/kube-hetzner/terraform-hcloud-kube-hetzner.git?ref=a52d120bfb9f67d6c1d01add5d202609543df3ab"
   providers = {
     hcloud = hcloud
   }
@@ -130,12 +130,18 @@ resource "local_sensitive_file" "kubeconfig" {
 
 provider "helm" {
   kubernetes {
-    config_path = fileexists(local.kubeconfig_path) ? local.kubeconfig_path : "/dev/null"
+    host                   = module.kube_hetzner.kubeconfig_data.host
+    client_certificate     = module.kube_hetzner.kubeconfig_data.client_certificate
+    client_key             = module.kube_hetzner.kubeconfig_data.client_key
+    cluster_ca_certificate = module.kube_hetzner.kubeconfig_data.cluster_ca_certificate
   }
 }
 
 provider "kubernetes" {
-  config_path = fileexists(local.kubeconfig_path) ? local.kubeconfig_path : "/dev/null"
+  host                   = module.kube_hetzner.kubeconfig_data.host
+  client_certificate     = module.kube_hetzner.kubeconfig_data.client_certificate
+  client_key             = module.kube_hetzner.kubeconfig_data.client_key
+  cluster_ca_certificate = module.kube_hetzner.kubeconfig_data.cluster_ca_certificate
 }
 
 resource "kubernetes_namespace" "bootstrap" {
@@ -275,6 +281,25 @@ resource "kubernetes_secret" "ghcr_credentials" {
         }
       }
     })
+  }
+
+  depends_on = [kubernetes_namespace.bootstrap]
+}
+
+# GitHub token for ImageUpdateAutomation (push commits back to repo).
+resource "kubernetes_secret" "github_image_automation" {
+  count = local.flux_git_secret_enabled ? 1 : 0
+
+  metadata {
+    name      = "github-image-automation"
+    namespace = "flux-system"
+  }
+
+  type = "Opaque"
+
+  data = {
+    username = "git"
+    password = var.flux_git_token
   }
 
   depends_on = [kubernetes_namespace.bootstrap]

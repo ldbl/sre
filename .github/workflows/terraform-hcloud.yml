@@ -1,21 +1,21 @@
-name: Terraform - Apply (Hetzner)
+name: Terraform - Hetzner
 
 on:
-  workflow_dispatch:
-    inputs:
-      approvers:
-        description: "GitHub users/team slugs (comma-separated) for manual approval"
-        required: true
-        type: string
-      minimum_approvals:
-        description: "Minimum number of approvals"
-        required: true
-        type: number
-        default: 1
+  pull_request:
+    paths:
+      - "infra/terraform/hcloud_cluster/**"
+      - "flux/**"
+      - ".github/workflows/terraform-hcloud*.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/hcloud_cluster/**"
+      - "flux/**"
+      - ".github/workflows/terraform-hcloud*.yml"
 
 concurrency:
-  group: terraform-hcloud-apply
-  cancel-in-progress: false
+  group: terraform-hcloud-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup kubectl (needed for FluxInstance apply via Terraform)
+      - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: "v1.34.1"
@@ -43,13 +43,19 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
       - name: Terraform init
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: terraform init -input=false
 
-      - name: Terraform plan (save planfile)
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
         id: plan
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -61,6 +67,7 @@ jobs:
           TF_VAR_flux_git_repository_branch: main
           TF_VAR_flux_kustomization_path: ./flux/bootstrap/flux-system
           TF_VAR_flux_git_token: ${{ secrets.FLUX_GIT_TOKEN }}
+          TF_VAR_enable_ghcr: "true"
           TF_VAR_ghcr_username: ${{ secrets.GHCR_USERNAME }}
           TF_VAR_ghcr_token: ${{ secrets.GHCR_TOKEN }}
           TF_VAR_sops_age_key: ${{ secrets.SOPS_AGE_KEY }}
@@ -71,7 +78,7 @@ jobs:
           TF_VAR_backup_s3_region: ${{ secrets.R2_REGION }}
         run: |
           set +e
-          terraform plan -input=false -lock-timeout=5m -no-color -detailed-exitcode -out=tfplan > plan.txt
+          terraform plan -input=false -lock-timeout=5m -no-color -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
           exit_code=$?
           set -e
           if [ "$exit_code" -eq 1 ]; then
@@ -85,6 +92,7 @@ jobs:
           fi
 
       - name: Upload tfplan artifact
+        if: github.event_name == 'push' && steps.plan.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: terraform-hcloud-tfplan
@@ -93,36 +101,32 @@ jobs:
             infra/terraform/hcloud_cluster/plan.txt
           retention-days: 1
 
-  no_changes:
-    runs-on: ubuntu-latest
-    needs: plan
-    if: needs.plan.outputs.has_changes != 'true'
-    steps:
-      - name: Nothing to apply
-        run: echo "Terraform plan has no infrastructure changes. Skipping approval/apply."
-
   approval:
     runs-on: ubuntu-latest
     needs: plan
-    if: needs.plan.outputs.has_changes == 'true'
+    if: github.event_name == 'push' && needs.plan.outputs.has_changes == 'true'
     timeout-minutes: 60
     steps:
       - name: Manual approval gate
-        uses: trstringer/manual-approval@v1
+        uses: pavlospt/manual-approval@v2
         with:
           secret: ${{ github.token }}
-          approvers: ${{ github.event.inputs.approvers }}
-          minimum-approvals: ${{ github.event.inputs.minimum_approvals }}
-          issue-title: "Terraform apply approval"
-          issue-body: "Approve to continue with terraform apply for commit ${{ github.sha }}."
+          approvers: ldbl
+          minimum-approvals: 1
+          issue-title: "Terraform apply — ${{ github.sha }}"
+          issue-body: |
+            Terraform plan detected infrastructure changes on `main`.
+
+            **Commit:** ${{ github.sha }}
+            **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Approve or deny this apply.
           exclude-workflow-initiator-as-approver: false
 
   apply:
     runs-on: ubuntu-latest
-    needs:
-      - plan
-      - approval
-    if: always() && needs.plan.outputs.has_changes == 'true' && needs.approval.result == 'success'
+    needs: [plan, approval]
+    if: github.event_name == 'push' && needs.plan.outputs.has_changes == 'true' && needs.approval.result == 'success'
 
     defaults:
       run:
@@ -132,7 +136,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup kubectl (needed for FluxInstance apply via Terraform)
+      - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: "v1.34.1"
@@ -152,7 +156,7 @@ jobs:
           name: terraform-hcloud-tfplan
           path: infra/terraform/hcloud_cluster
 
-      - name: Terraform apply (approved tfplan)
+      - name: Terraform apply
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}

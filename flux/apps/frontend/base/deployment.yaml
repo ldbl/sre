@@ -53,7 +53,7 @@ spec:
           protocol: TCP
         env:
         - name: VITE_API_URL
-          value: "http://backend.${NAMESPACE}.svc.cluster.local:8080"
+          value: "/api"
         - name: VITE_UPTRACE_DSN
           valueFrom:
             secretKeyRef:
