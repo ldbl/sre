@@ -28,6 +28,15 @@ repos:
 
   - repo: local
     hooks:
+      - id: flux-kustomize-validate
+        name: Flux kustomize validate
+        entry: scripts/flux-kustomize-validate.sh
+        language: script
+        files: ^flux/.*\.ya?ml$
+        pass_filenames: true
+        require_serial: true
+        stages: [pre-commit]
+
       - id: terraform-fmt
         name: Terraform format check
         entry: terraform fmt -recursive -diff -check

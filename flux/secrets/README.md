@@ -142,8 +142,8 @@ spec:
 ```bash
 # Create a plain Kubernetes Secret YAML
 kubectl create secret generic backend-secrets \
-  --from-literal=database-url="postgresql://user:pass@host:5432/db" \
   --from-literal=api-key="my-secret-api-key" \
+  --from-literal=jwt-secret="change-me" \
   --dry-run=client -o yaml > flux/secrets/develop/backend-secrets.yaml
 
 # Encrypt with SOPS
@@ -169,8 +169,8 @@ metadata:
   namespace: develop
 type: Opaque
 stringData:
-  database-url: "postgresql://user:pass@host:5432/db"
   api-key: "my-secret-api-key"
+  jwt-secret: "change-me"
 EOF
 ```
 
@@ -217,11 +217,18 @@ spec:
       containers:
         - name: backend
           env:
-            - name: DATABASE_URL
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: backend-secrets
-                  key: database-url
+                  name: app-postgres-app
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-postgres-app
+                  key: password
+            - name: DATABASE_URL
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@app-postgres-rw:5432/app?sslmode=disable"
             - name: API_KEY
               valueFrom:
                 secretKeyRef:
@@ -258,7 +265,7 @@ metadata:
 type: Opaque
 data:
     api-key: ENC[AES256_GCM,data:xxxxx,iv:xxxxx,tag:xxxxx,type:str]
-    database-url: ENC[AES256_GCM,data:xxxxx,iv:xxxxx,tag:xxxxx,type:str]
+    jwt-secret: ENC[AES256_GCM,data:xxxxx,iv:xxxxx,tag:xxxxx,type:str]
 sops:
     kms: []
     gcp_kms: []

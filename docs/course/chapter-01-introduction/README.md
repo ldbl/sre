@@ -35,6 +35,22 @@ Why it sounds reasonable:
 - Single-change policy:
   - one PR for image/promotion
   - separate PR for networking/ingress
+- Git pre-hooks for repository hygiene:
+  - `scripts/pre-commit-master-check.sh` blocks direct work against protected branches
+  - `scripts/prevent-amend-after-push.sh` blocks amending already-pushed commits
+  - `scripts/flux-kustomize-validate.sh` blocks broken Flux Kustomize renders before commit
+
+## Local Git Guardrails (Pre-Hooks)
+
+Install and verify local hooks before running labs:
+
+```bash
+make install-hooks
+pre-commit run --all-files
+```
+
+These hooks enforce branch and history discipline before CI starts, so risky workflow mistakes are caught early on the workstation.
+For GitOps manifest changes under `flux/**`, they also enforce local Kustomize render validity.
 
 ## Safe Workflow (Step-by-Step)
 

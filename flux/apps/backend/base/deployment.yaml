@@ -85,6 +85,18 @@ spec:
             secretKeyRef:
               name: backend-secrets
               key: jwt-secret
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-postgres-app
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-postgres-app
+              key: password
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@app-postgres-rw:5432/app?sslmode=disable"
         livenessProbe:
           httpGet:
             path: /livez
