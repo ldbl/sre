@@ -32,10 +32,11 @@ spec:
             summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 3 days"
             description: "Users will see TLS errors when it expires. Check the Certificate, its Order and Challenge."
         - alert: CertificateNotReady
-          expr: certmanager_certificate_ready_status{condition="False"} == 1
+          # Unknown too: a Certificate stuck in issuing for 30 minutes is as broken as a failed one
+          expr: certmanager_certificate_ready_status{condition=~"False|Unknown"} == 1
           for: 30m
           labels:
             severity: warning
           annotations:
-            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} is not Ready"
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} is not Ready ({{ $labels.condition }})"
             description: "kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}"
