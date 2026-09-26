@@ -1,0 +1,41 @@
+---
+# A certificate that stops renewing is a silent outage with a date on it. cert-manager renews
+# Let's Encrypt certificates (90 days) 30 days before expiry, so less than 14 days left means
+# renewal has been failing for over two weeks.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager-alerts
+  namespace: observability
+  labels:
+    prometheus: kube-prometheus-stack
+    role: alert-rules
+spec:
+  groups:
+    - name: cert-manager.rules
+      rules:
+        - alert: CertificateExpiringSoon
+          # > 0: a Certificate that was never issued reports 0 - that is CertificateNotReady, not expiry
+          expr: certmanager_certificate_expiration_timestamp_seconds > 0 and (certmanager_certificate_expiration_timestamp_seconds - time()) < 14 * 24 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 14 days"
+            description: "Renewal is failing. Check: kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}"
+        - alert: CertificateExpiresIn3Days
+          expr: certmanager_certificate_expiration_timestamp_seconds > 0 and (certmanager_certificate_expiration_timestamp_seconds - time()) < 3 * 24 * 3600
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 3 days"
+            description: "Users will see TLS errors when it expires. Check the Certificate, its Order and Challenge."
+        - alert: CertificateNotReady
+          expr: certmanager_certificate_ready_status{condition="False"} == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} is not Ready"
+            description: "kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }}"
