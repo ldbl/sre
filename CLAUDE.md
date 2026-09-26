@@ -101,6 +101,11 @@ scripts/             # Pre-commit hooks, automation scripts
   `cloudflare-api-token`; origin-ca-issuer (namespace `cert-manager`) reads a separate token with only
   "SSL and Certificates: Edit" from `cloudflare-origin-ca-token` (both in flux/secrets/cloudflare)
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
+- App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
+  Deployment sets `automountServiceAccountToken: false`; backend `PPROF_ENABLED` is `"false"` in Git;
+  `CHAOS_ENABLED` is explicit - `"true"` only in develop/staging, `"false"` in production.
+  `scripts/security-smoke.sh BASE_URL [HOST]` checks the public path from outside (no secrets on /api/env,
+  no /api/token, no pprof, chaos as expected, bounded /delay, no wildcard CORS).
 
 ### Resource Management
 - ResourceQuotas enforce per-namespace limits (develop/staging: 500m CPU, 512Mi; production: 1 CPU, 1Gi)

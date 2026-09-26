@@ -19,6 +19,20 @@ images:
     newName: ${image_registry}/backend
     newTag: develop-v0.0.0-cc80741-1790436267 # {"$imagepolicy": "develop:backend:tag"}
 patches:
+  # Chaos labs (Ch11/13/14/15/19) use /panic and the probe toggles here. Production keeps the base: off.
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+      spec:
+        template:
+          spec:
+            containers:
+              - name: backend
+                env:
+                  - name: CHAOS_ENABLED
+                    value: "true"
   - patch: |-
       - op: replace
         path: /spec/replicas

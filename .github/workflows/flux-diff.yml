@@ -27,6 +27,11 @@ jobs:
           chmod +x kubeconform && sudo mv kubeconform /usr/local/bin/
           rm kubeconform-linux-amd64.tar.gz
 
+      # Rules the apps must keep (security review 2026-09-27): no ServiceAccount token, pprof off,
+      # chaos off in production. kustomize and yq come with the ubuntu runner.
+      - name: App security rules
+        run: scripts/check-app-security.sh
+
       - name: Build and validate kustomizations
         id: validate
         run: |
