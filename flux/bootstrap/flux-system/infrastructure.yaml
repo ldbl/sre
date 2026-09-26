@@ -64,8 +64,12 @@ spec:
   url: https://github.com/cloudflare/origin-ca-issuer
   ref:
     commit: 47728cb96bbbf3a7d23026cc001c69ef8a06cc9e # v0.15.0
+  # gitignore semantics: a path cannot be re-included while its parent is excluded, so
+  # re-include /deploy/, exclude its children, then re-include /deploy/crds/.
   ignore: |
     /*
+    !/deploy/
+    /deploy/*
     !/deploy/crds/
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
