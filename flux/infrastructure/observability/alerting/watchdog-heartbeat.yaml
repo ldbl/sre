@@ -1,0 +1,29 @@
+---
+# Dead man's switch. The Watchdog alert (kube-prometheus-stack) fires all the time, on purpose.
+# Alertmanager forwards it to Healthchecks.io every minute; when the pings stop - Prometheus down,
+# Alertmanager down, the cluster or its network gone - Healthchecks.io alerts by e-mail, from outside
+# the cluster. Silence is the signal. Platform only: the URL is the SOPS secret alertmanager-heartbeat
+# (flux/secrets/observability); the local kind profile removes this Kustomization.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: watchdog-heartbeat
+  labels:
+    alertmanagerconfig: safeops
+spec:
+  route:
+    receiver: healthchecks
+    matchers:
+      - name: alertname
+        value: Watchdog
+        matchType: "="
+    groupWait: 0s
+    groupInterval: 1m
+    repeatInterval: 1m
+  receivers:
+    - name: healthchecks
+      webhookConfigs:
+        - urlSecret:
+            name: alertmanager-heartbeat
+            key: url
+          sendResolved: false

@@ -73,10 +73,28 @@ spec:
       ingress:
         enabled: false
 
-    # Alertmanager is intentionally disabled.
-    # Alert routing is handled by k8s-ai-monitor.
+    # Alertmanager: the path from a firing alert to a human. The chart's default config sends
+    # everything to the "null" receiver (so kind stays quiet); receivers are added per cluster with
+    # AlertmanagerConfig objects labelled alertmanagerconfig: safeops - on the platform:
+    # flux/infrastructure/observability/alerting (Watchdog -> Healthchecks.io dead man's switch).
     alertmanager:
-      enabled: false
+      enabled: true
+      alertmanagerSpec:
+        replicas: 1
+        retention: 24h
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        alertmanagerConfigSelector:
+          matchLabels:
+            alertmanagerconfig: safeops
+        # Without this the operator adds a namespace="observability" matcher to every
+        # AlertmanagerConfig route - and Watchdog has no namespace label, so it would never match.
+        alertmanagerConfigMatcherStrategy:
+          type: None
 
     # Prometheus Operator configuration
     prometheusOperator:
