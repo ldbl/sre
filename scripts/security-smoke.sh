@@ -27,21 +27,28 @@ status_of() { curl "${curl_args[@]}" --output /dev/null --write-out '%{http_code
 echo "security smoke: ${base_url}${host_header:+ (Host: ${host_header})}, chaos expected: ${expect_chaos}"
 
 # 1. /api/env answers, and no key or value looks like a secret.
-env_body="$(curl "${curl_args[@]}" "${base_url}/api/env")" || { fail "/api/env unreachable"; env_body='{}'; }
-if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"${env_body}"; then
+if ! env_body="$(curl "${curl_args[@]}" "${base_url}/api/env")"; then
+  fail "/api/env unreachable - not checked"
+elif ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"${env_body}"; then
   fail "/api/env did not return a JSON object"
 else
-  leaked_keys="$(jq -r 'keys[] | select(test("SECRET|PASSWORD|TOKEN|DSN|KEY|HEADERS|CREDENTIAL"; "i"))' <<<"${env_body}")"
+  # Key names at any depth (names are not secrets and are printed); values are checked for
+  # credentials in a URL (scheme://user[:pass]@host) or a JWT, and only counted - never printed.
+  leaked_keys="$(jq -r '[.. | objects | keys[]] | unique[] | select(test("SECRET|PASSWORD|TOKEN|DSN|KEY|HEADERS|CREDENTIAL"; "i"))' <<<"${env_body}")"
+  leaked_values="$(jq '[.. | strings | select(test("://[^/@[:space:]]+@|eyJ[A-Za-z0-9_-]+\\.eyJ"))] | length' <<<"${env_body}")"
   if [[ -n "${leaked_keys}" ]]; then
     fail "/api/env exposes secret-looking keys: $(tr '\n' ' ' <<<"${leaked_keys}")"
+  elif [[ "${leaked_values}" != "0" ]]; then
+    fail "/api/env has ${leaked_values} value(s) that look like credentials (URL userinfo or JWT) - values not shown"
   else
-    pass "/api/env has no secret-looking keys ($(jq 'length' <<<"${env_body}") keys)"
+    pass "/api/env has no secret-looking keys or values ($(jq 'length' <<<"${env_body}") keys)"
   fi
 fi
 
-# 2. No password-less token endpoint.
+# 2. No password-less token endpoint: the route must not exist (404 from nginx, or 404/405 from a
+#    backend without it). Anything else - a 2xx, a 401 (the route is back), 000 (curl failed) - fails.
 code="$(status_of --request POST --data admin "${base_url}/api/token")"
-if [[ "${code}" == "200" ]]; then fail "POST /api/token issued something (200)"; else pass "POST /api/token -> ${code}"; fi
+if [[ "${code}" == "404" || "${code}" == "405" ]]; then pass "POST /api/token -> ${code}"; else fail "POST /api/token -> ${code} (expected 404/405)"; fi
 
 # 3. No profiling on the public path.
 for path in /api/debug/pprof/ /api/debug/pprof/heap /api/debug/pprof/cmdline; do
@@ -62,8 +69,9 @@ code="$(status_of "${base_url}/api/delay/99999")"
 if [[ "${code}" == "400" ]]; then pass "/api/delay/99999 -> 400"; else fail "/api/delay/99999 -> ${code} (expected 400)"; fi
 
 # 6. The backend no longer answers with a wildcard CORS header.
-cors_headers="$(curl "${curl_args[@]}" --dump-header - --output /dev/null --header 'Origin: https://evil.example' "${base_url}/api/version" || true)"
-if grep -qi '^access-control-allow-origin: \*' <<<"${cors_headers}"; then
+if ! cors_headers="$(curl "${curl_args[@]}" --dump-header - --output /dev/null --header 'Origin: https://evil.example' "${base_url}/api/version" 2>&1)"; then
+  fail "/api/version request failed - CORS not checked"
+elif grep -qi '^access-control-allow-origin: \*' <<<"${cors_headers}"; then
   fail "/api/version sends Access-Control-Allow-Origin: *"
 else
   pass "/api/version has no wildcard CORS header"

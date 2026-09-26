@@ -3,7 +3,9 @@
 # overlay and fails when a rule is broken:
 #   - every Deployment: automountServiceAccountToken: false (the apps never call the Kubernetes API)
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
-#   - backend: CHAOS_ENABLED is set explicitly, and is "false" in production
+#   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
+#     "false" in production
+#   - every overlay renders at least one Deployment (an empty render must not pass as OK)
 #
 # Runs in pre-commit (flux/apps/**) and in the Flux Diff workflow. Needs kustomize and yq (v4).
 set -euo pipefail
@@ -26,6 +28,15 @@ overlays=(
 
 failures=()
 
+# The only accepted CHAOS_ENABLED per backend overlay (a case, not an associative array: macOS /bin/bash is 3.2).
+expected_chaos_for() {
+  case "$1" in
+    flux/apps/backend/develop | flux/apps/backend/staging) echo true ;;
+    flux/apps/backend/production) echo false ;;
+    *) echo "" ;;
+  esac
+}
+
 # backend_env OVERLAY_YAML NAME -> the value of env NAME in the backend container ("" when unset)
 backend_env() {
   yq "select(.kind == \"Deployment\" and .metadata.name == \"backend\")
@@ -39,12 +50,17 @@ for overlay in "${overlays[@]}"; do
     continue
   fi
 
+  deployments=0
   while IFS=$'\t' read -r name automount; do
     [[ -z "${name}" ]] && continue
+    deployments=$((deployments + 1))
     if [[ "${automount}" != "false" ]]; then
       failures+=("${overlay}: Deployment ${name} must set automountServiceAccountToken: false (got: ${automount})")
     fi
   done < <(yq 'select(.kind == "Deployment") | [.metadata.name, (.spec.template.spec.automountServiceAccountToken | tostring)] | @tsv' <<<"${rendered}")
+  if ((deployments == 0)); then
+    failures+=("${overlay}: renders no Deployment - nothing was checked")
+  fi
 
   if [[ "${overlay}" == flux/apps/backend/* ]]; then
     pprof="$(backend_env "${rendered}" PPROF_ENABLED)"
@@ -52,11 +68,11 @@ for overlay in "${overlays[@]}"; do
     if [[ "${pprof}" != "false" ]]; then
       failures+=("${overlay}: backend PPROF_ENABLED must be \"false\" in Git (got: '${pprof}')")
     fi
-    if [[ "${chaos}" != "true" && "${chaos}" != "false" ]]; then
-      failures+=("${overlay}: backend CHAOS_ENABLED must be set to \"true\" or \"false\" (got: '${chaos}')")
-    fi
-    if [[ "${overlay}" == */production && "${chaos}" != "false" ]]; then
-      failures+=("${overlay}: backend CHAOS_ENABLED must be \"false\" in production (got: '${chaos}')")
+    expected="$(expected_chaos_for "${overlay}")"
+    if [[ -z "${expected}" ]]; then
+      failures+=("${overlay}: no expected CHAOS_ENABLED value - add the overlay to expected_chaos_for")
+    elif [[ "${chaos}" != "${expected}" ]]; then
+      failures+=("${overlay}: backend CHAOS_ENABLED must be \"${expected}\" (got: '${chaos}')")
     fi
   fi
 done
