@@ -16,8 +16,11 @@ rules:
       - endpoints
       - persistentvolumeclaims
       - configmaps
-      - secrets
     verbs: ["get", "list", "watch"]
+  # No `secrets`: reading a Secret returns its contents, and a cluster-wide read would give the
+  # monitor (which processes alerts, logs and LLM output) flux-system/sops-age, the backup keys and
+  # every password. The checks work without it (k8s-ai-monitor#4). The opt-in S3 storage check needs
+  # exactly one Secret - grant it with a namespaced Role + resourceNames, see README.md.
   - apiGroups: [""]
     resources:
       - events
@@ -56,11 +59,6 @@ rules:
       - clusters
       - backups
       - scheduledbackups
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["psmdb.percona.com"]
-    resources:
-      - perconaservermongodbs
-      - perconaservermongodbbackups
     verbs: ["get", "list", "watch"]
   - apiGroups: ["kustomize.toolkit.fluxcd.io"]
     resources:
