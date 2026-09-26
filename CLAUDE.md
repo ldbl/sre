@@ -105,7 +105,10 @@ scripts/             # Pre-commit hooks, automation scripts
 ### Resource Management
 - ResourceQuotas enforce per-namespace limits (develop/staging: 500m CPU, 512Mi; production: 1 CPU, 1Gi)
 - LimitRange sets defaults (10m/64Mi request) — cert-manager ACME solver needs min 10m CPU
-- Production: 2 replicas with higher requests; develop/staging: 1 replica with minimal requests
+- Replica counts live ONLY in the HPA (`hpa.yaml` per environment: production 2-3, staging 2, develop 1);
+  Deployments set no `spec.replicas`, or Flux would reset what the HPA scaled on every reconcile. An
+  existing cluster needs `scripts/hpa-replicas-handover.sh <context> --apply` once before such a change
+  (server-side apply resets a removed, solely-owned field to 1). Production has higher requests.
 
 ## Make Targets
 

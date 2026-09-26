@@ -8,7 +8,9 @@ metadata:
     app.kubernetes.io/name: backend
     app.kubernetes.io/component: api
 spec:
-  replicas: 1
+  # No spec.replicas: the HorizontalPodAutoscaler owns the replica count (hpa.yaml per environment,
+  # minReplicas is the floor). A replicas value in Git makes Flux reset what the HPA scaled on every
+  # reconcile. Existing clusters: run scripts/hpa-replicas-handover.sh once before this change.
   revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate
