@@ -60,11 +60,6 @@ rules:
       - backups
       - scheduledbackups
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["psmdb.percona.com"]
-    resources:
-      - perconaservermongodbs
-      - perconaservermongodbbackups
-    verbs: ["get", "list", "watch"]
   - apiGroups: ["kustomize.toolkit.fluxcd.io"]
     resources:
       - kustomizations
