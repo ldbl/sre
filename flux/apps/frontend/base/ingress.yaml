@@ -4,7 +4,9 @@ kind: Ingress
 metadata:
   name: frontend
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-production
+    cert-manager.io/issuer: cloudflare-origin-ca
+    cert-manager.io/issuer-kind: ClusterOriginIssuer
+    cert-manager.io/issuer-group: cert-manager.k8s.cloudflare.com
     cloudflare-proxied: "${cloudflare_proxied}"
 spec:
   ingressClassName: traefik

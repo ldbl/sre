@@ -43,7 +43,9 @@ spec:
       enabled: true
       ingressClassName: traefik
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-production
+        cert-manager.io/issuer: cloudflare-origin-ca
+        cert-manager.io/issuer-kind: ClusterOriginIssuer
+        cert-manager.io/issuer-group: cert-manager.k8s.cloudflare.com
         # external-dns only publishes Ingresses that opt in (--annotation-filter=cloudflare-proxied=enabled)
         cloudflare-proxied: "enabled"
       hosts:
