@@ -69,8 +69,12 @@ code="$(status_of "${base_url}/api/delay/99999")"
 if [[ "${code}" == "400" ]]; then pass "/api/delay/99999 -> 400"; else fail "/api/delay/99999 -> ${code} (expected 400)"; fi
 
 # 6. The backend no longer answers with a wildcard CORS header.
-if ! cors_headers="$(curl "${curl_args[@]}" --dump-header - --output /dev/null --header 'Origin: https://evil.example' "${base_url}/api/version" 2>&1)"; then
+# Fail closed: only a 200 from the real endpoint proves anything; a 404/500/redirect without the
+# header would otherwise look like a pass.
+if ! cors_headers="$(curl "${curl_args[@]}" --dump-header - --output /dev/null --write-out 'HTTP_CODE=%{http_code}' --header 'Origin: https://evil.example' "${base_url}/api/version" 2>&1)"; then
   fail "/api/version request failed - CORS not checked"
+elif ! grep -q 'HTTP_CODE=200$' <<<"${cors_headers}"; then
+  fail "/api/version -> $(grep -o 'HTTP_CODE=[0-9]*' <<<"${cors_headers}" | cut -d= -f2) (expected 200) - CORS not checked"
 elif grep -qi '^access-control-allow-origin: \*' <<<"${cors_headers}"; then
   fail "/api/version sends Access-Control-Allow-Origin: *"
 else
