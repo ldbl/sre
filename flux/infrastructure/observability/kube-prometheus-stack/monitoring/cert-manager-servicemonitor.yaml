@@ -1,0 +1,22 @@
+---
+# cert-manager's own metrics (certmanager_certificate_*). The chart's ServiceMonitor cannot be used:
+# cert-manager is installed before kube-prometheus-stack brings the ServiceMonitor CRD. On kind there
+# is no cert-manager, so this selects nothing.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager
+  namespace: observability
+spec:
+  namespaceSelector:
+    matchNames: [cert-manager]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
+  endpoints:
+    - port: tcp-prometheus-servicemonitor
+      interval: 60s
+      # Keep the Certificate's own namespace label; without this Prometheus overwrites it with the
+      # scrape target's namespace (cert-manager) and moves the real one to exported_namespace.
+      honorLabels: true

@@ -3,9 +3,13 @@ kind: NetworkPolicy
 metadata:
   name: allow-backend-metrics-from-observability
 spec:
+  # backend-primary: with Flagger (develop) the Service - and so Prometheus - reaches the primary
+  # pods; allowing only app=backend blocked the scrape (context deadline exceeded).
   podSelector:
-    matchLabels:
-      app: backend
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [backend, backend-primary]
   policyTypes:
     - Ingress
   ingress:

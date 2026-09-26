@@ -42,11 +42,19 @@ spec:
               resources:
                 requests:
                   storage: 10Gi
-        # Enable service monitor discovery across all namespaces
+        # Select every ServiceMonitor, PodMonitor and PrometheusRule in every namespace.
+        # The *NilUsesHelmValues: false lines are what makes the empty selectors mean "all": with the
+        # chart default (true) an empty selector silently becomes release=kube-prometheus-stack, and
+        # our own backend ServiceMonitors and PrometheusRules were never scraped or loaded.
+        serviceMonitorSelectorNilUsesHelmValues: false
         serviceMonitorSelector: {}
         serviceMonitorNamespaceSelector: {}
+        podMonitorSelectorNilUsesHelmValues: false
         podMonitorSelector: {}
         podMonitorNamespaceSelector: {}
+        ruleSelectorNilUsesHelmValues: false
+        ruleSelector: {}
+        ruleNamespaceSelector: {}
 
     # Grafana configuration
     grafana:
