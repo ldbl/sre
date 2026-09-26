@@ -65,6 +65,7 @@ reviews:
         - Every *.yaml except kustomization.yaml has a top-level sops: block and ENC[...] values under data/stringData.
         - encrypted_regex and the recipient match the .sops.yaml rule for that directory; metadata.namespace matches the environment.
         - *.yaml.example files hold placeholders only (change-me style) and are not listed in kustomization.yaml.
+        - Encrypted files live only here: flux/secrets/<dir>/*.yaml except kustomization.yaml and *.yaml.example (exactly the path_regex rules in .sops.yaml; no SOPS file exists elsewhere in the repo). They are written by sops (sops edit / scripts/sops-encrypt-secret.sh), never by hand: no leading ---, 4-space indent. Do not ask to reformat them (document separator, indentation, key order, quoting); a hand edit drifts from what the next sops edit writes back and risks the encrypted values. The YAML style rules apply to kustomization.yaml and *.yaml.example only.
     - path: "flux/apps/**/patches/**"
       instructions: |
         Strategic-merge patches, partial by design: do not ask for securityContext, probes or resources that come from base/.
