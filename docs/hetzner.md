@@ -149,11 +149,20 @@ Optional `/etc/hosts` for browser testing:
 <LB_IP> backend.local
 ```
 
-## DNS/TLS Strategy (Short-Term MVP)
+## DNS/TLS
 
-- DNS: local hosts file or test DNS entries pointing to LB IP.
-- TLS: intentionally deferred for MVP to keep bootstrap deterministic.
-- When moving beyond MVP: add managed DNS records + cert-manager and switch ingresses to HTTPS.
+- **DNS:** external-dns writes the Ingress hostnames to Cloudflare as **proxied** records and owns them
+  through TXT records (`txtOwnerId k8s-external-dns-<cluster_name>`). Records it does not own - for
+  example from an older cluster - it never changes; delete those by hand.
+- **TLS, edge:** visitors get Cloudflare's certificate. The zone SSL mode is **Full (strict)**:
+  Cloudflare validates the origin certificate.
+- **TLS, origin:** cert-manager issues every Ingress certificate from **Cloudflare Origin CA**
+  (origin-ca-issuer, `ClusterOriginIssuer cloudflare-origin-ca`). Trusted by Cloudflare, not by browsers
+  - it only works behind the proxy - and free of Let's Encrypt rate limits however often the cluster is
+  rebuilt. For the first minute of a new cluster, until the certificates are issued, Cloudflare answers
+  526.
+- Token: Cloudflare API token "Zone / SSL and Certificates / Edit" for the zone, SOPS secret
+  `flux/secrets/cloudflare/cloudflare-origin-ca-token.yaml`.
 
 ## Private Repo Variant (Non-MVP)
 

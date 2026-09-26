@@ -14,7 +14,7 @@ private key: whoever gets the key can open every version of every file, includin
 |---|---|---|---|
 | `flux-system/` | `secrets-flux-system` | platform key | `flux-system` (image automation deploy key) |
 | `auth/` | `secrets-auth` | platform key | `auth` (Dex) |
-| `cloudflare/` | `secrets-cloudflare` | platform key | `cert-manager`, `external-dns` |
+| `cloudflare/` | `secrets-cloudflare` | platform key | `cert-manager` (Origin CA token), `external-dns` (DNS token) |
 | `observability/` | `secrets-observability` | platform key | `observability` |
 | `develop/`, `staging/`, `production/` | `secrets-develop` / `-staging` / `-production` | platform key | the environment's namespace |
 | `local/` | `secrets-local` (kind local profile only) | **your** key | `develop` |
