@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - repository-external-dns.yaml
   - release-external-dns.yaml
-  - cluster-issuer.yaml
+  - origin-issuer.yaml

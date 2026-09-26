@@ -1,0 +1,10 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: origin-ca-issuer
+  namespace: flux-system
+spec:
+  type: oci
+  interval: 24h
+  url: oci://ghcr.io/cloudflare/origin-ca-issuer-charts

@@ -73,7 +73,7 @@ scripts/             # Pre-commit hooks, automation scripts
 - **IaC**: Terraform with kube-hetzner module (MicroOS, k3s)
 - **GitOps**: FluxCD (Flux Operator + FluxInstance, Kustomizations, HelmReleases)
 - **Secrets**: SOPS with AGE encryption
-- **DNS/TLS**: external-dns + cert-manager (Cloudflare DNS-01)
+- **DNS/TLS**: external-dns (Cloudflare, proxied records) + cert-manager with Cloudflare Origin CA (origin-ca-issuer); zone SSL mode Full (strict)
 - **Ingress**: Traefik (via kube-hetzner)
 - **Observability**: kube-prometheus-stack (Prometheus, Grafana) + k8s-ai-monitor (AI-assisted alert routing)
 - **Database**: CloudNativePG
@@ -97,8 +97,9 @@ scripts/             # Pre-commit hooks, automation scripts
 - Environments: develop, staging, production — each has its own namespace and overlays
 - Kustomize overlays pattern: `base/` + `overlays/{develop,staging,production}/patches/`
 - SOPS secrets go in `flux/secrets/` with `.sops.yaml` rules per directory
-- cert-manager (namespace `cert-manager`) and external-dns (namespace `external-dns`) each read the
-  Cloudflare DNS token from their own SOPS Secret `cloudflare-api-token` (flux/secrets/cloudflare)
+- external-dns (namespace `external-dns`) reads the Cloudflare DNS token from its SOPS Secret
+  `cloudflare-api-token`; origin-ca-issuer (namespace `cert-manager`) reads a separate token with only
+  "SSL and Certificates: Edit" from `cloudflare-origin-ca-token` (both in flux/secrets/cloudflare)
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 
 ### Resource Management
