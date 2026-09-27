@@ -100,6 +100,9 @@ scripts/             # Pre-commit hooks, automation scripts
 - external-dns (namespace `external-dns`) reads the Cloudflare DNS token from its SOPS Secret
   `cloudflare-api-token`; origin-ca-issuer (namespace `cert-manager`) reads a separate token with only
   "SSL and Certificates: Edit" from `cloudflare-origin-ca-token` (both in flux/secrets/cloudflare)
+- Flagger (progressive delivery) is installed but the develop canaries are OPT-IN (Ch19):
+  `flux/bootstrap/flux-system/progressive-delivery-develop.yaml` is not in that kustomization.yaml.
+  Canaries set `revertOnDeletion: true` so disabling restores the app Deployment and Service.
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;
