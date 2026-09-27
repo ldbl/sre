@@ -45,6 +45,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: oidc-rbac
+        name: OIDC RBAC binds only Dex org:team groups; write roles only in develop
+        entry: scripts/check-oidc-rbac.sh
+        language: script
+        files: ^flux/infrastructure/security/(rbac|dex)/.*\.ya?ml$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: app-resources
         name: App resources (staging = production >= develop) fit the namespace quotas
         entry: scripts/check-app-resources.sh

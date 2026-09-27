@@ -103,6 +103,12 @@ scripts/             # Pre-commit hooks, automation scripts
 - Flagger (progressive delivery) is installed but the develop canaries are OPT-IN (Ch19):
   `flux/bootstrap/flux-system/progressive-delivery-develop.yaml` is not in that kustomization.yaml.
   Canaries set `revertOnDeletion: true` so disabling restores the app Deployment and Service.
+- OIDC access (Dex GitHub connector, `flux/infrastructure/security/{dex,rbac}`): only members of the
+  GitHub teams `safeops-course/members` and `admins` can log in; groups are `safeops-course:members` /
+  `safeops-course:admins` (Dex never sends the bare org). Both: admin in develop, read-only in staging,
+  production, flux-system, kube-system (no Secrets/exec). Admins also patch Kustomizations/HelmReleases
+  in flux-system (suspend/resume/reconcile); GitRepositories stay read-only. Writing elsewhere = the
+  Terraform break-glass kubeconfig. Enforced by `scripts/check-oidc-rbac.sh` (pre-commit + Flux Diff).
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;

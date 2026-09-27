@@ -121,7 +121,8 @@ module "kube_hetzner" {
 locals {
   # Structured authentication (not --oidc-* flags): one issuer can accept several audiences, so
   # both Dex clients work - "kubernetes" (kubectl oidc-login) and "headlamp" (Headlamp's own login).
-  # Claims map 1:1 to RBAC: users by email, groups = GitHub orgs (e.g. "safeops-course").
+  # Claims map 1:1 to RBAC: users by email, groups = GitHub teams as "org:team"
+  # (safeops-course:members, safeops-course:admins - Dex never sends the bare org).
   oidc_authentication_config = var.oidc_issuer_url == "" ? "" : yamlencode({
     apiVersion = "apiserver.config.k8s.io/v1"
     kind       = "AuthenticationConfiguration"

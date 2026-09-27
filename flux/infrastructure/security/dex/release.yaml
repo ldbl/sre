@@ -40,8 +40,15 @@ spec:
             clientID: $DEX_GITHUB_CLIENT_ID
             clientSecret: $DEX_GITHUB_CLIENT_SECRET
             redirectURI: https://dex.safeops.work/callback
+            # Dex puts only "org:team" into the groups claim, never the bare org, so RBAC binds
+            # safeops-course:members and safeops-course:admins. Listing the teams also limits the
+            # login to their members (fail closed); anyone else in the org is refused.
             orgs:
               - name: safeops-course
+                teams:
+                  - members
+                  - admins
+            teamNameField: slug
       oauth2:
         skipApprovalScreen: true
       staticClients:
