@@ -32,6 +32,10 @@ jobs:
       - name: App security rules
         run: scripts/check-app-security.sh
 
+      # staging = production >= develop, and the worst case (HPA max + surge + Postgres) fits the quota.
+      - name: App resources and quota budget
+        run: scripts/check-app-resources.sh
+
       - name: Build and validate kustomizations
         id: validate
         run: |

@@ -45,6 +45,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: app-resources
+        name: App resources (staging = production >= develop) fit the namespace quotas
+        entry: scripts/check-app-resources.sh
+        language: script
+        files: ^flux/(apps|infrastructure/resource-management|infrastructure/data/cnpg-clusters)/.*\.ya?ml$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: terraform-fmt
         name: Terraform format check
         entry: terraform fmt -recursive -diff -check
