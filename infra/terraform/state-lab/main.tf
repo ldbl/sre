@@ -1,9 +1,10 @@
 # State lab: why Terraform's state belongs in a shared, locked backend.
 #
 # Two ConfigMaps in the "lab" namespace of the local kind cluster stand in for cloud resources:
-#   - worker_3: a resource with a fixed, unique name (like a server called "worker-3")
-#   - volume:   a resource whose name the platform generates (like a cloud volume or load
-#               balancer) - creating it twice gives two of them, and nobody gets an error
+#   - migration_db: a resource with a fixed, unique name (like a server called "migration-db") -
+#                   creating it twice fails with "already exists"
+#   - worker:       a resource whose name gets a generated suffix (like the kube-hetzner nodes,
+#                   sre-workers-ezz) - creating it twice gives two of them, and nobody gets an error
 #
 # Copy this directory to a second place to play a second engineer ("laptop B"). With the default
 # local state each copy has its own memory; with backend-minio.tf.example both share one state in
@@ -29,34 +30,34 @@ variable "kubeconfig_path" {
   default     = "../kind_cluster/kubeconfig.yaml"
 }
 
-variable "worker_role" {
+variable "db_size" {
   description = "A value to change, so that an apply has something to do"
   type        = string
-  default     = "worker"
+  default     = "cx23"
 }
 
 provider "kubernetes" {
   config_path = var.kubeconfig_path
 }
 
-resource "kubernetes_config_map_v1" "worker_3" {
+resource "kubernetes_config_map_v1" "migration_db" {
   metadata {
-    name      = "lab-worker-3"
+    name      = "lab-migration-db"
     namespace = "lab"
   }
 
   data = {
-    role = var.worker_role
+    server_type = var.db_size
   }
 }
 
-resource "kubernetes_config_map_v1" "volume" {
+resource "kubernetes_config_map_v1" "worker" {
   metadata {
-    generate_name = "lab-volume-"
+    generate_name = "lab-worker-"
     namespace     = "lab"
   }
 
   data = {
-    size = "10Gi"
+    role = "worker"
   }
 }
