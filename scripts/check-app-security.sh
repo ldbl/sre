@@ -6,6 +6,8 @@
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
 #     "false" in production
 #   - every overlay renders at least one Deployment (an empty render must not pass as OK)
+#   - a Deployment targeted by an HPA sets no spec.replicas (the HPA owns the count; a value in Git
+#     makes Flux reset what the HPA scaled on every reconcile)
 #
 # Runs in pre-commit (flux/apps/**) and in the Flux Diff workflow. Needs kustomize and yq (v4).
 set -euo pipefail
@@ -61,6 +63,14 @@ for overlay in "${overlays[@]}"; do
   if ((deployments == 0)); then
     failures+=("${overlay}: renders no Deployment - nothing was checked")
   fi
+
+  while IFS= read -r target; do
+    [[ -z "${target}" ]] && continue
+    replicas="$(yq "select(.kind == \"Deployment\" and .metadata.name == \"${target}\") | .spec.replicas" <<<"${rendered}")"
+    if [[ -n "${replicas}" && "${replicas}" != "null" ]]; then
+      failures+=("${overlay}: Deployment ${target} has an HPA and must not set spec.replicas (got: ${replicas})")
+    fi
+  done < <(yq 'select(.kind == "HorizontalPodAutoscaler" and .spec.scaleTargetRef.kind == "Deployment") | .spec.scaleTargetRef.name' <<<"${rendered}")
 
   if [[ "${overlay}" == flux/apps/backend/* ]]; then
     pprof="$(backend_env "${rendered}" PPROF_ENABLED)"

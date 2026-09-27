@@ -100,9 +100,13 @@ scripts/             # Pre-commit hooks, automation scripts
 - external-dns (namespace `external-dns`) reads the Cloudflare DNS token from its SOPS Secret
   `cloudflare-api-token`; origin-ca-issuer (namespace `cert-manager`) reads a separate token with only
   "SSL and Certificates: Edit" from `cloudflare-origin-ca-token` (both in flux/secrets/cloudflare)
+- Flagger (progressive delivery) is installed but the develop canaries are OPT-IN (Ch19):
+  `flux/bootstrap/flux-system/progressive-delivery-develop.yaml` is not in that kustomization.yaml.
+  Canaries set `revertOnDeletion: true` so disabling restores the app Deployment and Service.
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
-  Deployment sets `automountServiceAccountToken: false`; backend `PPROF_ENABLED` is `"false"` in Git;
+  Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;
+  backend `PPROF_ENABLED` is `"false"` in Git;
   `CHAOS_ENABLED` is explicit - `"true"` only in develop/staging, `"false"` in production.
   `scripts/security-smoke.sh BASE_URL [HOST]` checks the public path from outside (no secrets on /api/env,
   no /api/token, no pprof, chaos as expected, bounded /delay, no wildcard CORS).
@@ -110,7 +114,10 @@ scripts/             # Pre-commit hooks, automation scripts
 ### Resource Management
 - ResourceQuotas enforce per-namespace limits (develop/staging: 500m CPU, 512Mi; production: 1 CPU, 1Gi)
 - LimitRange sets defaults (10m/64Mi request) — cert-manager ACME solver needs min 10m CPU
-- Production: 2 replicas with higher requests; develop/staging: 1 replica with minimal requests
+- Replica counts live ONLY in the HPA (`hpa.yaml` per environment: production 2-3, staging 2, develop 1);
+  Deployments set no `spec.replicas`, or Flux would reset what the HPA scaled on every reconcile. An
+  existing cluster needs `scripts/hpa-replicas-handover.sh <context> --apply` once before such a change
+  (server-side apply resets a removed, solely-owned field to 1). Production has higher requests.
 
 ## Make Targets
 

@@ -11,7 +11,17 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: backend
+  # Flagger copies this HPA to backend-primary (the serving Deployment) and leaves the canary Deployment
+  # at 0 between releases (an HPA does not scale a Deployment that is at 0 replicas).
+  autoscalerRef:
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    name: backend
   progressDeadlineSeconds: 600
+  # Deleting the Canary (disabling this module) restores the app: Flagger scales the Deployment back up
+  # and points the Service at it again. Without this the Service keeps selecting the deleted primary
+  # and the Deployment may stay at 0 replicas (an HPA does not scale up from 0). Tested on kind.
+  revertOnDeletion: true
   service:
     port: 80
     targetPort: http
