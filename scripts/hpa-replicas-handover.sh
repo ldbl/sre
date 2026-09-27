@@ -22,7 +22,21 @@ field_manager="hpa-handover"
 kube() { kubectl --context "${context}" "$@"; }
 
 for ns in "${namespaces[@]}"; do
-  kube get namespace "${ns}" >/dev/null 2>&1 || { echo "skip ${ns}: namespace not found"; continue; }
+  # Only an absent namespace is skipped; any other error (no access, wrong context) stops the run.
+  if ! found_ns="$(kube get namespace "${ns}" --ignore-not-found -o name)"; then
+    echo "error: cannot read namespace ${ns}" >&2
+    exit 1
+  fi
+  if [[ -z "${found_ns}" ]]; then
+    echo "skip ${ns}: namespace not found"
+    continue
+  fi
+
+  # Captured, not a process substitution: a failed lookup must stop the run, not look like "no HPAs".
+  if ! hpas="$(kube -n "${ns}" get hpa -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.scaleTargetRef.kind}{"\t"}{.spec.scaleTargetRef.name}{"\n"}{end}')"; then
+    echo "error: cannot list HPAs in ${ns}" >&2
+    exit 1
+  fi
 
   while IFS=$'\t' read -r hpa kind target; do
     [[ -z "${hpa}" ]] && continue
@@ -30,7 +44,10 @@ for ns in "${namespaces[@]}"; do
       echo "skip ${ns}/${hpa}: targets ${kind}, not a Deployment"
       continue
     fi
-    replicas="$(kube -n "${ns}" get deployment "${target}" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
+    if ! replicas="$(kube -n "${ns}" get deployment "${target}" --ignore-not-found -o jsonpath='{.spec.replicas}')"; then
+      echo "error: cannot read deployment ${ns}/${target}" >&2
+      exit 1
+    fi
     if [[ -z "${replicas}" ]]; then
       echo "skip ${ns}/${target}: Deployment not found"
       continue
@@ -50,7 +67,7 @@ spec:
   replicas: ${replicas}
 EOF
     echo "handed over ${ns}/${target} spec.replicas=${replicas} to ${field_manager}"
-  done < <(kube -n "${ns}" get hpa -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.scaleTargetRef.kind}{"\t"}{.spec.scaleTargetRef.name}{"\n"}{end}')
+  done <<<"${hpas}"
 done
 
 if [[ "${mode}" != "--apply" ]]; then
