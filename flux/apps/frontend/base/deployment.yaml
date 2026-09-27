@@ -27,6 +27,8 @@ spec:
         app.kubernetes.io/name: frontend
         app.kubernetes.io/component: web
     spec:
+      # nginx never calls the Kubernetes API: no ServiceAccount token in the pod.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

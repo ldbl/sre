@@ -31,6 +31,8 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: "/metrics"
     spec:
+      # The backend never calls the Kubernetes API: no ServiceAccount token in the pod.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -101,6 +103,14 @@ spec:
           value: app-postgres-rw
         - name: POSTGRES_DB
           value: app
+        # Security switches (backend >= the 2026-09-27 hardening). Safe values here; an environment
+        # overlay may only turn chaos on (develop, staging). scripts/check-app-security.sh enforces it.
+        - name: CHAOS_ENABLED       # /panic + readiness/liveness toggles (still need a token)
+          value: "false"
+        - name: PPROF_ENABLED       # profiling listener on loopback; never on in Git
+          value: "false"
+        - name: AUTH_REGISTRATION_ENABLED
+          value: "true"
         livenessProbe:
           httpGet:
             path: /livez

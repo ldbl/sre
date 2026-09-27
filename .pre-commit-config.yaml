@@ -37,6 +37,14 @@ repos:
         require_serial: true
         stages: [pre-commit]
 
+      - id: app-security
+        name: App manifests keep the security rules (no SA token, no pprof, no chaos in production)
+        entry: scripts/check-app-security.sh
+        language: script
+        files: ^flux/apps/.*\.ya?ml$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: terraform-fmt
         name: Terraform format check
         entry: terraform fmt -recursive -diff -check
