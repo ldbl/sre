@@ -4,8 +4,9 @@
 #   - staging and production differ for an app (staging is the pre-production copy of production)
 #   - production gets less than develop for any request or limit
 #   - a namespace quota cannot hold the worst case: every app at HPA maxReplicas + its rolling-update
-#     surge, plus the Postgres instances - checked for requests and for limits
-# Resources are summed over all regular containers of a pod (init containers are not counted).
+#     surge, plus the Postgres instances - checked for requests, limits and the pod count
+# A pod's resources are what Kubernetes charges against the quota: for each request/limit the larger
+# of (the sum over regular containers) and (the largest single init container).
 #
 # A broken input (a failed kustomize build, a missing or duplicate HPA, a missing request/limit)
 # stops the run at once with a message; rule violations are collected and reported together.
@@ -40,11 +41,16 @@ yqs() { yq -N "$1" | sed -e '/^$/d' -e '/^---$/d'; }
 # `set -e` stops the script when the build fails (a `local` or a here-string would hide it).
 render() { kustomize build "$1" || die "kustomize build $1 failed"; }
 
-# CPU quantity -> millicores ("250m" -> 250, "1" -> 1000, "0.5" -> 500)
+# CPU quantity -> millicores ("250m" -> 250, "1" -> 1000, "0.5" -> 500); anything else stops the run
 to_milli() {
   local q="$1"
-  [[ -n "${q}" && "${q}" != null ]] || die "missing CPU quantity ($2)"
-  if [[ "${q}" == *m ]]; then echo "${q%m}"; else awk -v v="${q}" 'BEGIN { printf "%d", v * 1000 }'; fi
+  if [[ "${q}" =~ ^[0-9]+m$ ]]; then
+    echo "${q%m}"
+  elif [[ "${q}" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    awk -v v="${q}" 'BEGIN { printf "%d", v * 1000 }'
+  else
+    die "unsupported or missing CPU quantity '${q}' ($2)"
+  fi
 }
 
 # Memory quantity -> MiB ("256Mi" -> 256, "3Gi" -> 3072, "512Ki" -> 1, rounded up)
@@ -73,6 +79,21 @@ pod_resources() {
     v="$(to_milli "${lc}" "${where} limits.cpu")"; sum_lc=$((sum_lc + v))
     v="$(to_mib "${lm}" "${where} limits.memory")"; sum_lm=$((sum_lm + v))
   done <<<"${lines}"
+  # Init containers run one at a time before the others: the pod needs the larger of the two.
+  local init_lines max_rc=0 max_rm=0 max_lc=0 max_lm=0
+  init_lines="$(yqs 'select(.kind == "Deployment") | .spec.template.spec.initContainers[]? | .resources | [.requests.cpu, .requests.memory, .limits.cpu, .limits.memory] | @tsv' <<<"${rendered}")"
+  if [[ -n "${init_lines}" ]]; then
+    while IFS=$'\t' read -r rc rm lc lm; do
+      v="$(to_milli "${rc}" "${where} init requests.cpu")"; ((v > max_rc)) && max_rc=${v}
+      v="$(to_mib "${rm}" "${where} init requests.memory")"; ((v > max_rm)) && max_rm=${v}
+      v="$(to_milli "${lc}" "${where} init limits.cpu")"; ((v > max_lc)) && max_lc=${v}
+      v="$(to_mib "${lm}" "${where} init limits.memory")"; ((v > max_lm)) && max_lm=${v}
+    done <<<"${init_lines}"
+  fi
+  ((max_rc > sum_rc)) && sum_rc=${max_rc}
+  ((max_rm > sum_rm)) && sum_rm=${max_rm}
+  ((max_lc > sum_lc)) && sum_lc=${max_lc}
+  ((max_lm > sum_lm)) && sum_lm=${max_lm}
   echo "${sum_rc} ${sum_rm} ${sum_lc} ${sum_lm}"
 }
 
@@ -121,6 +142,7 @@ done
 # 3: quota budget per namespace
 for env in "${envs[@]}"; do
   need=(0 0 0 0)
+  need_pods=0
   breakdown=()
 
   for app in "${apps[@]}"; do
@@ -128,6 +150,7 @@ for env in "${envs[@]}"; do
     pods="$(worst_case_pods "${rendered}" "${app}/${env}")"
     s="$(pod_resources "${rendered}" "${app}/${env}")"; read -r -a per_pod <<<"${s}"
     for i in 0 1 2 3; do need[i]=$((need[i] + pods * per_pod[i])); done
+    need_pods=$((need_pods + pods))
     breakdown+=("${app} ${pods}x")
   done
 
@@ -139,6 +162,7 @@ for env in "${envs[@]}"; do
   v="$(to_mib "${prm}" "cnpg ${env} requests.memory")"; need[1]=$((need[1] + instances * v))
   v="$(to_milli "${plc}" "cnpg ${env} limits.cpu")"; need[2]=$((need[2] + instances * v))
   v="$(to_mib "${plm}" "cnpg ${env} limits.memory")"; need[3]=$((need[3] + instances * v))
+  need_pods=$((need_pods + instances))
   breakdown+=("postgres ${instances}x")
 
   quota="$(render "flux/infrastructure/resource-management/${env}")"
@@ -153,7 +177,16 @@ for env in "${envs[@]}"; do
       failures+=("${env}: worst case (${breakdown[*]}) needs ${labels[$i]}=${need[$i]} but the quota allows ${have[$i]}")
     fi
   done
-  echo "  ${env}: worst case (${breakdown[*]}) requests ${need[0]}m/${need[1]}Mi of ${have[0]}m/${have[1]}Mi, limits ${need[2]}m/${need[3]}Mi of ${have[2]}m/${have[3]}Mi"
+  # Pod count: only the apps and Postgres are counted here; other pods in the namespace (CronJobs,
+  # lab pods) need the rest of the quota, so this is a floor, not the whole budget.
+  quota_pods="$(yqs 'select(.kind == "ResourceQuota") | .spec.hard.pods // ""' <<<"${quota}")"
+  if [[ -n "${quota_pods}" ]]; then
+    [[ "${quota_pods}" =~ ^[0-9]+$ ]] || die "quota ${env}: pods '${quota_pods}' is not an integer"
+    if ((need_pods > quota_pods)); then
+      failures+=("${env}: worst case (${breakdown[*]}) needs ${need_pods} pods but the quota allows ${quota_pods}")
+    fi
+  fi
+  echo "  ${env}: worst case (${breakdown[*]}) requests ${need[0]}m/${need[1]}Mi of ${have[0]}m/${have[1]}Mi, limits ${need[2]}m/${need[3]}Mi of ${have[2]}m/${have[3]}Mi, pods ${need_pods} of ${quota_pods:-unlimited}"
 done
 
 if ((${#failures[@]} > 0)); then
