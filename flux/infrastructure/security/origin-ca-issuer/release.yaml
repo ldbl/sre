@@ -29,6 +29,13 @@ spec:
     remediation:
       retries: 3
   values:
+    # The chart binds "approve" on the Origin CA signers to this ServiceAccount. Ours is named after
+    # the HelmRelease (cert-manager-cert-manager), not the chart default "cert-manager" - with the
+    # default, cert-manager's webhook refuses to approve every CertificateRequest and no origin
+    # certificate is ever issued (found on the Hetzner cycle 2026-09-27).
+    certmanager:
+      namespace: cert-manager
+      serviceAccountName: cert-manager-cert-manager
     controller:
       # ClusterOriginIssuer tokens are read from this namespace (flux/secrets/cloudflare).
       clusterResourceNamespace: cert-manager
