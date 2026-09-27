@@ -52,6 +52,8 @@ hint() {
     age-keygen:*)      echo "apt install age  | https://github.com/FiloSottile/age#installation" ;;
     pre-commit:Darwin) echo "brew install pre-commit  | https://pre-commit.com/#install" ;;
     pre-commit:*)      echo "pip install pre-commit  | https://pre-commit.com/#install" ;;
+    checkov:Darwin)    echo "brew install checkov  | https://www.checkov.io/2.Basics/Installing%20Checkov.html" ;;
+    checkov:*)         echo "pip install checkov  | https://www.checkov.io/2.Basics/Installing%20Checkov.html" ;;
     git:Darwin)        echo "xcode-select --install or brew install git" ;;
     git:*)             echo "apt install git" ;;
     make:Darwin)       echo "xcode-select --install" ;;
@@ -97,6 +99,7 @@ check flux       "$MIN_FLUX"      "flux version --client"
 check sops       ""               "sops --version"
 check age-keygen ""               "age-keygen --version"
 check pre-commit ""               "pre-commit --version"
+check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
 
 # Docker must not only be installed but running - the kind nodes are containers.
 if command -v docker >/dev/null 2>&1; then
