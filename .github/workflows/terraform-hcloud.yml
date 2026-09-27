@@ -125,6 +125,13 @@ jobs:
           PLAN_SHA256: ${{ steps.fingerprint.outputs.plan_sha256 }}
           PLAN_MAX_AGE_MINUTES: "60"
         run: |
+          # The approver must see the plan: a missing plan.txt or a summary GitHub will not show
+          # (over 1 MiB per step) fails here, before the plan is encrypted and uploaded.
+          if [ ! -s plan.txt ]; then
+            echo "::error::plan.txt is missing or empty - there is no plan to show the approver"
+            exit 1
+          fi
+          summary="$(mktemp)"
           {
             echo "## Terraform plan (Hetzner)"
             echo
@@ -142,7 +149,13 @@ jobs:
             cat plan.txt
             echo '```'
             echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } > "$summary"
+          size="$(wc -c < "$summary")"
+          if [ "$size" -gt 1000000 ]; then
+            echo "::error::the plan summary is ${size} bytes; GitHub shows at most 1 MiB per step, so the approver could not read the plan - split the change"
+            exit 1
+          fi
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
 
       # A saved plan holds every non-ephemeral input variable in plain text - the Hetzner token
       # and the backup keys (the SOPS age key is ephemeral, the node SSH key goes through
@@ -242,12 +255,12 @@ jobs:
             echo "::error::this plan file ($actual) is not the one shown in the run summary ($PLAN_SHA256)"
             exit 1
           fi
-          age_minutes=$(( ($(date +%s) - PLAN_CREATED) / 60 ))
-          if [ "$age_minutes" -gt "$PLAN_MAX_AGE_MINUTES" ]; then
-            echo "::error::the plan is ${age_minutes} minutes old (limit ${PLAN_MAX_AGE_MINUTES}); reality may have moved under it - re-run the workflow for a fresh plan and review it again"
+          age_seconds=$(( $(date +%s) - PLAN_CREATED ))
+          if [ "$age_seconds" -gt $(( PLAN_MAX_AGE_MINUTES * 60 )) ]; then
+            echo "::error::the plan is ${age_seconds}s old (limit ${PLAN_MAX_AGE_MINUTES} minutes); reality may have moved under it - re-run the workflow for a fresh plan and review it again"
             exit 1
           fi
-          echo "applying exactly the reviewed plan $actual (${age_minutes} minutes old)"
+          echo "applying exactly the reviewed plan $actual (${age_seconds}s old)"
 
       - name: Terraform apply
         env:
