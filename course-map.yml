@@ -106,7 +106,7 @@ flux/infrastructure/resource-management/develop/resourcequota.yaml:
 flux/infrastructure/security/dns-and-certificates:
   - appendix-dns-tls
 
-flux/infrastructure/security/dns-and-certificates/cluster-issuer.yaml:
+flux/infrastructure/security/dns-and-certificates/origin-issuer.yaml:
   - appendix-dns-tls
 
 flux/infrastructure/security/dns-and-certificates/release-external-dns.yaml:
