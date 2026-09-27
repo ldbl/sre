@@ -67,6 +67,10 @@ flux_patch_roles="$(yq -N 'select(.kind == "Role" or .kind == "ClusterRole")
     ))
   | .metadata.name' <<<"${rendered}")" || die "cannot read the Flux roles"
 
+field_policy="$(yq -N 'select(.kind == "ValidatingAdmissionPolicy")
+  | select(.metadata.name == "oidc-flux-operator-fields") | .metadata.name' <<<"${rendered}")" \
+  || die "cannot read the admission policies"
+
 field_policy_deny="$(yq -N 'select(.kind == "ValidatingAdmissionPolicyBinding")
   | select(.spec.policyName == "oidc-flux-operator-fields")
   | select(.spec.validationActions | any_c(test("^Deny$"))) | .metadata.name' <<<"${rendered}")" \
@@ -94,8 +98,11 @@ while IFS= read -r role; do
 done <<<"${sensitive_roles}"
 
 # 4. Writes on Flux objects only together with the field-limiting policy in Deny.
-if [[ -n "${flux_patch_roles}" && -z "${field_policy_deny}" ]]; then
-  failures+=("role(s) $(tr '\n' ' ' <<<"${flux_patch_roles}")may write Flux objects, but the admission policy oidc-flux-operator-fields is missing or not in Deny")
+if [[ -n "${flux_patch_roles}" ]]; then
+  [[ -n "${field_policy}" ]] \
+    || failures+=("role(s) $(tr '\n' ' ' <<<"${flux_patch_roles}")may write Flux objects, but the ValidatingAdmissionPolicy oidc-flux-operator-fields is missing")
+  [[ -n "${field_policy_deny}" ]] \
+    || failures+=("role(s) $(tr '\n' ' ' <<<"${flux_patch_roles}")may write Flux objects, but no binding puts oidc-flux-operator-fields in Deny")
 fi
 
 if ((${#failures[@]} > 0)); then
