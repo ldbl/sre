@@ -1,0 +1,28 @@
+# OPT-IN (Ch19 Progressive Delivery): the develop canaries for backend and frontend.
+#
+# Not listed in kustomization.yaml, so Flux ignores this file until Ch19. To enable, add
+#   - progressive-delivery-develop.yaml
+# to the resources in flux/bootstrap/flux-system/kustomization.yaml and push.
+# Until then develop gets a plain rolling update from the app Kustomizations.
+#
+# Before enabling, the analysis needs traffic that reaches Traefik with the canary Host header
+# (see flux/infrastructure/progressive-delivery/README.md, "Known gap"): without it every release
+# is rolled back. Disabling again is safe: the Canaries set revertOnDeletion, so Flagger restores the
+# app Deployment and Service before it removes its primary objects.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: progressive-delivery-develop
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/progressive-delivery/develop
+  prune: true
+  wait: false
+  dependsOn:
+    - name: flagger
+    - name: apps-develop

@@ -18,6 +18,10 @@ spec:
     kind: HorizontalPodAutoscaler
     name: frontend
   progressDeadlineSeconds: 600
+  # Deleting the Canary (disabling this module) restores the app: Flagger scales the Deployment back up
+  # and points the Service at it again. Without this the Service keeps selecting the deleted primary
+  # and the Deployment may stay at 0 replicas (an HPA does not scale up from 0). Tested on kind.
+  revertOnDeletion: true
   service:
     port: 8080
     targetPort: http

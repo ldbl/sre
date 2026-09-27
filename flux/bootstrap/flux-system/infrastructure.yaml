@@ -481,23 +481,6 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: progressive-delivery-develop
-  namespace: flux-system
-spec:
-  interval: 10m0s
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  path: ./flux/infrastructure/progressive-delivery/develop
-  prune: true
-  wait: false
-  dependsOn:
-    - name: flagger
-    - name: apps-develop
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
   name: dex
   namespace: flux-system
 spec:
