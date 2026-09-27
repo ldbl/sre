@@ -157,7 +157,9 @@ scripts/             # Pre-commit hooks, automation scripts
 2. Make changes, run `make pre-commit`
 3. Push and create PR — CodeRabbit reviews automatically
 4. GitHub Actions runs `terraform plan` on PR
-5. Merge to main — apply via `workflow_dispatch` with approval gate
+5. Merge to main — a fresh plan runs; the apply waits for approval (environment `production`). Approve only the plan
+   in the run summary: the apply job applies only the plan file with that SHA-256 and refuses one older than
+   60 minutes (re-run the workflow for a fresh plan). The PR's plan is not the one that runs.
 
 ## Coding Style
 
