@@ -4,9 +4,13 @@ metadata:
   name: compute-quota
   namespace: production
 spec:
+  # limits.* must cover the worst case: every app at HPA maxReplicas + 1 surge pod of a rolling
+  # update, plus the Postgres instances. scripts/check-app-resources.sh computes it from the
+  # rendered manifests and fails when it does not fit (2Gi was exactly full before the backend got
+  # the same 256Mi limit as develop).
   hard:
     requests.cpu: "1"
     requests.memory: 1Gi
-    limits.cpu: "2"
-    limits.memory: 2Gi
+    limits.cpu: "3"
+    limits.memory: 3Gi
     pods: "15"
