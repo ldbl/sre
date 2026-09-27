@@ -32,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has_changes: ${{ steps.plan.outputs.has_changes }}
+      plan_sha256: ${{ steps.fingerprint.outputs.plan_sha256 }}
+      plan_created: ${{ steps.fingerprint.outputs.plan_created }}
 
     defaults:
       run:
@@ -106,6 +108,54 @@ jobs:
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # What the approver reads is what gets applied: the plan text, the SHA-256 of the plan file
+      # and the time it was made go to the run's summary - the page with "Review deployments".
+      # The apply job refuses a file with another hash, or a plan older than PLAN_MAX_AGE_MINUTES.
+      - name: Fingerprint the plan
+        id: fingerprint
+        if: github.event_name != 'pull_request' && steps.plan.outputs.has_changes == 'true'
+        run: |
+          echo "plan_sha256=$(sha256sum tfplan | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "plan_created=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Plan summary
+        if: always() && steps.plan.outcome != 'skipped'
+        env:
+          PLAN_SHA256: ${{ steps.fingerprint.outputs.plan_sha256 }}
+          PLAN_MAX_AGE_MINUTES: "60"
+        run: |
+          # The approver must see the plan: a missing plan.txt or a summary GitHub will not show
+          # (over 1 MiB per step) fails here, before the plan is encrypted and uploaded.
+          if [ ! -s plan.txt ]; then
+            echo "::error::plan.txt is missing or empty - there is no plan to show the approver"
+            exit 1
+          fi
+          summary="$(mktemp)"
+          {
+            echo "## Terraform plan (Hetzner)"
+            echo
+            echo "**$(grep -E '^(Plan:|No changes)' plan.txt | tail -1)**"
+            if [ -n "$PLAN_SHA256" ]; then
+              echo
+              echo "- plan file SHA-256: \`$PLAN_SHA256\` - the apply job applies only a file with this hash"
+              echo "- made at $(date -u '+%Y-%m-%d %H:%M UTC'); the apply refuses it after ${PLAN_MAX_AGE_MINUTES} minutes - then re-run the workflow for a fresh plan"
+              echo "- approve only what you read below: this is the plan that will run, not the one from the pull request"
+            fi
+            echo
+            echo "<details><summary>Full plan</summary>"
+            echo
+            echo '```'
+            cat plan.txt
+            echo '```'
+            echo "</details>"
+          } > "$summary"
+          size="$(wc -c < "$summary")"
+          if [ "$size" -gt 1000000 ]; then
+            echo "::error::the plan summary is ${size} bytes; GitHub shows at most 1 MiB per step, so the approver could not read the plan - split the change"
+            exit 1
+          fi
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
 
       # A saved plan holds every non-ephemeral input variable in plain text - the Hetzner token
       # and the backup keys (the SOPS age key is ephemeral, the node SSH key goes through
@@ -189,6 +239,28 @@ jobs:
         run: |
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:TFPLAN_PASSPHRASE -in tfplan.enc -out tfplan
           rm -f tfplan.enc
+
+      - name: Apply only the reviewed plan, and only while it is fresh
+        env:
+          PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
+          PLAN_CREATED: ${{ needs.plan.outputs.plan_created }}
+          PLAN_MAX_AGE_MINUTES: "60"
+        run: |
+          if [ -z "$PLAN_SHA256" ] || [ -z "$PLAN_CREATED" ]; then
+            echo "::error::the plan job reported no hash or time - refusing to apply an unidentified plan"
+            exit 1
+          fi
+          actual="$(sha256sum tfplan | cut -d' ' -f1)"
+          if [ "$actual" != "$PLAN_SHA256" ]; then
+            echo "::error::this plan file ($actual) is not the one shown in the run summary ($PLAN_SHA256)"
+            exit 1
+          fi
+          age_seconds=$(( $(date +%s) - PLAN_CREATED ))
+          if [ "$age_seconds" -gt $(( PLAN_MAX_AGE_MINUTES * 60 )) ]; then
+            echo "::error::the plan is ${age_seconds}s old (limit ${PLAN_MAX_AGE_MINUTES} minutes); reality may have moved under it - re-run the workflow for a fresh plan and review it again"
+            exit 1
+          fi
+          echo "applying exactly the reviewed plan $actual (${age_seconds}s old)"
 
       - name: Terraform apply
         env:
