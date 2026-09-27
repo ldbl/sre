@@ -12,7 +12,7 @@ This Terraform configuration creates a local Kubernetes cluster using [kind](htt
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
-- [Terraform](https://www.terraform.io/downloads.html) >= 1.0
+- [Terraform](https://www.terraform.io/downloads.html) >= 1.11 (write-only attributes; `required_version` in main.tf)
 - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 
