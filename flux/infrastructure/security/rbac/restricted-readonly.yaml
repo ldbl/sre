@@ -1,6 +1,6 @@
 ---
 # Read-only access without secrets, exec, or portforward.
-# Used for production, flux-system, and kube-system.
+# Used for staging, production, flux-system, and kube-system.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

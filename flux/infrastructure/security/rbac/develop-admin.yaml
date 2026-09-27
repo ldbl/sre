@@ -10,5 +10,8 @@ roleRef:
   name: admin
 subjects:
   - kind: Group
-    name: "safeops-course"
+    name: "safeops-course:members"
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: "safeops-course:admins"
     apiGroup: rbac.authorization.k8s.io

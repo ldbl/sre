@@ -5,7 +5,9 @@ resources:
   - restricted-readonly.yaml
   - cluster-view.yaml
   - develop-admin.yaml
-  - staging-admin.yaml
+  - staging-readonly.yaml
   - production-readonly.yaml
   - flux-system-readonly.yaml
+  - flux-operator.yaml
+  - flux-operator-fields.yaml
   - kube-system-readonly.yaml

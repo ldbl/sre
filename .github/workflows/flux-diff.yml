@@ -36,6 +36,10 @@ jobs:
       - name: App resources and quota budget
         run: scripts/check-app-resources.sh
 
+      # Groups are Dex org:team groups (the bare org is never sent); write roles only in develop.
+      - name: OIDC RBAC rules
+        run: scripts/check-oidc-rbac.sh
+
       - name: Build and validate kustomizations
         id: validate
         run: |

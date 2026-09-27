@@ -1,0 +1,61 @@
+---
+# The RBAC half (oidc-flux-operator) lets safeops-course:admins patch Kustomizations and HelmReleases.
+# RBAC cannot limit WHICH fields, and a patch to spec.sourceRef, spec.path, spec.patches or values is
+# applied by kustomize-/helm-controller with cluster-admin rights. This policy is the other half: for
+# that group, an update may change only spec.suspend and the reconcile request annotations (what
+# flux suspend/resume/reconcile write). Everything else needs the break-glass kubeconfig.
+# Native ValidatingAdmissionPolicy (GA since Kubernetes 1.30), Deny from the start - it is part of
+# the access model, not a Chapter 16 Kyverno policy that starts in Audit.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: oidc-flux-operator-fields
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: ["UPDATE"]
+        resources: ["kustomizations"]
+      - apiGroups: ["helm.toolkit.fluxcd.io"]
+        apiVersions: ["*"]
+        operations: ["UPDATE"]
+        resources: ["helmreleases"]
+  matchConditions:
+    - name: oidc-admins
+      expression: "has(request.userInfo.groups) && 'safeops-course:admins' in request.userInfo.groups"
+  variables:
+    - name: requestAnnotations
+      expression: "['reconcile.fluxcd.io/requestedAt', 'reconcile.fluxcd.io/forceAt', 'reconcile.fluxcd.io/resetAt']"
+  validations:
+    - expression: >-
+        object.spec.all(k, k == 'suspend' || (k in oldObject.spec && object.spec[k] == oldObject.spec[k]))
+        && oldObject.spec.all(k, k == 'suspend' || k in object.spec)
+      message: "OIDC admins may change only spec.suspend; other spec changes go through Git"
+    - expression: >-
+        (!has(object.metadata.annotations) || object.metadata.annotations.all(k,
+          k in variables.requestAnnotations
+          || (has(oldObject.metadata.annotations) && k in oldObject.metadata.annotations
+              && oldObject.metadata.annotations[k] == object.metadata.annotations[k])))
+        && (!has(oldObject.metadata.annotations) || oldObject.metadata.annotations.all(k,
+          k in variables.requestAnnotations
+          || (has(object.metadata.annotations) && k in object.metadata.annotations)))
+      message: "OIDC admins may change only the reconcile.fluxcd.io request annotations"
+    - expression: >-
+        has(object.metadata.labels) == has(oldObject.metadata.labels)
+        && (!has(object.metadata.labels) || object.metadata.labels == oldObject.metadata.labels)
+        && has(object.metadata.finalizers) == has(oldObject.metadata.finalizers)
+        && (!has(object.metadata.finalizers) || object.metadata.finalizers == oldObject.metadata.finalizers)
+        && has(object.metadata.ownerReferences) == has(oldObject.metadata.ownerReferences)
+        && (!has(object.metadata.ownerReferences)
+            || object.metadata.ownerReferences == oldObject.metadata.ownerReferences)
+      message: "OIDC admins may not change labels, finalizers or ownerReferences"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: oidc-flux-operator-fields
+spec:
+  policyName: oidc-flux-operator-fields
+  validationActions: [Deny]
