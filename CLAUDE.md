@@ -110,6 +110,10 @@ scripts/             # Pre-commit hooks, automation scripts
   in flux-system, limited by the ValidatingAdmissionPolicy `oidc-flux-operator-fields` (Deny) to
   spec.suspend + reconcile annotations; GitRepositories stay read-only. Writing elsewhere = the
   Terraform break-glass kubeconfig. Enforced by `scripts/check-oidc-rbac.sh` (pre-commit + Flux Diff).
+  kubectl login: `kubectl oidc-login setup --oidc-issuer-url=https://dex.safeops.work --oidc-client-id=kubernetes
+  --oidc-extra-scope=email --oidc-extra-scope=groups` (int128/kubelogin; the API server maps the user from
+  `email` and groups from `groups` - without these scopes the token has neither; the Dex client
+  `kubernetes` is public - no secret, PKCE).
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;

@@ -57,12 +57,14 @@ spec:
           redirectURIs:
             - https://headlamp.safeops.work/oidc-callback
           secretEnv: DEX_HEADLAMP_CLIENT_SECRET
+        # The kubectl client (kubelogin) is public: no secret, PKCE instead. A secret copied to every
+        # laptop is not a secret, and Dex compares it even for public clients - with secretEnv set,
+        # "kubectl oidc-login" without the secret fails with invalid_client (Hetzner cycle 2026-09-27).
         - id: kubernetes
           name: Kubernetes
           redirectURIs:
             - http://localhost:8000
             - http://localhost:18000
-          secretEnv: DEX_KUBERNETES_CLIENT_SECRET
           public: true
     envFrom:
       - secretRef:
