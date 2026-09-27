@@ -1,0 +1,10 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.tfstate.lock.info
+tfplan*
+
+# Copied from backend-minio.tf.example during the lab
+backend.tf

@@ -8,4 +8,4 @@ if ! command -v checkov &>/dev/null; then
     echo "Install: brew install checkov (macOS) or pip install checkov; see scripts/check-tools.sh" >&2
     exit 1
 fi
-checkov -d infra/terraform/kind_cluster -d infra/terraform/hcloud_cluster --framework terraform --quiet --compact
+checkov -d infra/terraform/kind_cluster -d infra/terraform/hcloud_cluster -d infra/terraform/state-lab --framework terraform --quiet --compact

@@ -57,6 +57,7 @@ This is the SRE DevOps infrastructure repository, responsible for managing k3s c
 infra/terraform/
   hcloud_cluster/    # Hetzner k3s cluster (kube-hetzner module)
   kind_cluster/      # Local development cluster
+  state-lab/         # Lab: local vs shared (MinIO, locked) state - two ConfigMaps in namespace lab
 flux/
   bootstrap/         # FluxCD bootstrap (kustomizations, secrets)
   infrastructure/    # Helm releases (cert-manager, external-dns, prometheus, cnpg)

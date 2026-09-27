@@ -1,0 +1,25 @@
+# Shared state for the state lab: the MinIO that runs in the kind cluster, reached through
+#   kubectl --context kind-sre-control-plane -n minio port-forward svc/minio 19000:9000
+# with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY taken from the Secret minio/minio-credentials.
+#
+# Copy it to backend.tf and run `terraform init -migrate-state`. use_lockfile = true writes a
+# lock object next to the state with a conditional write, so a second plan or apply stops with
+# "Error acquiring the state lock" instead of overwriting the first one's work.
+#
+# A lab shortcut: this backend lives INSIDE the cluster it could manage - destroying the cluster
+# would destroy Terraform's memory too. A real backend lives outside, like the Hetzner module's
+# Cloudflare R2 bucket (infra/terraform/hcloud_cluster/backend.tf).
+terraform {
+  backend "s3" {
+    bucket                      = "sre"
+    key                         = "state-lab/terraform.tfstate"
+    region                      = "us-east-1"
+    endpoints                   = { s3 = "http://127.0.0.1:19000" }
+    use_path_style              = true
+    skip_credentials_validation = true
+    skip_region_validation      = true
+    skip_requesting_account_id  = true
+    skip_metadata_api_check     = true
+    use_lockfile                = true
+  }
+}
