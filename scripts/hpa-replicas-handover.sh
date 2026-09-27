@@ -16,7 +16,14 @@ set -euo pipefail
 
 context="${1:?usage: $0 KUBE_CONTEXT [--apply]}"
 mode="${2:-dry-run}"
+if [[ "${mode}" != "dry-run" && "${mode}" != "--apply" ]]; then
+  echo "error: unknown argument '${mode}' - use nothing (dry run) or --apply" >&2
+  exit 2
+fi
 namespaces=(develop staging production)
+# Every app Deployment that exists must be covered by an HPA: once Git has no replicas, a Deployment
+# without an HPA would be reset to 1 with nothing to scale it back.
+apps=(backend frontend)
 field_manager="hpa-handover"
 
 kube() { kubectl --context "${context}" "$@"; }
@@ -37,6 +44,17 @@ for ns in "${namespaces[@]}"; do
     echo "error: cannot list HPAs in ${ns}" >&2
     exit 1
   fi
+
+  for app in "${apps[@]}"; do
+    if ! app_deploy="$(kube -n "${ns}" get deployment "${app}" --ignore-not-found -o name)"; then
+      echo "error: cannot read deployment ${ns}/${app}" >&2
+      exit 1
+    fi
+    if [[ -n "${app_deploy}" ]] && ! grep -q "Deployment	${app}\$" <<<"${hpas}"; then
+      echo "error: ${ns}/${app} exists but no HPA targets it - removing replicas from Git would leave it at 1" >&2
+      exit 1
+    fi
+  done
 
   while IFS=$'\t' read -r hpa kind target; do
     [[ -z "${hpa}" ]] && continue
