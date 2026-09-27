@@ -107,7 +107,8 @@ scripts/             # Pre-commit hooks, automation scripts
   GitHub teams `safeops-course/members` and `admins` can log in; groups are `safeops-course:members` /
   `safeops-course:admins` (Dex never sends the bare org). Both: admin in develop, read-only in staging,
   production, flux-system, kube-system (no Secrets/exec). Admins also patch Kustomizations/HelmReleases
-  in flux-system (suspend/resume/reconcile); GitRepositories stay read-only. Writing elsewhere = the
+  in flux-system, limited by the ValidatingAdmissionPolicy `oidc-flux-operator-fields` (Deny) to
+  spec.suspend + reconcile annotations; GitRepositories stay read-only. Writing elsewhere = the
   Terraform break-glass kubeconfig. Enforced by `scripts/check-oidc-rbac.sh` (pre-commit + Flux Diff).
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app

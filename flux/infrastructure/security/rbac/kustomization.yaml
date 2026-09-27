@@ -9,4 +9,5 @@ resources:
   - production-readonly.yaml
   - flux-system-readonly.yaml
   - flux-operator.yaml
+  - flux-operator-fields.yaml
   - kube-system-readonly.yaml
