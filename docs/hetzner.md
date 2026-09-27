@@ -159,8 +159,8 @@ Optional `/etc/hosts` for browser testing:
 - **TLS, origin:** cert-manager issues every Ingress certificate from **Cloudflare Origin CA**
   (origin-ca-issuer, `ClusterOriginIssuer cloudflare-origin-ca`). Trusted by Cloudflare, not by browsers
   - it only works behind the proxy - and free of Let's Encrypt rate limits however often the cluster is
-  rebuilt. For the first minute of a new cluster, until the certificates are issued, Cloudflare answers
-  526.
+  rebuilt. On a new cluster Cloudflare answers 526 until cert-manager has issued the certificates
+  (not measured yet - watch `kubectl get certificate -A`).
 - Token: Cloudflare API token "Zone / SSL and Certificates / Edit" for the zone, SOPS secret
   `flux/secrets/cloudflare/cloudflare-origin-ca-token.yaml`.
 
