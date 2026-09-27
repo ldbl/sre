@@ -12,7 +12,7 @@
 set -Eeuo pipefail
 
 # Minimum versions (major.minor[.patch]); "" = any version.
-MIN_TERRAFORM="1.10"
+MIN_TERRAFORM="1.11"   # the kind and Hetzner modules need write-only attributes (data_wo)
 MIN_KIND="0.30"
 MIN_KUBECTL="1.35"
 MIN_FLUX="2.4"
