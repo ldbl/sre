@@ -23,3 +23,6 @@ site/public/
 age.agekey
 *.agekey
 *.agekey.*.bak
+
+# State lab: the second engineer's copy of infra/terraform/state-lab
+infra/terraform/state-lab-b/
