@@ -76,9 +76,10 @@ if ! [[ -d "${WORKDIR}" ]]; then
   exit 1
 fi
 
-# Numbers only: bash arithmetic would evaluate anything else as an expression.
-if ! [[ "${MAX_AGE_MINUTES}" =~ ^[0-9]+$ ]]; then
-  echo "[guard-tf] --max-age-minutes must be a whole number, got: ${MAX_AGE_MINUTES}" >&2
+# Plain decimal only: bash arithmetic evaluates anything else as an expression,
+# and reads a leading 0 as octal (0060 would be 48).
+if ! [[ "${MAX_AGE_MINUTES}" =~ ^[1-9][0-9]{0,4}$ ]]; then
+  echo "[guard-tf] --max-age-minutes must be a whole number 1-99999, got: ${MAX_AGE_MINUTES}" >&2
   exit 2
 fi
 
@@ -110,14 +111,16 @@ case "${MODE}" in
     fi
 
     # Read the metadata as data, never run it: sourcing would execute whatever
-    # the file contains. A missing or non-numeric time is a refusal.
+    # the file contains. A missing, non-decimal or future time is a refusal:
+    # a time after now (or one too large to fit) would give a negative age
+    # that passes the age check.
     CREATED_AT_EPOCH="$(sed -n 's/^created_at_epoch=//p' "${META_PATH}" | head -n 1)"
-    if ! [[ "${CREATED_AT_EPOCH}" =~ ^[0-9]+$ ]]; then
+    NOW_EPOCH="$(date +%s)"
+    if ! [[ "${CREATED_AT_EPOCH}" =~ ^[1-9][0-9]{0,11}$ ]] || (( CREATED_AT_EPOCH > NOW_EPOCH )); then
       echo "[guard-tf] invalid created_at_epoch in ${META_PATH}" >&2
       echo "[guard-tf] re-run plan before apply" >&2
       exit 1
     fi
-    NOW_EPOCH="$(date +%s)"
     AGE_SECONDS="$((NOW_EPOCH - CREATED_AT_EPOCH))"
     AGE_MINUTES="$((AGE_SECONDS / 60))"
 
