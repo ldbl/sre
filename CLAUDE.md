@@ -118,6 +118,8 @@ scripts/             # Pre-commit hooks, automation scripts
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;
+  every container runs non-root with a read-only root filesystem, no privilege escalation, capabilities
+  drop ALL and seccomp RuntimeDefault (admission only audits these);
   backend `PPROF_ENABLED` is `"false"` in Git;
   `CHAOS_ENABLED` is explicit - `"true"` only in develop/staging, `"false"` in production.
   `scripts/security-smoke.sh BASE_URL [HOST]` checks the public path from outside (no secrets on /api/env,

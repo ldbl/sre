@@ -2,6 +2,9 @@
 # Guardrail for the app manifests (security review 2026-09-27). Renders every backend and frontend
 # overlay and fails when a rule is broken:
 #   - every Deployment: automountServiceAccountToken: false (the apps never call the Kubernetes API)
+#   - every container (and init container): runAsNonRoot, readOnlyRootFilesystem, no privilege
+#     escalation, capabilities drop ALL, seccomp RuntimeDefault - the container value wins over
+#     the pod's, as in Kubernetes (admission only audits these, so this is where a regression stops)
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
 #     "false" in production
@@ -63,6 +66,31 @@ for overlay in "${overlays[@]}"; do
   if ((deployments == 0)); then
     failures+=("${overlay}: renders no Deployment - nothing was checked")
   fi
+
+  # One line per container: deployment, container, runAsNonRoot (container, pod), readOnlyRootFilesystem,
+  # allowPrivilegeEscalation, capabilities.drop, seccomp type (container, pod). Both levels are printed
+  # and decided here: yq's // would treat an explicit false on the container as unset.
+  # shellcheck disable=SC2016 # $pod and $d below are yq variables, not shell ones
+  while IFS=$'\t' read -r dep ctr nonroot_c nonroot_p rofs ape drop seccomp_c seccomp_p; do
+    [[ -z "${ctr}" ]] && continue
+    where="${overlay}: Deployment ${dep} container ${ctr}"
+    nonroot="${nonroot_c}"; [[ "${nonroot}" == "null" ]] && nonroot="${nonroot_p}"
+    seccomp="${seccomp_c}"; [[ "${seccomp}" == "null" ]] && seccomp="${seccomp_p}"
+    [[ "${nonroot}" == "true" ]] || failures+=("${where}: runAsNonRoot must be true (got: ${nonroot})")
+    [[ "${rofs}" == "true" ]] || failures+=("${where}: readOnlyRootFilesystem must be true (got: ${rofs})")
+    [[ "${ape}" == "false" ]] || failures+=("${where}: allowPrivilegeEscalation must be false (got: ${ape})")
+    [[ ",${drop}," == *",ALL,"* ]] || failures+=("${where}: capabilities.drop must include ALL (got: '${drop}')")
+    [[ "${seccomp}" == "RuntimeDefault" || "${seccomp}" == "Localhost" ]] ||
+      failures+=("${where}: seccompProfile must be RuntimeDefault (got: ${seccomp})")
+  done < <(yq 'select(.kind == "Deployment") | .spec.template.spec as $pod | .metadata.name as $d
+      | ($pod.containers + ($pod.initContainers // []))[]
+      | [$d, .name,
+         (.securityContext.runAsNonRoot | tostring), ($pod.securityContext.runAsNonRoot | tostring),
+         (.securityContext.readOnlyRootFilesystem | tostring),
+         (.securityContext.allowPrivilegeEscalation | tostring),
+         ((.securityContext.capabilities.drop // []) | join(",")),
+         (.securityContext.seccompProfile.type | tostring), ($pod.securityContext.seccompProfile.type | tostring)]
+      | @tsv' <<<"${rendered}")
 
   while IFS= read -r target; do
     [[ -z "${target}" ]] && continue
