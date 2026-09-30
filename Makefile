@@ -51,6 +51,7 @@ kind-apply: ## kind: apply exactly the saved plan (refused when older than TF_MA
 	@$(GUARD_TF) apply --dir $(KIND_DIR) --out tfplan --max-age-minutes $(TF_MAX_AGE)
 
 kind-drift: ## kind: does the cluster match the code? (0 = yes, 2 = drift, 1 = error)
+	@terraform -chdir=$(KIND_DIR) init -input=false >/dev/null
 	@rc=0; terraform -chdir=$(KIND_DIR) plan -input=false -lock=false -detailed-exitcode >/dev/null || rc=$$?; \
 	case $$rc in 0) echo "[drift] kind: no changes - code, state and cluster match";; \
 	  2) echo "[drift] kind: something would change - run make kind-plan and read it";; \

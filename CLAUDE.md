@@ -146,8 +146,8 @@ scripts/             # Pre-commit hooks, automation scripts
 - `make tf` — list the Terraform modules and their targets
 - `make kind-plan` / `kind-apply` / `kind-drift` / `kind-destroy` — local cluster; plan is saved with
   `guard-terraform-plan.sh`, apply applies only that plan (refused when older than `TF_MAX_AGE`, default 60 min)
-- `make hcloud-plan` / `hcloud-apply` / `hcloud-drift` / `hcloud-destroy` — the same for Hetzner (aliases of
-  `terraform-hcloud-*`; CI calls `terraform-hcloud-destroy`)
+- `make hcloud-plan` / `hcloud-apply` / `hcloud-destroy` — the same for Hetzner (aliases of
+  `terraform-hcloud-plan|apply|destroy`; CI calls `terraform-hcloud-destroy`); `make hcloud-drift` - drift check
 
 ### hcloud_cluster / kind_cluster Makefiles
 - `make init` / `make plan` (saved, via the guard) / `make apply` (that plan only) / `make destroy`
