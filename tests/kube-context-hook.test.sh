@@ -36,6 +36,20 @@ check block "kubectl get pods --context kind-sre-control-plane | grep backend; k
 check block "KUBECONFIG=other.yaml kubectl get ns"
 check block "/usr/local/bin/kubectl get ns"
 
+# config set / use change the shared kubeconfig even with --context.
+check block "kubectl --context kind-sre-control-plane config set current-context prod"
+check block "kubectl --context kind-sre-control-plane config use prod"
+
+# Tabs are whitespace too.
+check block "$(printf 'kubectl\tget\tns')"
+check block "$(printf 'flux\tget\tkustomizations')"
+
+# An empty --context means the current context.
+check block "kubectl --context= get ns"
+check block 'kubectl --context "" get ns'
+check block "kubectl --context '' get ns"
+
+check allow "$(printf 'kubectl\t--context\tkind-sre-control-plane\tget\tns')"
 check allow "kubectl --context kind-sre-control-plane -n develop get pods"
 check allow "kubectl get pods --context=kind-sre-control-plane -n develop"
 check allow "flux --context kind-sre-control-plane get kustomizations"

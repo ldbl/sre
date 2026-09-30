@@ -38,14 +38,15 @@ parts="${parts//;/${nl}}"
 parts="${parts//|/${nl}}"
 
 while IFS= read -r part; do
-  # Drop leading spaces and VAR=value prefixes, then take the first word.
+  # Tabs count as spaces; drop leading spaces and VAR=value prefixes, then take the first word.
+  part="${part//$'\t'/ }"
   part="$(printf '%s' "${part}" | sed -E 's/^[[:space:]]+//; s/^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*//')"
   [[ -z "${part}" ]] && continue
   tool="$(basename -- "${part%% *}")"
   [[ "${tool}" == "kubectl" || "${tool}" == "flux" ]] || continue
 
   # Changing the shared kubeconfig: never.
-  if [[ "${part}" =~ [[:space:]]config[[:space:]]+(use-context|set-context|delete-context|rename-context|set-cluster|set-credentials|unset)([[:space:]]|$) ]]; then
+  if [[ "${part}" =~ [[:space:]]config[[:space:]]+(use-context|use|set-context|set|delete-context|rename-context|set-cluster|set-credentials|unset)([[:space:]]|$) ]]; then
     block "'${part}' changes the shared kubeconfig"
   fi
 
@@ -55,8 +56,14 @@ while IFS= read -r part; do
     continue
   fi
 
-  # Everything else talks to a cluster: it must say which one.
-  if ! [[ "${part}" =~ [[:space:]]--context([[:space:]]|=) ]]; then
+  # Everything else talks to a cluster: it must say which one - and an empty
+  # --context (--context= or --context "") means "use the current context".
+  if [[ "${part}" =~ [[:space:]]--context(=|[[:space:]]+)([^[:space:]]*) ]]; then
+    value="${BASH_REMATCH[2]}"
+    if [[ -z "${value}" || "${value}" == '""' || "${value}" == "''" ]]; then
+      block "'${part}' passes an empty --context, which means the current context"
+    fi
+  else
     block "'${part}' does not name its cluster (--context)"
   fi
 done <<< "${parts}"
