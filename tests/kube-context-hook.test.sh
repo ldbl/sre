@@ -49,6 +49,11 @@ check block "kubectl --context= get ns"
 check block 'kubectl --context "" get ns'
 check block "kubectl --context '' get ns"
 
+# kubectl takes the last --context: a second, empty one would win.
+check block 'kubectl --context kind-sre-control-plane --context "" get ns'
+check block "kubectl --context=kind-sre-control-plane --context= get ns"
+check block "kubectl --context kind-sre-control-plane get ns --context other"
+
 check allow "$(printf 'kubectl\t--context\tkind-sre-control-plane\tget\tns')"
 check allow "kubectl --context kind-sre-control-plane -n develop get pods"
 check allow "kubectl get pods --context=kind-sre-control-plane -n develop"

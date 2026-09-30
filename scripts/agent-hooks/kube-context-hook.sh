@@ -56,8 +56,14 @@ while IFS= read -r part; do
     continue
   fi
 
-  # Everything else talks to a cluster: it must say which one - and an empty
+  # Everything else talks to a cluster: it must say which one - exactly once
+  # (kubectl takes the last one, so a second, empty --context wins), and an empty
   # --context (--context= or --context "") means "use the current context".
+  # (grep finds nothing -> exit 1; that is a count of 0, not an error)
+  count="$( { grep -o -E '(^|[[:space:]])--context([[:space:]]|=)' <<< "${part}" || true; } | wc -l | tr -d ' ')"
+  if (( count > 1 )); then
+    block "'${part}' passes --context more than once"
+  fi
   if [[ "${part}" =~ [[:space:]]--context(=|[[:space:]]+)([^[:space:]]*) ]]; then
     value="${BASH_REMATCH[2]}"
     if [[ -z "${value}" || "${value}" == '""' || "${value}" == "''" ]]; then
