@@ -142,13 +142,15 @@ scripts/             # Pre-commit hooks, automation scripts
 - `make install-hooks` — install all pre-commit hooks
 - `make pre-commit` — run all hooks manually
 - `make fmt` — terraform fmt recursive
-- `make validate` — terraform validate
-- `make terraform-hcloud-plan` — init + plan for Hetzner cluster
-- `make terraform-hcloud-apply` — init + apply
-- `make terraform-hcloud-destroy` — init + destroy (with state cleanup)
+- `make validate` — terraform validate of every module (kind, hcloud, state-lab), no backend, no credentials
+- `make tf` — list the Terraform modules and their targets
+- `make kind-plan` / `kind-apply` / `kind-drift` / `kind-destroy` — local cluster; plan is saved with
+  `guard-terraform-plan.sh`, apply applies only that plan (refused when older than `TF_MAX_AGE`, default 60 min)
+- `make hcloud-plan` / `hcloud-apply` / `hcloud-drift` / `hcloud-destroy` — the same for Hetzner (aliases of
+  `terraform-hcloud-*`; CI calls `terraform-hcloud-destroy`)
 
-### hcloud_cluster Makefile
-- `make init` / `make plan` / `make apply` / `make destroy`
+### hcloud_cluster / kind_cluster Makefiles
+- `make init` / `make plan` (saved, via the guard) / `make apply` (that plan only) / `make destroy`
 - `make test` — validate terraform configuration
 - `make state-clean` — remove all resources from remote state
 - `make state-clean-k8s` — remove only kubernetes resources from state

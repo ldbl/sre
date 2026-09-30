@@ -10,11 +10,14 @@ help: ## List available targets
 init: ## Terraform init
 	$(TF) init
 
-plan: ## Terraform plan
-	$(TF) plan
+GUARD_TF   := ../../../scripts/guard-terraform-plan.sh
+TF_MAX_AGE ?= 60
 
-apply: ## Terraform apply
-	$(TF) apply
+plan: ## Terraform plan, saved to tfplan (read it before apply)
+	@$(GUARD_TF) plan --dir . --out tfplan
+
+apply: ## Apply exactly the saved tfplan (refused when older than TF_MAX_AGE minutes)
+	@$(GUARD_TF) apply --dir . --out tfplan --max-age-minutes $(TF_MAX_AGE)
 
 DESTROY_ATTEMPTS ?= 3
 
