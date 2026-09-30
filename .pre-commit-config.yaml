@@ -28,6 +28,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: guard-kube-context-test
+        name: guard-kube-context tests (fake kubectl, no cluster)
+        entry: tests/guard-kube-context.test.sh
+        language: script
+        files: ^(scripts/guard-kube-context\.sh|tests/guard-kube-context\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh
