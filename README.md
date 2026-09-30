@@ -76,8 +76,8 @@ The full platform profile (`./flux/bootstrap/flux-system`) is what Hetzner runs;
 ## Where To Start Reading
 
 - Course website: [safeops.work](https://safeops.work/)
-- Course source repo: [`sre-course`](https://github.com/safeops-course/sre)
-- AI guardrails: `docs/ai-code-of-conduct.md`
+- Course source repo: [`sre-course`](https://github.com/safeops-course/sre-course)
+- Rules for your AI agent, per chapter: `docs/agent-rules.md`
 - Hetzner cluster: `docs/hetzner.md`
 - Local bootstrap: `docs/local-dev.md`
 - Flux/GitOps: `docs/gitops/flux.md`
