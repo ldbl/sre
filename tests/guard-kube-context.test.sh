@@ -59,6 +59,23 @@ expect "command with -nprod" 2 "sets its own target (-nprod)" \
   -- "${GUARD}" --context ctx-a --namespace develop -- kubectl apply -nprod -f app.yaml
 expect "command with -A" 2 "sets its own target (-A)" \
   -- "${GUARD}" --context ctx-a --namespace develop -- kubectl delete pods -A --all
+# Flags that point kubectl at another cluster or all namespaces, in every form.
+expect "command with --cluster X" 2 "sets its own target (--cluster)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods --cluster other
+expect "command with --cluster=X" 2 "sets its own target (--cluster=other)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods --cluster=other
+expect "command with --server X" 2 "sets its own target (--server)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods --server https://other:6443
+expect "command with --server=X" 2 "sets its own target (--server=https://other:6443)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods --server=https://other:6443
+expect "command with -s X" 2 "sets its own target (-s)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods -s https://other:6443
+expect "command with -sX" 2 "sets its own target (-shttps://other:6443)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods -shttps://other:6443
+expect "command with -A=true" 2 "sets its own target (-A=true)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods -A=true
+expect "command with --all-namespaces=true" 2 "sets its own target (--all-namespaces=true)" \
+  -- "${GUARD}" --context ctx-a --namespace develop -- kubectl get pods --all-namespaces=true
 expect "only kubectl and flux" 2 "only kubectl and flux can be pinned" \
   -- "${GUARD}" --context ctx-a --namespace develop -- helm upgrade x
 expect "check-only, current matches" 0 "OK context=ctx-a" \

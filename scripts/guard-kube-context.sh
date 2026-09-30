@@ -83,11 +83,13 @@ if [[ ${#COMMAND[@]} -gt 0 ]]; then
     echo "[guard-kube] only kubectl and flux can be pinned, got: ${COMMAND[0]}" >&2
     exit 2
   fi
-  # The guard sets the target; a second one inside the command would be
-  # ambiguous (which one wins depends on the tool), so refuse it.
+  # The guard sets the target; anything in the command that picks another
+  # cluster (--cluster and --server/-s override the context's cluster) or
+  # another namespace would win or be ambiguous, so refuse it - in every
+  # form: separate value, --flag=value and the attached short form.
   for arg in "${COMMAND[@]:1}"; do
     case "${arg}" in
-      --context|--context=*|--kubeconfig|--kubeconfig=*|-n|-n?*|--namespace|--namespace=*|-A|--all-namespaces|--all-namespaces=*)
+      --context|--context=*|--kubeconfig|--kubeconfig=*|--cluster|--cluster=*|--server|--server=*|-s|-s?*|-n|-n?*|--namespace|--namespace=*|-A|-A=*|--all-namespaces|--all-namespaces=*)
         echo "[guard-kube] the command sets its own target (${arg}); give it only to the guard" >&2
         exit 2
         ;;
