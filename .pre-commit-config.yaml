@@ -28,6 +28,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: kube-context-hook-test
+        name: agent kube-context hook tests (text only, no cluster)
+        entry: tests/kube-context-hook.test.sh
+        language: script
+        files: ^(scripts/agent-hooks/kube-context-hook\.sh|tests/kube-context-hook\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh

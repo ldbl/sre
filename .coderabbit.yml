@@ -118,7 +118,7 @@ knowledge_base:
     enabled: true
     filePatterns:
       - "CLAUDE.md"
-      - "docs/ai-code-of-conduct.md"
+      - "docs/agent-rules.md"
       - "course-map.yml"
 chat:
   auto_reply: false
