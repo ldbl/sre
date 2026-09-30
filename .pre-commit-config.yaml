@@ -28,6 +28,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: guard-kube-context-test
+        name: guard-kube-context tests (fake kubectl, no cluster)
+        entry: tests/guard-kube-context.test.sh
+        language: script
+        files: ^(scripts/guard-kube-context\.sh|tests/guard-kube-context\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: kube-context-hook-test
         name: agent kube-context hook tests (text only, no cluster)
         entry: tests/kube-context-hook.test.sh
