@@ -112,6 +112,9 @@ flux/infrastructure/security/dns-and-certificates/origin-issuer.yaml:
 flux/infrastructure/security/dns-and-certificates/release-external-dns.yaml:
   - appendix-dns-tls
 
+infra/terraform/hcloud_cluster/backend.tf:
+  - chapter-02-iac
+
 infra/terraform/hcloud_cluster/main.tf:
   - chapter-12-backup-restore
 
