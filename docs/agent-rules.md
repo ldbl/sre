@@ -57,8 +57,10 @@ against the common mistake, not a shell parser: a script that calls `kubectl` in
 ## Chapter 02 - Apply only the plan a person has read
 
 Terraform changes real infrastructure from its state - its memory of what it built. A saved plan
-is exact but gets older every minute, and both the plan and the state hold every secret in plain
-text. The agent proposes and plans; a person reads the plan and decides.
+is exact but gets older every minute, and both the plan and the state can hold sensitive values in
+plain text - everything Terraform stores, such as generated passwords. Values passed as `ephemeral`
+or write-only (the SOPS key through `data_wo`) and the nodes' SSH key, which never is a Terraform
+value, stay out of both. The agent proposes and plans; a person reads the plan and decides.
 
 | Rule for the agent | What enforces it |
 |---|---|
