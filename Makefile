@@ -82,8 +82,10 @@ pre-commit: ## Run all pre-commit hooks
 fmt: ## Format Terraform files
 	terraform fmt -recursive infra/terraform/
 
-smoke-test: ## Run infrastructure smoke tests against the cluster
-	bash tests/smoke-test.sh
+KUBE_CONTEXT ?= kind-sre-control-plane
+
+smoke-test: ## Smoke tests against KUBE_CONTEXT (default: the local kind cluster)
+	KUBE_CONTEXT=$(KUBE_CONTEXT) bash tests/smoke-test.sh
 
 validate: ## Validate every Terraform module (no backend, no credentials)
 	@# A throw-away data dir per module: a .terraform left by a real init would make even

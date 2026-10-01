@@ -142,7 +142,8 @@ jobs:
 
       - name: Smoke test
         working-directory: ${{ github.workspace }}
-        run: make smoke-test
+        # The renamed context of the Hetzner kubeconfig (hcloud_cluster/main.tf).
+        run: make smoke-test KUBE_CONTEXT=hetzner-sre-control-plane
 
       - name: Keep the cluster for inspection
         if: inputs.keep_minutes != '0'
