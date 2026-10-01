@@ -1,3 +1,20 @@
+# Local kind cluster of the SafeOps course - Chapter 00 builds it, Chapter 02 explains it.
+#
+# What this file creates. Terraform works out the order from the references
+# between resources (kind_cluster.sre.endpoint in a provider block, depends_on):
+#   1. kind_cluster.sre                     the cluster: each node is a Docker container
+#   2. merge_kubeconfig, wait_for_cluster   its kubeconfig merged into ~/.kube/config, a short wait for the API
+#   3. helm_release.traefik / metrics_server ingress on localhost:8080/8443, metrics for kubectl top and the HPA
+#   4. namespaces, ConfigMaps, Secrets      what Flux expects to find when it starts deploying -
+#                                           incl. flux_git_auth, the Git token (private forks only)
+#   5. flux_operator_install, flux_instance Flux, following your fork - from here on Git drives the cluster
+# local-profile.tf adds the generated secrets of the local profile; variables.tf holds the inputs.
+#
+# Run it through the guard - plan, read, apply that plan: make kind-plan, then make kind-apply.
+# Terraform language: https://developer.hashicorp.com/terraform/language
+
+# Terraform and provider versions. A provider is a plugin that talks to one API;
+# "~> 3.3" means 3.3 or newer, but below 4.0. https://developer.hashicorp.com/terraform/language/providers/requirements
 terraform {
   required_version = ">= 1.11.0" # write-only attributes (data_wo) need 1.11; ephemeral variables 1.10
 
@@ -33,8 +50,14 @@ terraform {
   }
 }
 
+# kind provider - creates the cluster. https://registry.terraform.io/providers/tehcyx/kind/latest/docs
 provider "kind" {}
 
+# Helm and Kubernetes providers, configured from the cluster created below
+# (kind_cluster.sre.*): they always talk to this cluster, never to your current
+# kubectl context. A lab convenience - in production the cluster and what runs in
+# it are separate applies (Chapter 02).
+# https://registry.terraform.io/providers/hashicorp/helm/latest/docs
 provider "helm" {
   kubernetes = {
     host                   = kind_cluster.sre.endpoint
@@ -44,6 +67,7 @@ provider "helm" {
   }
 }
 
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs
 provider "kubernetes" {
   host                   = kind_cluster.sre.endpoint
   client_certificate     = kind_cluster.sre.client_certificate
@@ -51,6 +75,7 @@ provider "kubernetes" {
   cluster_ca_certificate = kind_cluster.sre.cluster_ca_certificate
 }
 
+# Values computed once and reused below. https://developer.hashicorp.com/terraform/language/values/locals
 locals {
   kubeconfig_path          = pathexpand("${path.module}/kubeconfig.yaml")
   flux_pull_secret_yaml    = var.flux_git_token != "" ? "    pullSecret: \"flux-system\"\n" : ""
@@ -58,6 +83,9 @@ locals {
   ghcr_secret_enabled      = var.enable_ghcr && nonsensitive(var.ghcr_token != "")
 }
 
+# The cluster. kind runs each node as a Docker container; the resource returns the
+# API address and client certificate that the providers above use.
+# https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster
 resource "kind_cluster" "sre" {
   name            = "sre-control-plane"
   wait_for_ready  = true
@@ -115,6 +143,10 @@ resource "kind_cluster" "sre" {
   }
 }
 
+# null_resource + local-exec: run a command on your machine as part of the apply.
+# Here: merge the new kubeconfig into ~/.kube/config as context kind-sre-control-plane.
+# https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource
+# https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec
 resource "null_resource" "merge_kubeconfig" {
   depends_on = [kind_cluster.sre]
 
@@ -131,6 +163,8 @@ resource "null_resource" "merge_kubeconfig" {
   }
 }
 
+# Give the API server a moment before Helm and Kubernetes resources talk to it.
+# https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep
 resource "time_sleep" "wait_for_cluster" {
   depends_on      = [null_resource.merge_kubeconfig]
   create_duration = "30s"
@@ -142,6 +176,7 @@ resource "time_sleep" "wait_for_cluster" {
   }
 }
 
+# Outputs: values printed after apply (terraform output). https://developer.hashicorp.com/terraform/language/values/outputs
 output "kubeconfig" {
   description = "Path to the generated kubeconfig for the kind cluster"
   value       = local.kubeconfig_path
@@ -150,19 +185,22 @@ output "kubeconfig" {
 output "kubeconfig_load_instructions" {
   description = "How to use the generated kubeconfig"
   value       = <<-EOT
-    export KUBECONFIG="${local.kubeconfig_path}"
-    kubectl get nodes
-    # Optional: merge into your default kubeconfig
-    ${path.module}/scripts/merge-kubeconfig.sh "${local.kubeconfig_path}"
-    kubectl config use-context kind-sre-control-plane
+    # The kubeconfig is already merged into ~/.kube/config. Name the cluster in every
+    # command instead of switching the shared current context (Chapter 01):
+    kubectl --context kind-sre-control-plane get nodes
+    flux --context kind-sre-control-plane get kustomizations -A
   EOT
 }
 
+# Kubernetes objects, created through the kubernetes provider.
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace_v1
 resource "kubernetes_namespace_v1" "traefik" {
   metadata { name = "traefik" }
   depends_on = [time_sleep.wait_for_cluster]
 }
 
+# A Helm chart installed and tracked as one resource: Traefik, the ingress.
+# https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release
 resource "helm_release" "traefik" {
   name       = "traefik"
   repository = "https://traefik.github.io/charts"
@@ -196,6 +234,7 @@ resource "helm_release" "traefik" {
   ]
 }
 
+# metrics-server: CPU and memory metrics for kubectl top and the HPA (Chapter 09).
 resource "helm_release" "metrics_server" {
   name       = "metrics-server"
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
@@ -213,6 +252,8 @@ resource "helm_release" "metrics_server" {
   ]
 }
 
+# The Flux Operator, installed from its release manifest (pinned: var.flux_operator_version).
+# https://fluxcd.control-plane.io/operator/
 resource "null_resource" "flux_operator_install" {
   depends_on = [time_sleep.wait_for_cluster]
 
@@ -239,6 +280,8 @@ resource "null_resource" "flux_operator_install" {
   }
 }
 
+# The FluxInstance: which Flux version to run, and which Git repository, branch and
+# path to follow. From here on Git drives what runs in the cluster (Chapter 03).
 resource "null_resource" "flux_instance" {
   depends_on = [
     null_resource.flux_operator_install,
@@ -309,6 +352,9 @@ EOF
   }
 }
 
+# Runs at destroy time (when = destroy): ../scripts/flux-pre-destroy.sh removes what
+# Flux created in these namespaces first, so the destroy does not race a controller
+# that recreates objects.
 resource "null_resource" "flux_pre_destroy" {
   depends_on = [
     kind_cluster.sre,
@@ -491,6 +537,7 @@ resource "kubernetes_config_map_v1" "backup_s3" {
 # backend). Generated per cluster and never written to Git - the plain Secret that used
 # to live in flux/infrastructure/data/cnpg-clusters/production made the production
 # database password public. develop/staging still come from SOPS (flux/secrets/<env>).
+# https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password - generated once, then stable (it lives in the state).
 resource "random_password" "postgres_app_production" {
   count   = var.local_profile ? 0 : 1
   length  = 32
