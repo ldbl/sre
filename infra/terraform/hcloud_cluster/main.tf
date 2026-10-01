@@ -1,8 +1,31 @@
+# Hetzner k3s cluster of the SafeOps platform - Chapter 02 explains it, read-only.
+# Creating it costs money; the course runs it on kind (../kind_cluster).
+#
+# What this file creates. Terraform works out the order from the references between
+# resources (module.kube_hetzner.kubeconfig_data in a provider block, depends_on):
+#   1. module.kube_hetzner           servers, private network, firewall, load balancer, k3s on every node
+#   2. local_sensitive_file          the kubeconfig, written next to the module (kubeconfig.yaml)
+#   3. namespaces, ConfigMaps,       what Flux expects to find when it starts deploying:
+#      Secrets                       cluster-config, backup-s3, sops-age, the production DB password
+#   4. flux_operator_install,        Flux, following the platform repository - from here on Git
+#      flux_instance                 drives the cluster
+#   5. flux_pre_destroy              on destroy only: removes what Flux created before the nodes go
+# backend.tf says where the state lives (Cloudflare R2), versions.tf the provider versions,
+# variables.tf the inputs.
+#
+# Run it through the guard - plan, read, apply that plan: make hcloud-plan, then make hcloud-apply.
+# Terraform language: https://developer.hashicorp.com/terraform/language
+
+# hcloud provider - talks to the Hetzner Cloud API with the project token.
+# https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs
 provider "hcloud" {
   token = var.hcloud_token
 }
 
 # ─── Pool & feature construction ─────────────────────────────────────────────
+# Values computed once and handed to the module below; a "x ? a : b" picks one shape or the other.
+# https://developer.hashicorp.com/terraform/language/values/locals
+# https://developer.hashicorp.com/terraform/language/expressions/conditionals
 
 locals {
   # Control plane — always one pool.
@@ -44,7 +67,8 @@ locals {
     },
   ] : []
 
-  # Kured options — only populated when enabled.
+  # Kured options — only populated when enabled. Kured reboots a node after an OS update
+  # (MicroOS updates itself), one node at a time, inside this window. https://kured.dev/docs/
   kured_options = var.kured_enabled ? {
     "reboot-days" = var.kured_reboot_days
     "start-time"  = var.kured_start_time
@@ -52,7 +76,7 @@ locals {
   } : {}
 
   # etcd S3 backup — the same Hetzner Object Storage bucket and key as the CNPG backups (BACKUP_S3).
-  # k3s expects a bare hostname (no https:// prefix).
+  # k3s expects a bare hostname (no https:// prefix). https://docs.k3s.io/cli/etcd-snapshot
   etcd_s3_endpoint = var.backup_s3_endpoint != "" ? replace(var.backup_s3_endpoint, "https://", "") : ""
 
   etcd_s3_backup = local.etcd_s3_endpoint != "" ? {
@@ -65,6 +89,12 @@ locals {
   } : {}
 }
 
+# kube-hetzner: a community module that builds a k3s cluster on Hetzner Cloud - servers on
+# openSUSE MicroOS, network, firewall, load balancer, k3s installed over SSH. A module is a
+# packaged set of resources with its own inputs; pinned to one version, so an upgrade is a PR.
+# https://registry.terraform.io/modules/kube-hetzner/kube-hetzner/hcloud/latest
+# https://github.com/kube-hetzner/terraform-hcloud-kube-hetzner
+# https://developer.hashicorp.com/terraform/language/modules
 module "kube_hetzner" {
   source  = "kube-hetzner/kube-hetzner/hcloud"
   version = "3.2.1"
@@ -118,11 +148,13 @@ module "kube_hetzner" {
   control_plane_exec_args = var.k3s_exec_server_args
 }
 
+# More computed values: the OIDC config for the API server and the kubeconfig with a clear name.
 locals {
   # Structured authentication (not --oidc-* flags): one issuer can accept several audiences, so
   # both Dex clients work - "kubernetes" (kubectl oidc-login) and "headlamp" (Headlamp's own login).
   # Claims map 1:1 to RBAC: users by email, groups = GitHub teams as "org:team"
   # (safeops-course:members, safeops-course:admins - Dex never sends the bare org).
+  # https://kubernetes.io/docs/reference/access-authn-authz/authentication/#using-authentication-configuration
   oidc_authentication_config = var.oidc_issuer_url == "" ? "" : yamlencode({
     apiVersion = "apiserver.config.k8s.io/v1"
     kind       = "AuthenticationConfiguration"
@@ -145,6 +177,7 @@ locals {
   # clusters in a merged kubeconfig. Rename only the context (cluster/user names, server and certs stay),
   # so it reads like kind's "kind-sre-control-plane". cluster_name itself must not change: it also names
   # the servers, the etcd snapshot folder and the external-dns owner ID.
+  # https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
   kubeconfig_context = "hetzner-${var.cluster_name}-control-plane"
   kubeconfig_parsed  = yamldecode(module.kube_hetzner.kubeconfig)
   kubeconfig_named = yamlencode(merge(local.kubeconfig_parsed, {
@@ -163,12 +196,18 @@ locals {
   )
 }
 
+# The kubeconfig on disk, readable only by you (0600). It holds the cluster's admin
+# certificate - the break-glass access - and is git-ignored.
+# https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/sensitive_file
 resource "local_sensitive_file" "kubeconfig" {
   content         = local.kubeconfig_named
   filename        = local.kubeconfig_path
   file_permission = "0600"
 }
 
+# Helm and Kubernetes providers, configured from the module's outputs: they always talk to
+# this cluster, never to your current kubectl context.
+# https://registry.terraform.io/providers/hashicorp/helm/latest/docs
 provider "helm" {
   kubernetes = {
     host                   = module.kube_hetzner.kubeconfig_data.host
@@ -178,6 +217,7 @@ provider "helm" {
   }
 }
 
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs
 provider "kubernetes" {
   host                   = module.kube_hetzner.kubeconfig_data.host
   client_certificate     = module.kube_hetzner.kubeconfig_data.client_certificate
@@ -185,6 +225,12 @@ provider "kubernetes" {
   cluster_ca_certificate = module.kube_hetzner.kubeconfig_data.cluster_ca_certificate
 }
 
+# The namespaces the Secrets and ConfigMaps below go into - they must exist before Flux starts.
+# for_each makes one namespace per name; ignore_changes leaves labels and annotations to Flux,
+# which sets its own (Pod Security, environment) - Terraform would otherwise remove them on every apply.
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/namespace_v1
+# https://developer.hashicorp.com/terraform/language/meta-arguments/for_each
+# https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle
 resource "kubernetes_namespace_v1" "bootstrap" {
   for_each = toset([
     "flux-system",
@@ -212,7 +258,9 @@ resource "kubernetes_namespace_v1" "bootstrap" {
   }
 }
 
-# Cluster-level config consumed by Flux postBuild substitutions.
+# Cluster-level config consumed by Flux postBuild substitutions: ${cluster_name} in a manifest
+# becomes the value from here. https://fluxcd.io/flux/components/kustomize/kustomizations/#post-build-variable-substitution
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1
 resource "kubernetes_config_map_v1" "cluster_config" {
   metadata {
     name      = "cluster-config"
@@ -230,6 +278,7 @@ resource "kubernetes_config_map_v1" "cluster_config" {
 }
 
 # Sensitive config consumed by Flux postBuild substitutions (via substituteFrom Secret).
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1
 resource "kubernetes_secret_v1" "cluster_secrets" {
   metadata {
     name      = "cluster-secrets"
@@ -245,7 +294,8 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
-# Optional: credentials for syncing a private Git repository over HTTPS.
+# Optional: credentials for syncing a private Git repository over HTTPS. count = 0 creates
+# nothing, so with an empty token there is no Secret. https://developer.hashicorp.com/terraform/language/meta-arguments/count
 resource "kubernetes_secret_v1" "flux_git_credentials" {
   count = local.flux_git_secret_enabled ? 1 : 0
 
@@ -264,6 +314,11 @@ resource "kubernetes_secret_v1" "flux_git_credentials" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
+# Flux Operator - installs and upgrades Flux from one FluxInstance object. A null_resource
+# owns no real object: it only runs the command (local-exec) on create; triggers decide when
+# it runs again. https://fluxcd.control-plane.io/operator/
+# https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource
+# https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec
 resource "null_resource" "flux_operator_install" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 
@@ -278,6 +333,9 @@ resource "null_resource" "flux_operator_install" {
   }
 }
 
+# The FluxInstance: which Flux version and controllers to run, and which Git repository,
+# branch and path to follow. A change of any trigger re-applies it.
+# https://fluxcd.control-plane.io/operator/fluxinstance/
 resource "null_resource" "flux_instance" {
   depends_on = [
     null_resource.flux_operator_install,
@@ -335,6 +393,9 @@ EOF
   }
 }
 
+# Runs only on destroy (when = destroy): ../scripts/flux-pre-destroy.sh suspends Flux and deletes
+# the workloads and volumes while the cluster still works - volumes left behind stay billed.
+# on_failure = continue: the destroy goes on, the script's log is the only warning.
 resource "null_resource" "flux_pre_destroy" {
   # module.kube_hetzner: destroy runs this hook before ANY node is removed. Without it a plain
   # `terraform destroy` deleted the workers in parallel - Kyverno, the Flux controllers and the CSI
@@ -359,7 +420,8 @@ resource "null_resource" "flux_pre_destroy" {
   }
 }
 
-# Optional: GHCR imagePullSecret in every namespace used by workloads.
+# Optional: GHCR imagePullSecret in every namespace used by workloads - only needed while
+# the images are private. https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 resource "kubernetes_secret_v1" "ghcr_credentials" {
   for_each = var.enable_ghcr ? toset(["flux-system", "develop", "staging", "production", "observability", "auth"]) : toset([])
 
@@ -385,10 +447,11 @@ resource "kubernetes_secret_v1" "ghcr_credentials" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
-
 # age private key for Flux SOPS decryption. Write-only (data_wo): the key is sent to the cluster
 # but never stored in the plan or the state. Terraform cannot see a change in a write-only value,
 # so after a key rotation bump sops_age_key_revision.
+# https://developer.hashicorp.com/terraform/language/resources/ephemeral/write-only
+# https://fluxcd.io/flux/guides/mozilla-sops/
 resource "kubernetes_secret_v1" "sops_age" {
   metadata {
     name      = "sops-age"
@@ -423,11 +486,14 @@ resource "kubernetes_config_map_v1" "backup_s3" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
-# Optional: backup object-store credentials for CloudNativePG.
 # CNPG owner credentials for production (bootstrap.initdb.secret, and DATABASE_* of the
 # backend). Generated per cluster and never written to Git - the plain Secret that used
 # to live in flux/infrastructure/data/cnpg-clusters/production made the production
 # database password public. develop/staging still come from SOPS (flux/secrets/<env>).
+# random_password is generated once and then stable - it lives in the state, so the state
+# itself is a secret.
+# https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password
+# https://cloudnative-pg.io/documentation/current/bootstrap/
 resource "random_password" "postgres_app_production" {
   length  = 32
   special = false
@@ -457,6 +523,8 @@ resource "kubernetes_secret_v1" "postgres_app_production" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
+# Optional: backup object-store credentials for CloudNativePG, one per environment - only when
+# the BACKUP_S3 keys are set. https://cloudnative-pg.io/documentation/current/backup/
 resource "kubernetes_secret_v1" "cnpg_backup_s3" {
   for_each = local.backup_s3_secret_enabled ? toset(["develop", "staging", "production"]) : toset([])
 
@@ -481,6 +549,8 @@ resource "kubernetes_secret_v1" "cnpg_backup_s3" {
 }
 
 # The secret used to be optional (count); keep the existing object instead of recreating it.
+# A moved block renames an address in the state; without it Terraform would destroy and create.
+# https://developer.hashicorp.com/terraform/language/modules/develop/refactoring
 moved {
   from = kubernetes_secret_v1.sops_age[0]
   to   = kubernetes_secret_v1.sops_age

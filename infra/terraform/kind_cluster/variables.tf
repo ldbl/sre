@@ -1,3 +1,12 @@
+# Inputs of the kind module. Every variable has a default, so terraform apply works without
+# any; override one with TF_VAR_<name> (export TF_VAR_flux_git_repository_url=...) or a
+# terraform.tfvars file (git-ignored). sensitive = true hides a value in plan and apply output;
+# ephemeral = true keeps it out of the saved plan and the state as well. A validation block
+# stops the plan with a clear message when a combination makes no sense.
+# https://developer.hashicorp.com/terraform/language/values/variables
+
+# ─── Flux: what the cluster follows ─────────────────────────────────────────
+
 variable "flux_git_repository_url" {
   description = "Git repository URL to sync with Flux. Defaults to the SafeOps course repo; point it at your fork once you start committing (GitOps chapter onward). Set to \"\" to skip GitOps bootstrap."
   type        = string
@@ -39,6 +48,8 @@ variable "flux_version" {
   type        = string
   default     = "2.9.5"
 }
+
+# ─── Credentials (all optional for the public course repository) ────────────
 
 variable "ghcr_token" {
   description = "GitHub Personal Access Token for pulling images from GitHub Container Registry (GHCR)."
@@ -85,6 +96,8 @@ variable "sops_age_key_revision" {
   default     = 1
 }
 
+# ─── Backups: only for local_profile = false (MinIO is used otherwise) ────────
+
 variable "backup_s3_access_key_id" {
   description = "S3 access key for CNPG backups (Hetzner Object Storage, BACKUP_S3). Only for local_profile = false."
   type        = string
@@ -117,6 +130,8 @@ variable "backup_s3_region" {
   default     = ""
 }
 
+# ─── Platform settings ───────────────────────────────────────────────────────
+
 variable "uptrace_dsn" {
   description = "Uptrace Cloud DSN for OpenTelemetry. Leave empty to skip. Sign up at https://uptrace.dev"
   type        = string
@@ -147,6 +162,8 @@ variable "age_key_file" {
   type        = string
   default     = "../../../age.agekey"
 }
+
+# ─── Pinned versions: a rebuild gets the same cluster ────────────────────────
 
 variable "kind_node_image" {
   description = "kindest/node image, pinned by digest. Kubernetes v1.36.4, the same minor as k3s on the Hetzner track."
