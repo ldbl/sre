@@ -163,9 +163,10 @@ variable "age_key_file" {
   default     = "../../../age.agekey"
 
   # *.agekey is git-ignored; any other name inside the repository could be committed.
+  # Only checked for the local profile - without it the file is never written or read.
   validation {
-    condition     = endswith(var.age_key_file, ".agekey")
-    error_message = "age_key_file must end in .agekey - that suffix is git-ignored, so the private key cannot be committed by accident."
+    condition     = !var.local_profile || endswith(var.age_key_file, ".agekey")
+    error_message = "age_key_file must end in .agekey when local_profile = true - that suffix is git-ignored, so the private key cannot be committed by accident."
   }
 }
 
