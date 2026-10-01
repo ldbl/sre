@@ -1,6 +1,6 @@
 #!/bin/bash
 # pre-commit hook no-secrets: the hook's `files` pattern selects kubeconfigs, private keys (.key,
-# .pem), credentials files, .env files, and Terraform state and saved plans; any staged file it
+# .pem, age .agekey), credentials files, .env files, and Terraform state and saved plans; any staged file it
 # passes here is refused.
 echo "BLOCKED: sensitive file(s) staged for commit:" >&2
 for f in "$@"; do echo "  $f" >&2; done

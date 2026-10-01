@@ -112,7 +112,8 @@ repos:
         # The file NAME, not the whole path: scripts/merge-kubeconfig.sh is not a kubeconfig.
         # Terraform state and saved plans hold every secret in plain text (Chapter 02):
         # *.tfstate, its backups (*.tfstate.*), tfplan, tfplan.meta, *.tfplan.
-        files: (^|/)(kubeconfig(\.ya?ml)?|[^/]+\.(key|pem)|credentials[^/]*|[^/]*\.env(\.[^/]+)?|[^/]*\.tfstate(\.[^/]+)?|tfplan(\.meta)?|[^/]*\.tfplan)$
+        # The age private key decrypts every SOPS secret: *.agekey and its backups (*.agekey.*).
+        files: (^|/)(kubeconfig(\.ya?ml)?|[^/]+\.(key|pem)|[^/]+\.agekey(\.[^/]+)?|credentials[^/]*|[^/]*\.env(\.[^/]+)?|[^/]*\.tfstate(\.[^/]+)?|tfplan(\.meta)?|[^/]*\.tfplan)$
         exclude: \.example$
         stages: [pre-commit]
 
