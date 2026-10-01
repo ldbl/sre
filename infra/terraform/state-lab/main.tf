@@ -63,8 +63,8 @@ resource "kubernetes_config_map_v1" "migration_db" {
   }
 }
 
-# generate_name: the API server adds a random suffix, so every create succeeds - and a second
-# copy with its own state quietly makes a second one.
+# generate_name: the API server adds a random suffix, so there is no fixed name to collide on -
+# a second copy with its own state quietly creates a second, distinct worker.
 # https://kubernetes.io/docs/reference/using-api/api-concepts/#generated-values
 resource "kubernetes_config_map_v1" "worker" {
   metadata {

@@ -1,5 +1,6 @@
-# Values printed after apply (terraform output). kubeconfig is sensitive: plan and apply print
-# (sensitive value); only asking for it by name shows it (terraform output -raw kubeconfig).
+# Values printed after apply (terraform output). kubeconfig is sensitive: plan, apply and a plain
+# terraform output print (sensitive value), but asking for it by name (terraform output kubeconfig,
+# -raw kubeconfig) or for JSON (terraform output -json) shows the whole kubeconfig.
 # https://developer.hashicorp.com/terraform/language/values/outputs
 output "kubeconfig" {
   description = "Kubeconfig for the created cluster (YAML), context hetzner-<cluster_name>-control-plane."

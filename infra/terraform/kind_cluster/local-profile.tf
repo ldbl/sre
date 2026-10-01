@@ -10,7 +10,8 @@
 #   - sops-age          from an age key generated on first apply   (see age_key_file)
 # Nothing here is written to Git; `terraform destroy` removes it all.
 # The generated passwords live in the Terraform state (random_password), so the
-# state file is a secret too - it is git-ignored, like the age key.
+# state file is a secret too - it is git-ignored, and so is the age key: age_key_file
+# must end in .agekey (a validation enforces it), the suffix .gitignore covers.
 #
 # Every resource here has count or for_each over local_envs: with local_profile = false
 # the sets are empty and nothing is created.

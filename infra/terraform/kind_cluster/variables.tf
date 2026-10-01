@@ -161,6 +161,12 @@ variable "age_key_file" {
   description = "Path to the age private key used for SOPS (generated with age-keygen if missing when local_profile is true). Never committed."
   type        = string
   default     = "../../../age.agekey"
+
+  # *.agekey is git-ignored; any other name inside the repository could be committed.
+  validation {
+    condition     = endswith(var.age_key_file, ".agekey")
+    error_message = "age_key_file must end in .agekey - that suffix is git-ignored, so the private key cannot be committed by accident."
+  }
 }
 
 # ─── Pinned versions: a rebuild gets the same cluster ────────────────────────
