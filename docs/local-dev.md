@@ -54,13 +54,13 @@ terraform apply
 ```
 The Terraform workflow creates the three-node topology (one control plane, two workers), writes a kubeconfig alongside the module (`kubeconfig.yaml`), and becomes the single source of truth for lifecycle operations.
 
-### Configure Kubeconfig Context
-Point kubectl to the generated kubeconfig and switch context:
+### Name the Cluster in Every Command
+Terraform merges the kubeconfig into your default config (`~/.kube/config`) under kind's context name `kind-sre-control-plane`, and also writes it next to the module (`kubeconfig.yaml`). Do not switch the current context: it is one line in a file every terminal shares, and another terminal - or an AI agent - can change it between your check and your command (Chapter 01). Name the cluster instead:
 ```bash
-export KUBECONFIG="$(pwd)/infra/terraform/kind_cluster/kubeconfig.yaml"
-kubectl config use-context kind-sre-control-plane
+kubectl --context kind-sre-control-plane get nodes
+flux --context kind-sre-control-plane get kustomizations -A
 ```
-Terraform automatically merges the kubeconfig into your default config (`~/.kube/config`) and keeps kind's context name `kind-sre-control-plane`.
+`make smoke-test` and `scripts/lab-pod.sh` name it for you (`KUBE_CONTEXT`, default `kind-sre-control-plane`).
 
 ## Configure Local Registry (Optional but Recommended)
 Run a local container registry to speed up iterative image pushes:
@@ -83,7 +83,7 @@ terraform destroy
 ```bash
 # one-off probe, labelled like the frontend so the NetworkPolicies let it through
 scripts/lab-pod.sh -n develop -i curlimages/curl -l app=frontend -- curl -sf http://backend/healthz
-# long-lived debug pod (prints its name), then kubectl exec into it
+# long-lived debug pod (prints its name), then kubectl --context kind-sre-control-plane exec into it
 scripts/lab-pod.sh -n develop --daemon np-debug
 ```
 
@@ -91,10 +91,10 @@ For pods that are *meant* to be non-compliant (the admission-policy audit drills
 
 ## Verify the Cluster Is Green
 ```bash
-flux get kustomizations -A          # every row Ready=True
-kubectl -n develop get pods         # backend, frontend, app-postgres-1 Running
-kubectl -n minio get pods           # minio Running, minio-create-bucket Completed
-make smoke-test                     # tests/smoke-test.sh
+flux --context kind-sre-control-plane get kustomizations -A    # every row Ready=True
+kubectl --context kind-sre-control-plane -n develop get pods   # backend, frontend, app-postgres-1 Running
+kubectl --context kind-sre-control-plane -n minio get pods     # minio Running, minio-create-bucket Completed
+make smoke-test                                               # tests/smoke-test.sh, on kind-sre-control-plane
 ```
 Pods stuck in `ImagePullBackOff` mean the GHCR packages are not public for your account - see the note above.
 
