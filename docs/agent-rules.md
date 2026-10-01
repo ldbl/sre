@@ -64,7 +64,7 @@ value, stay out of both. The agent proposes and plans; a person reads the plan a
 
 | Rule for the agent | What enforces it |
 |---|---|
-| Never run `terraform apply` without a saved plan that a person has read. Plan with `make kind-plan`, stop, and let the person run `make kind-apply`. | `make kind-apply` (`scripts/guard-terraform-plan.sh`) refuses a missing plan or one older than 60 minutes. A bare `terraform apply` is not blocked locally: instruction only. On Hetzner, CI applies only the approved plan with the hash shown on the run page. |
+| Never run `terraform apply` without a saved plan that a person has read. Plan with `make kind-plan`, stop, and let the person run `make kind-apply`. | `make kind-apply` (`scripts/guard-terraform-plan.sh`) refuses a missing plan or one older than 60 minutes - it does not check that anyone read or approved it; that part is an instruction. A bare `terraform apply` is not blocked locally: instruction only. On Hetzner, CI applies only the plan a person approved, with the hash shown on the run page. |
 | Never use `-auto-approve`, and never run `terraform destroy` on your own. | Instruction only - nothing blocks it locally. |
 | Never commit, paste or upload a state or a plan file (`*.tfstate*`, `tfplan`, `tfplan.meta`, `*.tfplan`). | `.gitignore`, and the `no-secrets` pre-commit hook plus the Secrets guard CI job refuse them even when added with `git add -f`. Pasting into a chat: instruction only. |
 | A plan that destroys or replaces something holding data, or creates something that should already exist: stop and report, do not apply. | Instruction only - the person reading the plan is the check. |
