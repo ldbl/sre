@@ -2,10 +2,29 @@
 # Infrastructure smoke tests for the SRE platform.
 # Validates a running cluster by checking core components.
 #
-# Requirements: kubectl (configured with cluster access), flux CLI
-# Exit codes: 0 = all pass, 1 = one or more failures
+# Requirements: kubectl, flux CLI, and KUBE_CONTEXT - the kubeconfig context
+# of the cluster to test (`make smoke-test` sets kind-sre-control-plane).
+# Every kubectl/flux call names that context: the test also creates and deletes a
+# pod, and it must never land on whatever the shared current context is (Chapter 01).
+# Exit codes: 0 = all pass, 1 = one or more failures, 2 = no or unknown context
 # Output: TAP-like format (test name + pass/fail)
 set -Eeuo pipefail
+
+KUBE_CONTEXT="${KUBE_CONTEXT:-}"
+if [ -z "$KUBE_CONTEXT" ]; then
+  echo "smoke-test: set KUBE_CONTEXT (make smoke-test uses kind-sre-control-plane)" >&2
+  exit 2
+fi
+if ! kubectl config get-contexts "$KUBE_CONTEXT" >/dev/null 2>&1; then
+  echo "smoke-test: context '$KUBE_CONTEXT' not found in the kubeconfig" >&2
+  exit 2
+fi
+export KUBE_CONTEXT
+echo "# cluster: $KUBE_CONTEXT"
+
+# The only way this script talks to a cluster.
+k() { kubectl --context "$KUBE_CONTEXT" "$@"; }
+f() { flux --context "$KUBE_CONTEXT" "$@"; }
 
 PASS=0
 FAIL=0
@@ -34,15 +53,16 @@ run_test() {
 }
 
 # --- 1. Flux health ---
-run_test "Flux check passes" flux check
+run_test "Flux check passes" f check
 
+# shellcheck disable=SC2016  # the inner shell expands the exported KUBE_CONTEXT
 run_test "All Kustomizations are ready" \
-  bash -c 'kubectl get kustomizations.kustomize.toolkit.fluxcd.io -n flux-system -o jsonpath="{.items[*].status.conditions[?(@.type==\"Ready\")].status}" | tr " " "\n" | grep -v True | wc -l | grep -q "^0$"'
+  bash -c 'kubectl --context "$KUBE_CONTEXT" get kustomizations.kustomize.toolkit.fluxcd.io -n flux-system -o jsonpath="{.items[*].status.conditions[?(@.type==\"Ready\")].status}" | tr " " "\n" | grep -v True | wc -l | grep -q "^0$"'
 
 # --- 2. Core deployments available ---
 for deploy in frontend backend; do
   run_test "Deployment $deploy in develop is Available" \
-    kubectl rollout status deployment/"$deploy" -n develop --timeout=10s
+    k rollout status deployment/"$deploy" -n develop --timeout=10s
 done
 
 # --- 3. Services reachable ---
@@ -53,16 +73,16 @@ done
 # timeout; create it, wait for completion, read the exit status, delete it.
 smoke_curl() {
   local ns="develop" pod="smoke-curl"
-  kubectl -n "$ns" delete pod "$pod" --ignore-not-found --wait=true >/dev/null 2>&1
-  kubectl run "$pod" --image=curlimages/curl --labels=app=frontend --restart=Never -n "$ns" \
+  k -n "$ns" delete pod "$pod" --ignore-not-found --wait=true >/dev/null 2>&1
+  k run "$pod" --image=curlimages/curl --labels=app=frontend --restart=Never -n "$ns" \
     --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl","command":["curl","-sf","-m","10","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
-  local phase="" i
-  for i in $(seq 1 30); do
-    phase="$(kubectl -n "$ns" get pod "$pod" -o jsonpath='{.status.phase}' 2>/dev/null)"
+  local phase=""
+  for _ in $(seq 1 30); do
+    phase="$(k -n "$ns" get pod "$pod" -o jsonpath='{.status.phase}' 2>/dev/null)"
     [ "$phase" = "Succeeded" ] || [ "$phase" = "Failed" ] && break
     sleep 2
   done
-  kubectl -n "$ns" delete pod "$pod" --ignore-not-found --wait=false >/dev/null 2>&1
+  k -n "$ns" delete pod "$pod" --ignore-not-found --wait=false >/dev/null 2>&1
   [ "$phase" = "Succeeded" ]
 }
 run_test "Backend /healthz responds in develop" smoke_curl
@@ -71,16 +91,18 @@ run_test "Backend /healthz responds in develop" smoke_curl
 # (uptrace-secrets is not part of flux/secrets/develop; the DSN lives in backend-secrets)
 for secret in backend-secrets app-postgres-app; do
   run_test "Secret $secret exists in develop" \
-    kubectl get secret "$secret" -n develop
+    k get secret "$secret" -n develop
 done
 
 # --- 5. Certificates valid ---
+# shellcheck disable=SC2016  # the inner shell expands the exported KUBE_CONTEXT
 run_test "cert-manager Certificate resources are Ready" \
-  bash -c 'kubectl get certificates -A -o jsonpath="{.items[*].status.conditions[?(@.type==\"Ready\")].status}" | tr " " "\n" | grep -v True | wc -l | grep -q "^0$"'
+  bash -c 'kubectl --context "$KUBE_CONTEXT" get certificates -A -o jsonpath="{.items[*].status.conditions[?(@.type==\"Ready\")].status}" | tr " " "\n" | grep -v True | wc -l | grep -q "^0$"'
 
 # --- 6. CNPG clusters healthy ---
+# shellcheck disable=SC2016  # the inner shell expands the exported KUBE_CONTEXT
 run_test "CNPG clusters are Running" \
-  bash -c 'kubectl get clusters.postgresql.cnpg.io -A -o jsonpath="{range .items[*]}{.status.phase}{\"\\n\"}{end}" | grep -v "^Cluster in healthy state$" | grep -v "^$" | wc -l | grep -q "^0$"'
+  bash -c 'kubectl --context "$KUBE_CONTEXT" get clusters.postgresql.cnpg.io -A -o jsonpath="{range .items[*]}{.status.phase}{\"\\n\"}{end}" | grep -v "^Cluster in healthy state$" | grep -v "^$" | wc -l | grep -q "^0$"'
 
 # --- Summary ---
 echo ""
