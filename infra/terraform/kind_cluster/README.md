@@ -47,10 +47,10 @@ Defaults target the SafeOps course repo and the local profile; set `TF_VAR_flux_
 kubectl cluster-info --context kind-sre-control-plane
 
 # Check Flux Operator
-kubectl -n flux-system get pods
+kubectl --context kind-sre-control-plane -n flux-system get pods
 
 # Check FluxInstance
-kubectl -n flux-system get fluxinstance
+kubectl --context kind-sre-control-plane -n flux-system get fluxinstance
 ```
 
 ## GitOps Bootstrap (Optional)
@@ -130,19 +130,19 @@ This will delete the kind cluster and clean up all resources.
 
 ### Check Flux Operator logs
 ```bash
-kubectl -n flux-system logs -l app.kubernetes.io/name=flux-operator
+kubectl --context kind-sre-control-plane -n flux-system logs -l app.kubernetes.io/name=flux-operator
 ```
 
 ### Check FluxInstance status
 ```bash
-kubectl -n flux-system describe fluxinstance flux
+kubectl --context kind-sre-control-plane -n flux-system describe fluxinstance flux
 ```
 
 ### Check Flux controllers
 ```bash
-kubectl -n flux-system get pods
-kubectl -n flux-system logs -l app=source-controller
-kubectl -n flux-system logs -l app=kustomize-controller
+kubectl --context kind-sre-control-plane -n flux-system get pods
+kubectl --context kind-sre-control-plane -n flux-system logs -l app=source-controller
+kubectl --context kind-sre-control-plane -n flux-system logs -l app=kustomize-controller
 ```
 
 ## Upgrading

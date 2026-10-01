@@ -5,8 +5,9 @@
 #   1. kind_cluster.sre                     the cluster: each node is a Docker container
 #   2. merge_kubeconfig, wait_for_cluster   its kubeconfig merged into ~/.kube/config, a short wait for the API
 #   3. helm_release.traefik / metrics_server ingress on localhost:8080/8443, metrics for kubectl top and the HPA
-#   4. flux_operator_install, flux_instance Flux, following your fork - from here on Git drives the cluster
-#   5. namespaces, ConfigMaps, Secrets      what Flux expects to find when it starts deploying
+#   4. namespaces, ConfigMaps, Secrets      what Flux expects to find when it starts deploying -
+#                                           incl. flux_git_auth, the Git token (private forks only)
+#   5. flux_operator_install, flux_instance Flux, following your fork - from here on Git drives the cluster
 # local-profile.tf adds the generated secrets of the local profile; variables.tf holds the inputs.
 #
 # Run it through the guard - plan, read, apply that plan: make kind-plan, then make kind-apply.
