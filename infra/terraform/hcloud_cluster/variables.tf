@@ -1,3 +1,9 @@
+# Inputs of the Hetzner module. Each variable has a description and, where a sane default
+# exists, a default; the rest (tokens, keys) come as TF_VAR_<name> environment variables -
+# locally from load-env.sh, in CI from GitHub secrets and variables. sensitive = true hides a value in plan
+# and apply output; ephemeral = true keeps it out of the saved plan and the state as well.
+# https://developer.hashicorp.com/terraform/language/values/variables
+
 # ─── Secrets (set via TF_VAR_* from load-env.sh) ─────────────────────────────
 
 variable "hcloud_token" {

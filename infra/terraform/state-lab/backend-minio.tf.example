@@ -9,6 +9,9 @@
 # A lab shortcut: this backend lives INSIDE the cluster it could manage - destroying the cluster
 # would destroy Terraform's memory too. A real backend lives outside, like the Hetzner module's
 # Cloudflare R2 bucket (infra/terraform/hcloud_cluster/backend.tf).
+#
+# s3 backend: https://developer.hashicorp.com/terraform/language/backend/s3
+# Locking:    https://developer.hashicorp.com/terraform/language/state/locking
 terraform {
   backend "s3" {
     bucket                      = "sre"

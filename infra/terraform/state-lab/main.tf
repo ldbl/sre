@@ -13,6 +13,12 @@
 # Terraform reaches the cluster through the kind module's kubeconfig (var.kubeconfig_path), never
 # your current kubectl context. The lab copies this directory next to itself (state-lab-b), so the
 # relative default works for both copies.
+#
+# Terraform language: https://developer.hashicorp.com/terraform/language
+# State and why it is shared and locked: https://developer.hashicorp.com/terraform/language/state/locking
+
+# Terraform and provider versions; "~> 3.0" means 3.x, never 4.0.
+# https://developer.hashicorp.com/terraform/language/providers/requirements
 terraform {
   required_version = ">= 1.11.0"
 
@@ -24,6 +30,7 @@ terraform {
   }
 }
 
+# Inputs. https://developer.hashicorp.com/terraform/language/values/variables
 variable "kubeconfig_path" {
   description = "kubeconfig of the kind cluster (written by infra/terraform/kind_cluster)"
   type        = string
@@ -36,10 +43,15 @@ variable "db_size" {
   default     = "cx23"
 }
 
+# The Kubernetes provider reads the kind kubeconfig file - a lab shortcut; the kind and
+# Hetzner modules configure it from the cluster resource instead.
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs
 provider "kubernetes" {
   config_path = var.kubeconfig_path
 }
 
+# A fixed name: a second copy with its own state tries to create it again and fails.
+# https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/config_map_v1
 resource "kubernetes_config_map_v1" "migration_db" {
   metadata {
     name      = "lab-migration-db"
@@ -51,6 +63,9 @@ resource "kubernetes_config_map_v1" "migration_db" {
   }
 }
 
+# generate_name: the API server adds a random suffix, so there is no fixed name to collide on -
+# a second copy with its own state quietly creates a second, distinct worker.
+# https://kubernetes.io/docs/reference/using-api/api-concepts/#generated-values
 resource "kubernetes_config_map_v1" "worker" {
   metadata {
     generate_name = "lab-worker-"
