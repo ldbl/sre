@@ -24,14 +24,14 @@ target_sha="${3:-HEAD}"
 # -e: a pattern that starts with "-" would otherwise be read as an option, grep would fail, and the
 # hook would never block.
 if git branch -r --contains "$target_sha" 2>/dev/null | grep -vF -e '->' | grep -v 'origin/HEAD' | grep -q .; then
-    echo ""
-    echo "BLOCKED: Cannot amend commits that have been pushed!"
-    echo "Remote branches containing this commit:"
-    git branch -r --contains "$target_sha" 2>/dev/null | sed 's/^[[:space:]]*//' | grep -vF -e '->' | grep -v 'origin/HEAD'
-    echo ""
-    echo "Create a new commit instead: git commit -m 'fix: ...'"
-    echo ""
-    exit 1
+  echo ""
+  echo "BLOCKED: Cannot amend commits that have been pushed!"
+  echo "Remote branches containing this commit:"
+  git branch -r --contains "$target_sha" 2>/dev/null | sed 's/^[[:space:]]*//' | grep -vF -e '->' | grep -v 'origin/HEAD'
+  echo ""
+  echo "Create a new commit instead: git commit -m 'fix: ...'"
+  echo ""
+  exit 1
 fi
 
 exit 0
