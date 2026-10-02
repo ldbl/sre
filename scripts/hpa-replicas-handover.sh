@@ -12,6 +12,10 @@
 #
 #   scripts/hpa-replicas-handover.sh kind-sre-control-plane            # dry run: show what it would do
 #   scripts/hpa-replicas-handover.sh kind-sre-control-plane --apply    # do it
+#
+# Run by hand, once per existing cluster. Needs: kubectl. Every call names the given context.
+# Changes (only with --apply): the field owner of spec.replicas on each HPA-targeted Deployment in
+# develop, staging and production - the replica count itself stays as it is.
 set -euo pipefail
 
 context="${1:?usage: $0 KUBE_CONTEXT [--apply]}"
@@ -26,8 +30,11 @@ namespaces=(develop staging production)
 apps=(backend frontend)
 field_manager="hpa-handover"
 
+# kube <args> - kubectl against the context given as the first argument; the only way this script
+# talks to a cluster.
 kube() { kubectl --context "${context}" "$@"; }
 
+# Per namespace: check that every app has an HPA, then hand over each HPA target's replicas.
 for ns in "${namespaces[@]}"; do
   # Only an absent namespace is skipped; any other error (no access, wrong context) stops the run.
   if ! found_ns="$(kube get namespace "${ns}" --ignore-not-found -o name)"; then
@@ -75,6 +82,8 @@ for ns in "${namespaces[@]}"; do
       echo "would hand over ${ns}/${target} spec.replicas=${replicas} to ${field_manager}"
       continue
     fi
+    # A server-side apply of just spec.replicas, with the same value, under our own field manager:
+    # the field gets a second owner, so it survives when Flux stops declaring it.
     kube apply --server-side --field-manager="${field_manager}" -f - >/dev/null <<EOF
 apiVersion: apps/v1
 kind: Deployment

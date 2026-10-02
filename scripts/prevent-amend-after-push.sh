@@ -1,4 +1,12 @@
 #!/bin/bash
+# prevent-amend-after-push.sh - pre-commit hook prevent-amend-after-push: refuse `git commit --amend`
+# when the commit being amended is already on a remote branch. Amending a pushed commit rewrites
+# shared history and forces a force-push; a new commit on top is the safe way to fix it.
+#
+# Runs at the prepare-commit-msg stage (.pre-commit-config.yaml). Git calls that hook with
+# <message file> <source> <sha>: for an amend the source is "commit" and the sha is the commit
+# being amended.
+# Usage: called by git through pre-commit, not by hand. Needs git; changes nothing.
 set -Eeuo pipefail
 
 # Skip if not in git repo or no remotes or no commits
@@ -11,6 +19,8 @@ git rev-parse HEAD >/dev/null 2>&1 || exit 0
 
 target_sha="${3:-HEAD}"
 
+# Any remote-tracking branch that contains the commit means it was pushed. Symbolic refs
+# ("origin/HEAD -> origin/main") are left out so the same branch is not counted twice.
 if git branch -r --contains "$target_sha" 2>/dev/null | grep -v '->' | grep -v 'origin/HEAD' | grep -q .; then
     echo ""
     echo "BLOCKED: Cannot amend commits that have been pushed!"

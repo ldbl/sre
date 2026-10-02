@@ -6,6 +6,10 @@
 #
 # Token: HCLOUD_TOKEN, or TF_VAR_hcloud_token (set by the local env file / the workflows).
 # Usage: scripts/hcloud-leftovers.sh
+#
+# Runs at the end of the Hetzner destroy: the hcloud_cluster Makefile's destroy target and the
+# terraform-hcloud-destroy and hetzner-e2e workflows. Needs: curl and jq. Changes nothing - it only
+# lists. Exit 0 = empty, 1 = something left, 2 = no token or the API could not be read.
 
 set -Eeuo pipefail
 
@@ -15,6 +19,8 @@ if [[ -z "${token}" ]]; then
   exit 2
 fi
 
+# list_names <kind> - print the name of every object of that kind in the project (one per line);
+# fails on an API error or a response without the expected list.
 # The header comes from a process substitution (printf is a shell builtin), so the token never
 # appears in curl's arguments - other accounts on the machine could read those with ps.
 list_names() {

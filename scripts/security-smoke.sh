@@ -8,6 +8,9 @@
 #
 # EXPECT_CHAOS (default true): with chaos on, /api/panic without a token is 401; with chaos off, 404.
 # Never prints response bodies: on a failure they may hold the very secrets this test looks for.
+#
+# Run by hand after a deploy (CLAUDE.md lists it with the app security rules). Needs: curl and jq.
+# Changes nothing - only GET/POST requests whose answers it inspects. Exit 1 when any check fails.
 set -euo pipefail
 
 base_url="${1:?usage: $0 BASE_URL [HOST_HEADER]}"
@@ -18,6 +21,7 @@ curl_args=(--silent --show-error --max-time 10)
 [[ -n "${host_header}" ]] && curl_args+=(--header "Host: ${host_header}")
 
 failures=0
+# pass / fail <message> - print one result line; fail also counts it.
 pass() { printf '  ok    %s\n' "$1"; }
 fail() { printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); }
 

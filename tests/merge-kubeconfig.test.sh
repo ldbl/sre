@@ -2,6 +2,8 @@
 # Tests infra/terraform/kind_cluster/scripts/merge-kubeconfig.sh with a throw-away HOME - your real
 # ~/.kube/config is never read or written, and no cluster is touched (kubectl only edits files).
 # Run: tests/merge-kubeconfig.test.sh   (pre-commit runs it when the script changes)
+# Two cases: a rebuild (a stale kind entry next to another cluster that is the current context) and
+# a first run (no ~/.kube/config yet). Exit 0 when every check passes, 1 otherwise.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,6 +17,7 @@ FAILED=0
 check() { # check <name> <expected> <actual>
   if [[ "$2" == "$3" ]]; then echo "ok   - $1"; else echo "FAIL - $1: expected '$2', got '$3'"; FAILED=1; fi
 }
+# view JSONPATH - read a value from the merged test kubeconfig (--raw: tokens are not redacted).
 view() { kubectl config view --raw --kubeconfig "${HOME}/.kube/config" -o jsonpath="$1"; }
 
 # ~/.kube/config before a rebuild: another cluster is the current context, and a STALE entry

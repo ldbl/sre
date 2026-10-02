@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
+# guard-kube-context.sh - run a kubectl or flux write against a cluster and namespace you name,
+# never against whatever the shared current context happens to be (Chapter 01, rule I).
+#
+# Two modes:
+#   - pinned (a command after --): checks that the named context exists and has the namespace,
+#     then runs the command with --context and --namespace added. Nothing can switch the target
+#     between the check and the write. Use this for every write.
+#   - check-only (no command): checks that the CURRENT context and the namespace are the expected
+#     ones. Weaker - the current context can change before your next command.
+#
+# Run by hand and by the AI agent (docs/agent-rules.md); tests/guard-kube-context.test.sh tests it
+# with a fake kubectl (pre-commit runs that test when this file changes).
+# Needs: kubectl (and flux for flux commands). Changes nothing itself - only the command you pass.
+# Usage: see usage() below.
 set -euo pipefail
 
+# usage - print the help text.
 usage() {
   cat <<'EOF'
 usage:
@@ -29,6 +44,7 @@ EXPECTED_NAMESPACE=""
 KUBECONFIG_PATH=""
 COMMAND=()
 
+# Parse the guard's own options; everything after -- is the command to pin.
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --context)
@@ -71,6 +87,8 @@ if ! command -v kubectl >/dev/null 2>&1; then
   exit 1
 fi
 
+# --kubeconfig is applied to every kubectl call below and to the pinned command, through the
+# environment, so the command itself never has to carry it.
 if [[ -n "${KUBECONFIG_PATH}" ]]; then
   export KUBECONFIG="${KUBECONFIG_PATH}"
 fi
@@ -106,6 +124,7 @@ if [[ ${#COMMAND[@]} -gt 0 ]]; then
   fi
 
   echo "[guard-kube] OK context=${EXPECTED_CONTEXT} namespace=${EXPECTED_NAMESPACE} - running ${TOOL} pinned to them" >&2
+  # exec: the command replaces the guard, so its output and exit code are the command's own.
   exec "${COMMAND[0]}" --context "${EXPECTED_CONTEXT}" --namespace "${EXPECTED_NAMESPACE}" "${COMMAND[@]:1}"
 fi
 

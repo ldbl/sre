@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Tests scripts/guard-kube-context.sh against a FAKE kubectl and flux - no cluster is touched.
 # Run: tests/guard-kube-context.test.sh   (pre-commit runs it when the guard changes)
+# It proves the guard's promises: a pinned command goes to the named context even when the current
+# context points elsewhere, and a command that brings its own target (--context, -n, -A, --server,
+# --cluster ...) is refused. The fakes live in a temp dir on PATH and are removed at exit.
+# Exit 0 when every case passes, 1 otherwise.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,6 +31,7 @@ export PATH="${FAKE}:${PATH}"
 
 FAILED=0
 # expect <name> <exit code> <text the output must contain> -- <command...>
+# Runs the command; the case passes when both the exit code and the output match.
 expect() {
   local name="$1" want_rc="$2" want_text="$3"
   shift 4

@@ -33,7 +33,7 @@ Images are pulled from `ghcr.io/safeops-course/*`; no registry credentials are n
 - `curl`, `tar`, and `unzip` available on your workstation
 - Go 1.24+ and Node.js 20+ with npm for backend/frontend development
 - `make` (GNU make recommended)
-- Terraform 1.11+, `kubectl`, `pre-commit`, `checkov` (the Terraform security hook fails without it) and `jq` (the AI agent's kube-context hook, Chapter 01, and `scripts/lab-pod.sh`) - `make check-tools` checks that every tool is installed, and its minimum version where one is set (checkov: installed, any version)
+- Terraform 1.11+, `kubectl`, `pre-commit`, `checkov` (the Terraform security hook fails without it), `jq` (the AI agent's kube-context hook, Chapter 01, and `scripts/lab-pod.sh`) and `yq` v4 (the pre-commit guardrails that read the Flux manifests) - `make check-tools` checks that every tool is installed, and its minimum version where one is set (checkov: installed, any version)
 
 ## Provision the Cluster with Terraform
 Use the Terraform module under `infra/terraform/kind_cluster/` to create (or destroy) the local kind cluster. The module codifies the multi-node topology directly in Terraform, automatically merges the generated kubeconfig into `~/.kube/config`, and bootstraps Flux via Flux Operator + `FluxInstance`.
@@ -45,7 +45,8 @@ export TF_VAR_local_profile=false                                              #
 ```
 A Git token is needed in two cases: the full platform profile (image automation pushes tag updates - PAT with Contents: write) and a private fork (Flux must read it - Contents: read). Prompt for it instead of typing it into the command line, so it never lands in shell history:
 ```bash
-read -rs -p "GitHub PAT: " TF_VAR_flux_git_token && export TF_VAR_flux_git_token
+printf 'GitHub PAT: '; stty -echo; IFS= read -r TF_VAR_flux_git_token; stty echo; echo   # works in zsh and bash
+export TF_VAR_flux_git_token
 ```
 ```bash
 cd infra/terraform/kind_cluster

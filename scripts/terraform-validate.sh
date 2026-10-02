@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
+# terraform-validate.sh - pre-commit hook terraform-validate (runs when a .tf or .tfvars file is
+# staged); `make validate` runs the same check with its own loop.
+#
 # Validate every Terraform module the course uses: the local kind cluster
 # (core track), the Hetzner cluster (cloud track) and the state lab.
+# Usage: scripts/terraform-validate.sh   (from the repository root). Needs terraform; downloads
+# providers into temporary directories and deletes them; changes no state and no cluster.
 #
 # Each module is initialised in its own throw-away TF_DATA_DIR with
 # -backend=false: validate needs the providers and modules, never the state.

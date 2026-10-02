@@ -9,6 +9,9 @@
 # Usage:
 #   make check-tools
 #   scripts/check-tools.sh
+#
+# Run by hand in Chapter 00, right after cloning. Needs only bash and the tools it checks;
+# runs on macOS (bash 3.2) and Linux. Changes nothing - it only reads versions and `docker info`.
 set -Eeuo pipefail
 
 # Minimum versions (major.minor[.patch]); "" = any version.
@@ -27,6 +30,7 @@ REC_DOCKER_MEM_GIB=12
 FAIL=0
 OS="$(uname -s)"
 
+# Result lines: ok / missing / too_old / too_low <name> <detail> [<needed>]. Every failure sets FAIL=1.
 ok()      { printf '  \033[0;32mOK\033[0m       %-12s %s\n' "$1" "$2"; }
 missing() { printf '  \033[0;31mMISSING\033[0m  %-12s %s\n' "$1" "$2"; FAIL=1; }
 too_old() { printf '  \033[0;33mTOO OLD\033[0m  %-12s %s (need >= %s)\n' "$1" "$2" "$3"; FAIL=1; }
@@ -60,6 +64,8 @@ hint() {
     make:*)            echo "apt install build-essential" ;;
     jq:Darwin)         echo "brew install jq  | https://jqlang.org/download/" ;;
     jq:*)              echo "apt install jq  | https://jqlang.org/download/" ;;
+    yq:Darwin)         echo "brew install yq  | https://github.com/mikefarah/yq#install" ;;
+    yq:*)              echo "https://github.com/mikefarah/yq#install (the Go yq v4 - not the Python 'yq' from apt)" ;;
     *)                 echo "" ;;
   esac
 }
@@ -95,6 +101,7 @@ check() {
   ok "$tool" "${ver:-installed}"
 }
 
+# The tool list: name, minimum version ("" = any), and the command that prints the version.
 echo "SafeOps lab tools ($OS)"
 echo ""
 check git        ""               "git --version"
@@ -109,6 +116,7 @@ check age-keygen ""               "age-keygen --version"
 check pre-commit ""               "pre-commit --version"
 check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
 check jq         ""               "jq --version"        # the AI agent's kube-context hook (Chapter 01) and scripts/lab-pod.sh
+check yq         "4"              "yq --version"        # the pre-commit guardrails that read the Flux manifests (Chapter 03 on)
 
 # Docker must not only be installed but running - the kind nodes are containers.
 if command -v docker >/dev/null 2>&1; then
@@ -116,6 +124,7 @@ if command -v docker >/dev/null 2>&1; then
     ok "docker daemon" "running"
     cpus="$(docker info --format '{{.NCPU}}' 2>/dev/null || echo 0)"
     mem_bytes="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
+    # Anything that is not a plain number (an error text, an empty answer) counts as 0.
     case "$cpus" in ''|*[!0-9]*) cpus=0 ;; esac
     case "$mem_bytes" in ''|*[!0-9]*) mem_bytes=0 ;; esac
     mem_gib="$(awk -v b="$mem_bytes" 'BEGIN { printf "%.1f", b / 1024 / 1024 / 1024 }')"
@@ -124,6 +133,7 @@ if command -v docker >/dev/null 2>&1; then
     else
       ok "docker cpus" "$cpus"
     fi
+    # bash compares only whole numbers, so awk compares the GiB values (with decimals).
     if awk -v m="$mem_gib" -v min="$MIN_DOCKER_MEM_GIB" 'BEGIN { exit !(m < min) }'; then
       too_low "docker memory" "${mem_gib} GiB" "8 GB - raise it in Docker Desktop / OrbStack / Colima settings"
     elif awk -v m="$mem_gib" -v rec="$REC_DOCKER_MEM_GIB" 'BEGIN { exit !(m < rec) }'; then

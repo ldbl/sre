@@ -10,6 +10,7 @@
 # `git commit --no-verify` skips hooks).
 #
 # Usage: scripts/check-sops-encrypted.sh [FILE...]    # no FILE: every flux/secrets/**/*.yaml
+# Read-only: it never decrypts or changes a file - it only reads them. Needs git and awk; not sops.
 
 set -Eeuo pipefail
 
@@ -27,6 +28,7 @@ fi
 failed=0
 checked=0
 for f in "${files[@]}"; do
+  # Only files under flux/secrets/ count; the manifests that wire them up and templates are skipped.
   case "$f" in
     flux/secrets/*) ;;
     *) continue ;;
@@ -37,6 +39,7 @@ for f in "${files[@]}"; do
   [[ -f "$f" ]] || continue
   checked=$((checked + 1))
 
+  # No top-level sops: block means the whole file was never encrypted.
   if ! grep -q '^sops:' "$f"; then
     echo "NOT ENCRYPTED: $f has no SOPS metadata - encrypt it: sops --encrypt --in-place $f" >&2
     failed=1
