@@ -22,8 +22,10 @@ DEFAULT_KCFG="$HOME/.kube/config"
 mkdir -p "$HOME/.kube"
 TMP_MERGE="$(mktemp)"
 if [[ -f "$DEFAULT_KCFG" ]]; then
-  # Work on a copy, so a failure halfway never leaves ~/.kube/config half-edited.
-  TMP_OLD="$(mktemp)"
+  # Work on a copy, so a failure halfway never leaves ~/.kube/config half-edited. The copy sits next
+  # to the original: kubectl resolves relative certificate and key paths from the file's directory.
+  TMP_OLD="$(mktemp "$HOME/.kube/config.merge.XXXXXX")"
+  trap 'rm -f "$TMP_OLD" "$TMP_MERGE"' EXIT
   cp "$DEFAULT_KCFG" "$TMP_OLD"
   # names JSONPATH - the names (one per line) the new kubeconfig brings; existing JSONPATH - the same
   # names in the copy of the old one, so only entries that are really there get deleted.

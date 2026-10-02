@@ -28,7 +28,7 @@ kind: Config
 current-context: other
 clusters:
 - name: other
-  cluster: {server: "https://other.example:6443"}
+  cluster: {server: "https://other.example:6443", certificate-authority: other-ca.crt}
 - name: kind-sre-control-plane
   cluster: {server: "https://127.0.0.1:1111"}
 users:
@@ -42,6 +42,10 @@ contexts:
 - name: kind-sre-control-plane
   context: {cluster: kind-sre-control-plane, user: kind-sre-control-plane}
 EOF
+
+# The other cluster's CA is a file next to the config, referenced by a RELATIVE path - kubectl
+# resolves it from the config's directory, so the merge must not move the config elsewhere.
+printf 'OTHER-CA\n' > "${HOME}/.kube/other-ca.crt"
 
 # The kubeconfig the rebuilt cluster wrote.
 cat > "${TMP}/new.yaml" <<'EOF'
@@ -67,6 +71,8 @@ check "current context is not switched" "other" "$(view '{.current-context}')"
 check "other cluster is kept" "https://other.example:6443" "$(view '{.clusters[?(@.name=="other")].cluster.server}')"
 check "one kind context, not two" "1" "$(view '{.contexts[*].name}' | tr ' ' '\n' | grep -cx 'kind-sre-control-plane')"
 check "file is private (0600)" "${HOME}/.kube/config" "$(find "${HOME}/.kube/config" -perm 600)"
+check "relative CA path of another cluster still resolves" "OTHER-CA" "$(view '{.clusters[?(@.name=="other")].cluster.certificate-authority-data}' | base64 -d)"
+check "no temp copy left next to the config" "" "$(find "${HOME}/.kube" -name 'config.merge.*')"
 
 # First run: no ~/.kube/config yet - the new file is taken as it is.
 rm "${HOME}/.kube/config"
