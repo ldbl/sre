@@ -45,7 +45,7 @@ export TF_VAR_local_profile=false                                              #
 ```
 A Git token is needed in two cases: the full platform profile (image automation pushes tag updates - PAT with Contents: write) and a private fork (Flux must read it - Contents: read). Prompt for it instead of typing it into the command line, so it never lands in shell history:
 ```bash
-printf 'GitHub PAT: '; stty -echo; IFS= read -r TF_VAR_flux_git_token; stty echo; echo   # works in zsh and bash
+printf 'GitHub PAT: '; IFS= read -rs TF_VAR_flux_git_token; echo   # silent; works in zsh and bash
 export TF_VAR_flux_git_token
 ```
 ```bash
