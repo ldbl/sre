@@ -55,6 +55,8 @@ done
 [ -n "$NAMESPACE" ] || { echo "-n <namespace> is required" >&2; usage; }
 kubectl config get-contexts "$CONTEXT" >/dev/null 2>&1 || { echo "context '$CONTEXT' not found in the kubeconfig (-c or KUBE_CONTEXT)" >&2; exit 2; }
 
+command -v jq >/dev/null 2>&1 || { echo "jq is required (make check-tools)" >&2; exit 2; }
+
 # The only way this script talks to a cluster.
 k() { kubectl --context "$CONTEXT" "$@"; }
 
@@ -65,7 +67,10 @@ if [ "$DAEMON" -eq 1 ]; then
 else
   [ $# -gt 0 ] || { echo "command after -- is required (or use --daemon)" >&2; usage; }
   NAME="lab-$(date +%s)-$RANDOM"
-  CMD_JSON="$(printf '%s\n' "$@" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split("\n")[:-1]))')"
+  # The command as a JSON array, each argument quoted by jq - no shell or JSON escaping by hand.
+  # The arguments go in on stdin, NUL-separated: on jq's command line an argument such as "-c"
+  # would be read as a jq option.
+  CMD_JSON="$(printf '%s\0' "$@" | jq -cRs 'split("\u0000") | .[:-1]')"
 fi
 
 RESOURCES_JSON="{}"
@@ -75,7 +80,8 @@ fi
 
 LABEL_JSON="{}"
 if [ ${#LABELS[@]} -gt 0 ]; then
-  LABEL_JSON="$(printf '%s\n' "${LABELS[@]}" | python3 -c 'import json,sys; print(json.dumps(dict(l.split("=",1) for l in sys.stdin.read().split("\n") if l)))')"
+  # key=value pairs to a JSON object; the value may itself contain "=".
+  LABEL_JSON="$(printf '%s\0' "${LABELS[@]}" | jq -cRs 'split("\u0000") | .[:-1] | map(capture("^(?<k>[^=]+)=(?<v>.*)$") | {(.k): .v}) | add // {}')"
 fi
 
 OVERRIDES="$(cat <<JSON

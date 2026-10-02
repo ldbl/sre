@@ -94,8 +94,18 @@ ensure_flux_schemas() {
   return 1
 }
 
-declare -A UNIQUE_DIRS=()
-declare -A UNIQUE_YAML_FILES=()
+# Candidate files and directories are collected in two lists and de-duplicated with sort -u.
+# Plain lists, not associative arrays or readarray: macOS ships bash 3.2, which has neither.
+# Every list is a temporary file, and every command that fills one is checked: a `< <(cmd)`
+# process substitution would hide a failing find or sort, and the hook would quietly validate less.
+DIR_LIST="$(mktemp)"
+YAML_LIST="$(mktemp)"
+FOUND="$(mktemp)"
+SORTED="$(mktemp)"
+trap 'rm -f "${DIR_LIST}" "${YAML_LIST}" "${FOUND}" "${SORTED}"' EXIT
+
+# fail <message> - print the message and stop the hook.
+fail() { echo "[flux-validate] $1" >&2; exit 1; }
 
 add_kustomize_parents() {
   local path="$1"
@@ -114,7 +124,7 @@ add_kustomize_parents() {
 
   while [[ "${dir}" == "${REPO_ROOT}"* && "${dir}" != "/" ]]; do
     if contains_kustomization "${dir}"; then
-      UNIQUE_DIRS["${dir}"]=1
+      printf '%s\n' "${dir}" >> "${DIR_LIST}"
     fi
     if [[ "${dir}" == "${REPO_ROOT}" ]]; then
       break
@@ -131,31 +141,39 @@ if [[ $# -gt 0 ]]; then
 
     if [[ "${changed}" =~ \.ya?ml$ ]]; then
       if [[ -f "${REPO_ROOT}/${changed}" ]]; then
-        UNIQUE_YAML_FILES["${REPO_ROOT}/${changed}"]=1
+        printf '%s\n' "${REPO_ROOT}/${changed}" >> "${YAML_LIST}"
       fi
       add_kustomize_parents "${changed}"
     fi
   done
 else
+  find "${FLUX_ROOT}" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0 > "${FOUND}" \
+    || fail "find of the YAML files under flux/ failed"
   while IFS= read -r -d '' yaml_file; do
-    UNIQUE_YAML_FILES["${yaml_file}"]=1
-  done < <(find "${FLUX_ROOT}" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0)
+    printf '%s\n' "${yaml_file}" >> "${YAML_LIST}"
+  done < "${FOUND}"
 
+  find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0 > "${FOUND}" \
+    || fail "find of the kustomizations under flux/ failed"
   while IFS= read -r -d '' kfile; do
-    UNIQUE_DIRS["$(dirname "${kfile}")"]=1
-  done < <(find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0)
+    dirname "${kfile}" >> "${DIR_LIST}"
+  done < "${FOUND}"
 fi
 
-if [[ ${#UNIQUE_YAML_FILES[@]} -eq 0 && ${#UNIQUE_DIRS[@]} -eq 0 ]]; then
+if [[ ! -s "${YAML_LIST}" && ! -s "${DIR_LIST}" ]]; then
   echo "[flux-validate] No Flux manifests to validate."
   exit 0
 fi
 
-readarray -t YAML_FILES < <(printf '%s\n' "${!UNIQUE_YAML_FILES[@]}" | sort)
-readarray -t TARGET_DIRS < <(printf '%s\n' "${!UNIQUE_DIRS[@]}" | sort)
+YAML_FILES=()
+sort -u "${YAML_LIST}" > "${SORTED}" || fail "sort of the YAML file list failed"
+while IFS= read -r f; do YAML_FILES+=("${f}"); done < "${SORTED}"
+TARGET_DIRS=()
+sort -u "${DIR_LIST}" > "${SORTED}" || fail "sort of the kustomization list failed"
+while IFS= read -r d; do TARGET_DIRS+=("${d}"); done < "${SORTED}"
 
 echo "[flux-validate] validating YAML syntax with yq"
-for yaml_file in "${YAML_FILES[@]}"; do
+for yaml_file in ${YAML_FILES[@]+"${YAML_FILES[@]}"}; do
   rel_file="${yaml_file#${REPO_ROOT}/}"
   echo "[flux-validate] yq ${rel_file}"
   yq e 'true' "${yaml_file}" >/dev/null
@@ -181,7 +199,7 @@ failed=0
 validated=0
 skipped=0
 
-for dir in "${TARGET_DIRS[@]}"; do
+for dir in ${TARGET_DIRS[@]+"${TARGET_DIRS[@]}"}; do
   rel_dir="${dir#${REPO_ROOT}/}"
   echo "[flux-validate] kustomize ${rel_dir}"
 

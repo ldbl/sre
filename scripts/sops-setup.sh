@@ -8,6 +8,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 AGE_KEY_FILE="${REPO_ROOT}/age.agekey"
 
+# Every kubectl call names its cluster (Chapter 01) - never the shared current context, which
+# another terminal or an AI agent may have switched to a different cluster.
+# KUBE_CONTEXT=hetzner-sre-control-plane for the Hetzner cluster.
+KUBE_CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
+k() { kubectl --context "${KUBE_CONTEXT}" "$@"; }
+
 echo "🔐 SOPS + age Setup for Flux"
 echo "============================"
 echo
@@ -81,27 +87,32 @@ create_k8s_secret() {
     echo "📦 Creating sops-age secret in Kubernetes..."
     echo
 
-    # Check if kubectl is connected
-    if ! kubectl cluster-info &> /dev/null; then
-        echo "❌ kubectl is not connected to a cluster"
-        echo "   Make sure your cluster is running and kubeconfig is configured"
+    # The named context must exist and answer
+    if ! kubectl config get-contexts "${KUBE_CONTEXT}" &> /dev/null; then
+        echo "❌ kubectl context '${KUBE_CONTEXT}' not found (set KUBE_CONTEXT)"
         exit 1
     fi
+    if ! k cluster-info &> /dev/null; then
+        echo "❌ cluster '${KUBE_CONTEXT}' does not answer"
+        echo "   Make sure your cluster is running"
+        exit 1
+    fi
+    echo "   cluster: ${KUBE_CONTEXT}"
 
     # Check if flux-system namespace exists
-    if ! kubectl get namespace flux-system &> /dev/null; then
+    if ! k get namespace flux-system &> /dev/null; then
         echo "❌ flux-system namespace not found"
         echo "   Make sure Flux is installed in your cluster"
         exit 1
     fi
 
     # Check if secret already exists
-    if kubectl get secret sops-age -n flux-system &> /dev/null; then
+    if k get secret sops-age -n flux-system &> /dev/null; then
         echo "⚠️  sops-age secret already exists in flux-system namespace"
         read -p "   Replace it? (y/N): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            kubectl delete secret sops-age -n flux-system
+            k delete secret sops-age -n flux-system
         else
             echo "   Skipping secret creation"
             return
@@ -109,9 +120,9 @@ create_k8s_secret() {
     fi
 
     # Create secret
-    cat "${AGE_KEY_FILE}" | kubectl create secret generic sops-age \
+    k create secret generic sops-age \
         --namespace=flux-system \
-        --from-file=age.agekey=/dev/stdin
+        --from-file=age.agekey=/dev/stdin < "${AGE_KEY_FILE}"
 
     echo "✅ sops-age secret created in flux-system namespace"
     echo
@@ -179,6 +190,8 @@ OPTIONS:
                         and create/refresh the sops-age secret in the cluster
     -h, --help          Show this help message
 
+Every kubectl call uses the context in KUBE_CONTEXT (default: kind-sre-control-plane).
+
 EXAMPLES:
     # Initial setup (all steps)
     $0 --all
@@ -220,15 +233,37 @@ main() {
             else
                 echo "🔑 Using existing key: ${AGE_KEY_FILE}"
             fi
-            update_local_sops_rule
-            # infra/terraform/kind_cluster already created sops-age from this
-            # key file; only create it when it is missing (no prompts - this
-            # runs inside course labs and CI).
-            if kubectl -n flux-system get secret sops-age &> /dev/null; then
-                echo "✅ sops-age secret already present in flux-system (created by Terraform)"
+            # The cluster side first: .sops.yaml is changed only once the cluster is known to hold
+            # this key, so a failure here leaves the configuration untouched.
+            # infra/terraform/kind_cluster already created sops-age from this key file; only create
+            # it when it is missing (no prompts - this runs inside course labs and CI).
+            if k -n flux-system get secret sops-age &> /dev/null; then
+                # Present is not enough: it must hold THIS key, or Flux cannot decrypt what you encrypt.
+                # Each step is checked on its own, so a read error is never mistaken for a mismatch.
+                if ! encoded="$(k -n flux-system get secret sops-age -o jsonpath='{.data.age\.agekey}')"; then
+                    echo "❌ could not read the sops-age secret in ${KUBE_CONTEXT}"
+                    exit 1
+                fi
+                if [[ -z "${encoded}" ]]; then
+                    echo "❌ the sops-age secret in ${KUBE_CONTEXT} has no age.agekey field"
+                    exit 1
+                fi
+                if ! printf '%s' "${encoded}" | base64 -d > /dev/null 2>&1; then
+                    echo "❌ the age.agekey field of sops-age in ${KUBE_CONTEXT} is not valid base64"
+                    exit 1
+                fi
+                if printf '%s' "${encoded}" | base64 -d | cmp -s - "${AGE_KEY_FILE}"; then
+                    echo "✅ sops-age secret in ${KUBE_CONTEXT} holds this key (created by Terraform)"
+                else
+                    echo "❌ sops-age secret in ${KUBE_CONTEXT} holds a DIFFERENT key than ${AGE_KEY_FILE}"
+                    echo "   Flux could not decrypt what you encrypt now. Rebuild the cluster with this key"
+                    echo "   (Chapter 00, Tear Down and Rebuild), or replace the secret: $0 --create-secret"
+                    exit 1
+                fi
             else
                 create_k8s_secret
             fi
+            update_local_sops_rule
             ;;
         -h|--help)
             usage

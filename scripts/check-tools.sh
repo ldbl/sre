@@ -108,7 +108,7 @@ check sops       ""               "sops --version"
 check age-keygen ""               "age-keygen --version"
 check pre-commit ""               "pre-commit --version"
 check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
-check jq         ""               "jq --version"        # the AI agent's kube-context hook reads the command with jq (Chapter 01)
+check jq         ""               "jq --version"        # the AI agent's kube-context hook (Chapter 01) and scripts/lab-pod.sh
 
 # Docker must not only be installed but running - the kind nodes are containers.
 if command -v docker >/dev/null 2>&1; then
