@@ -11,7 +11,8 @@
 #   Called by null_resource.merge_kubeconfig (local-exec) in infra/terraform/kind_cluster/main.tf
 #   with the kubeconfig kind wrote next to the module. Tested by tests/merge-kubeconfig.test.sh.
 # Needs kubectl - it only edits kubeconfig files and talks to no cluster.
-# Changes: ~/.kube/config (created if missing, mode 0600).
+# Changes: ~/.kube/config (created if missing, mode 0600); while it runs, a temporary copy sits next
+# to it (config.merge.*) and is removed on exit.
 set -euo pipefail
 NEW_KCFG=${1:-}
 if [[ -z "$NEW_KCFG" || ! -f "$NEW_KCFG" ]]; then
