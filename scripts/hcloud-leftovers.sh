@@ -19,8 +19,10 @@ if [[ -z "${token}" ]]; then
   exit 2
 fi
 
-# list_names <kind> - print the name of every object of that kind in the project (one per line);
-# fails on an API error or a response without the expected list.
+# list_names <kind> - print the names of the objects of that kind in the project (one per line);
+# fails on an API error or a response without the expected list. It reads only the first page
+# (per_page=50, the API maximum): enough to tell "empty" from "not empty" - any object at all makes
+# the check fail - but with more than 50 of one kind the printed list is incomplete.
 # The header comes from a process substitution (printf is a shell builtin), so the token never
 # appears in curl's arguments - other accounts on the machine could read those with ps.
 list_names() {

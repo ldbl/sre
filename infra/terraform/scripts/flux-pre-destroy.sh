@@ -183,16 +183,17 @@ unblock_namespace() {
 # --- main ---
 # Without kubectl, a kubeconfig or a reachable API there is nothing this script can clean: warn and
 # let Terraform go on (exit 0), as the provisioner continues on failure anyway.
+SKIPPED="skipped: suspend Flux, stop Kyverno, remove admission webhooks, delete the namespaces and PVCs, wait for the PersistentVolumes, clear stuck finalizers, remove Flux"
 if ! command -v kubectl >/dev/null 2>&1; then
-  warn "kubectl not found - no cluster-side cleanup; volumes created by the cluster may be left behind"
+  warn "kubectl not found - no cluster-side cleanup (${SKIPPED}); volumes created by the cluster may be left behind"
   exit 0
 fi
 if [[ -z "${KUBECONFIG_PATH}" || ! -f "${KUBECONFIG_PATH}" ]]; then
-  warn "kubeconfig '${KUBECONFIG_PATH}' not found - no cluster-side cleanup; volumes created by the cluster may be left behind"
+  warn "kubeconfig '${KUBECONFIG_PATH}' not found - no cluster-side cleanup (${SKIPPED}); volumes created by the cluster may be left behind"
   exit 0
 fi
 if ! kc version >/dev/null 2>&1; then
-  warn "cluster not reachable - no cluster-side cleanup; volumes created by the cluster may be left behind"
+  warn "cluster not reachable - no cluster-side cleanup (${SKIPPED}); volumes created by the cluster may be left behind"
   exit 0
 fi
 

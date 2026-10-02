@@ -14,7 +14,7 @@
 # with KUBE_CONTEXT=hetzner-sre-control-plane.
 # What it checks: Flux, the backend and frontend in develop, a request to the backend, the generated
 # secrets, cert-manager Certificates and the CNPG clusters. It changes nothing in the cluster except
-# one short-lived probe pod (smoke-curl in develop), which it deletes again.
+# one short-lived probe pod (smoke-curl-<time>-<random> in develop), which it deletes again.
 set -Eeuo pipefail
 
 KUBE_CONTEXT="${KUBE_CONTEXT:-}"
@@ -82,9 +82,10 @@ done
 # No `--rm -i`: attaching to a pod that exits in <1s races and reports a
 # timeout; create it, wait for completion, read the exit status, delete it.
 # smoke_curl - true when the probe pod's curl to the backend's /healthz succeeded (waits up to 60s).
+# The pod gets a unique name, so two runs never collide and no pod of anyone else is deleted.
 smoke_curl() {
-  local ns="develop" pod="smoke-curl"
-  k -n "$ns" delete pod "$pod" --ignore-not-found --wait=true >/dev/null 2>&1
+  local ns="develop" pod
+  pod="smoke-curl-$(date +%s)-$RANDOM"
   k run "$pod" --image=curlimages/curl --labels=app=frontend --restart=Never -n "$ns" \
     --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl","command":["curl","-sf","-m","10","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
   local phase=""
