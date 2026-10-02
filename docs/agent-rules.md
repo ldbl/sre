@@ -73,17 +73,18 @@ value, stay out of both. The agent proposes and plans; a person reads the plan a
 ## Chapter 03 - Git is the only way in
 
 Flux keeps the cluster equal to Git: at every reconcile it undoes a change made by hand, creates again
-what was deleted, and prunes what was removed from Git. A fix that is not in Git does not last. A
+what was deleted, and - where `prune: true` is set, as on every Kustomization here except the one for
+CRDs - deletes what was removed from Git. A fix that is not in Git does not last. A
 suspended Kustomization keeps the hand change - and ignores every later commit, security fixes
 included, while it still shows `READY True`.
 
 | Rule for the agent | What enforces it |
 |---|---|
-| A fix to an object Flux manages goes into Git, through a pull request - never `kubectl edit`, `patch` or `apply` on that object. | On Hetzner the OIDC roles are read-only in `staging`, `production` and `flux-system`. In `develop` and on kind a hand change is allowed, and Flux sets it back at the next reconcile - that undoes it, it does not stop it: instruction only. |
+| A fix to an object Flux manages goes into Git, through a pull request - never `kubectl edit`, `patch` or `apply` on that object. | On Hetzner the OIDC roles are read-only in `staging` and `production`; in `flux-system` too, except that `safeops-course:admins` may patch Kustomizations and HelmReleases to change `spec.suspend` or the reconcile annotations - nothing else. In `develop` and on kind a hand change is allowed, and Flux sets it back at the next reconcile - that undoes it, it does not stop it: instruction only. |
 | Never `flux suspend` on your own. If a suspend looks necessary, stop and report: who would suspend what, why, and when it is resumed. | On Hetzner only the `safeops-course:admins` group may suspend, resume or reconcile (`flux/infrastructure/security/rbac`); an agent signed in as an admin can, so for it this is an instruction. On kind: instruction only. |
 | Never report the cluster as healthy from `READY` alone: read the `SUSPENDED` column too. | `make smoke-test` fails on a suspended Kustomization. |
 | Before proposing a change to a shared `base`, run `flux diff kustomization` for every environment the base feeds, and report every `deleted`. Exit `2` means the preview failed, not that nothing changes. | Instruction only. The Flux Diff CI job builds and validates the manifests; it does not compare them with a cluster. |
-| Never stop Flux another way: removing its labels, setting `prune: false`, changing `spec.path` or the source. | On Hetzner the admission policy `oidc-flux-operator-fields` lets admins change only `spec.suspend`, and GitRepositories are read-only. In Git: the review of the pull request. On kind: instruction only. |
+| Never weaken Flux another way: removing its labels, changing `spec.path` or the source, or setting `prune: false` - which does not stop reconciling or later commits, but leaves every object removed from Git running in the cluster. | On Hetzner the admission policy `oidc-flux-operator-fields` lets admins change only `spec.suspend`, and GitRepositories are read-only. In Git: the review of the pull request. On kind: instruction only. |
 
 ## Chapter 04 - Secrets stay encrypted in Git, and a leaked one is burned
 
