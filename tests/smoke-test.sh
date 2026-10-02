@@ -130,10 +130,15 @@ certificates_ready() {
   local states
   states="$(k get certificates.cert-manager.io -A -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')" || return 1
   [ -n "$states" ] || return 1
-  ! printf '%s\n' "$states" | grep -qvx True
+  # A here-string, not a pipe: `grep -q` stops at the first match, and with pipefail a writer killed
+  # by SIGPIPE would make the pipeline fail - which `!` would turn into "healthy".
+  ! grep -qvx True <<< "$states"
 }
 # cert-manager runs only on the Hetzner cluster (the local profile has no public address).
-if k api-resources -o name 2>/dev/null | grep -qx 'certificates.cert-manager.io'; then
+# Discovery must succeed first: a failing API is a failed check, not "cert-manager is not installed".
+if ! api_resources="$(k api-resources -o name 2>/dev/null)"; then
+  fail "cert-manager Certificate resources are Ready (API discovery failed)"
+elif grep -qx 'certificates.cert-manager.io' <<< "$api_resources"; then
   run_test "cert-manager Certificate resources are Ready" certificates_ready
 else
   skip "cert-manager Certificate resources are Ready" "cert-manager is not installed on this cluster"
@@ -146,7 +151,7 @@ cnpg_healthy() {
   local phases
   phases="$(k get clusters.postgresql.cnpg.io -A -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')" || return 1
   [ -n "$phases" ] || return 1
-  ! printf '%s\n' "$phases" | grep -qvx 'Cluster in healthy state'
+  ! grep -qvx 'Cluster in healthy state' <<< "$phases"
 }
 run_test "CNPG clusters are healthy" cnpg_healthy
 
