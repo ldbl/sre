@@ -36,6 +36,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: merge-kubeconfig-test
+        name: merge-kubeconfig tests (throw-away HOME, no cluster)
+        entry: tests/merge-kubeconfig.test.sh
+        language: script
+        files: ^(infra/terraform/kind_cluster/scripts/merge-kubeconfig\.sh|tests/merge-kubeconfig\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: kube-context-hook-test
         name: agent kube-context hook tests (text only, no cluster)
         entry: tests/kube-context-hook.test.sh
