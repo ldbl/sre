@@ -96,9 +96,16 @@ ensure_flux_schemas() {
 
 # Candidate files and directories are collected in two lists and de-duplicated with sort -u.
 # Plain lists, not associative arrays or readarray: macOS ships bash 3.2, which has neither.
+# Every list is a temporary file, and every command that fills one is checked: a `< <(cmd)`
+# process substitution would hide a failing find or sort, and the hook would quietly validate less.
 DIR_LIST="$(mktemp)"
 YAML_LIST="$(mktemp)"
-trap 'rm -f "${DIR_LIST}" "${YAML_LIST}"' EXIT
+FOUND="$(mktemp)"
+SORTED="$(mktemp)"
+trap 'rm -f "${DIR_LIST}" "${YAML_LIST}" "${FOUND}" "${SORTED}"' EXIT
+
+# fail <message> - print the message and stop the hook.
+fail() { echo "[flux-validate] $1" >&2; exit 1; }
 
 add_kustomize_parents() {
   local path="$1"
@@ -140,13 +147,17 @@ if [[ $# -gt 0 ]]; then
     fi
   done
 else
+  find "${FLUX_ROOT}" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0 > "${FOUND}" \
+    || fail "find of the YAML files under flux/ failed"
   while IFS= read -r -d '' yaml_file; do
     printf '%s\n' "${yaml_file}" >> "${YAML_LIST}"
-  done < <(find "${FLUX_ROOT}" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0)
+  done < "${FOUND}"
 
+  find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0 > "${FOUND}" \
+    || fail "find of the kustomizations under flux/ failed"
   while IFS= read -r -d '' kfile; do
     dirname "${kfile}" >> "${DIR_LIST}"
-  done < <(find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0)
+  done < "${FOUND}"
 fi
 
 if [[ ! -s "${YAML_LIST}" && ! -s "${DIR_LIST}" ]]; then
@@ -155,9 +166,11 @@ if [[ ! -s "${YAML_LIST}" && ! -s "${DIR_LIST}" ]]; then
 fi
 
 YAML_FILES=()
-while IFS= read -r f; do YAML_FILES+=("${f}"); done < <(sort -u "${YAML_LIST}")
+sort -u "${YAML_LIST}" > "${SORTED}" || fail "sort of the YAML file list failed"
+while IFS= read -r f; do YAML_FILES+=("${f}"); done < "${SORTED}"
 TARGET_DIRS=()
-while IFS= read -r d; do TARGET_DIRS+=("${d}"); done < <(sort -u "${DIR_LIST}")
+sort -u "${DIR_LIST}" > "${SORTED}" || fail "sort of the kustomization list failed"
+while IFS= read -r d; do TARGET_DIRS+=("${d}"); done < "${SORTED}"
 
 echo "[flux-validate] validating YAML syntax with yq"
 for yaml_file in ${YAML_FILES[@]+"${YAML_FILES[@]}"}; do
