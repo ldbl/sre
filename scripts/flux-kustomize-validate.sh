@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
+# flux-kustomize-validate.sh - pre-commit hook: do the Flux manifests you are about to commit build?
+#
+# For every kustomization directory under flux/ that a changed file belongs to (or all of them,
+# when run without arguments):
+#   1. build it with `kubectl kustomize` - a missing file, a broken patch or invalid YAML fails here;
+#   2. if kubeconform is installed, validate the built objects against the Kubernetes and Flux CRD
+#      schemas. Without kubeconform this step is skipped with a notice: the Flux Diff CI job runs
+#      it on every pull request and fails on errors, so nothing reaches main unchecked.
+# YAML syntax of single files is the yamllint hook's job.
+#
+# Needs only kubectl (already a lab tool). Optional: kubeconform, plus curl and tar for the schemas.
+# Runs on macOS (bash 3.2) and Linux.
+#
+# Usage: scripts/flux-kustomize-validate.sh [changed files...]   (pre-commit passes the changed files)
 set -euo pipefail
-
-# Flux manifest validation modeled after the official Flux example:
-# YAML syntax (yq) + kustomize build + kubeconform + Flux CRD schemas.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FLUX_ROOT="${REPO_ROOT}/flux"
@@ -14,18 +25,25 @@ SCHEMA_DIR="${SCHEMA_ROOT}/${SCHEMA_VARIANT}"
 ALLOW_NO_FLUX_SCHEMAS="${FLUX_VALIDATE_ALLOW_NO_FLUX_SCHEMAS:-0}"
 DISABLE_SCHEMA_DOWNLOAD="${FLUX_VALIDATE_DISABLE_SCHEMA_DOWNLOAD:-0}"
 
+# LoadRestrictionsNone: some overlays reference files outside their own directory.
 kustomize_flags=(--load-restrictor=LoadRestrictionsNone)
+# Secrets under flux/secrets are SOPS-encrypted; their data does not match the Secret schema.
 kubeconform_flags=(-skip=Secret)
 
-for tool in yq kustomize kubeconform tar; do
-  if ! command -v "${tool}" >/dev/null 2>&1; then
-    echo "[flux-validate] required tool missing: ${tool}" >&2
-    exit 1
-  fi
-done
+if ! command -v kubectl >/dev/null 2>&1; then
+  echo "[flux-validate] required tool missing: kubectl" >&2
+  exit 1
+fi
 
-if [[ "${DISABLE_SCHEMA_DOWNLOAD}" != "1" ]] && ! command -v curl >/dev/null 2>&1; then
-  echo "[flux-validate] required tool missing: curl" >&2
+# kubeconform is optional locally; when it is there, it needs tar (and curl to download schemas).
+run_kubeconform=1
+if ! command -v kubeconform >/dev/null 2>&1; then
+  run_kubeconform=0
+elif ! command -v tar >/dev/null 2>&1; then
+  echo "[flux-validate] required tool missing: tar (for the Flux CRD schemas)" >&2
+  exit 1
+elif [[ "${DISABLE_SCHEMA_DOWNLOAD}" != "1" ]] && ! command -v curl >/dev/null 2>&1; then
+  echo "[flux-validate] required tool missing: curl (to download the Flux CRD schemas)" >&2
   exit 1
 fi
 
@@ -34,15 +52,18 @@ if [[ ! -d "${FLUX_ROOT}" ]]; then
   exit 1
 fi
 
+# contains_kustomization <dir> - true when <dir> holds a kustomization.yaml (or .yml).
 contains_kustomization() {
   local dir="$1"
   [[ -f "${dir}/kustomization.yaml" || -f "${dir}/kustomization.yml" ]]
 }
 
+# has_local_flux_schemas - true when the Flux CRD schemas were already downloaded (cached in /tmp).
 has_local_flux_schemas() {
   [[ -d "${SCHEMA_DIR}" ]] && find "${SCHEMA_DIR}" -type f -name '*.json' -print -quit | grep -q .
 }
 
+# download_flux_schemas - fetch the Flux CRD JSON schemas of the pinned Flux release and unpack them.
 download_flux_schemas() {
   local tmp_archive
   tmp_archive="$(mktemp "/tmp/flux-crd-schemas.XXXXXX.tar.gz")"
@@ -63,6 +84,8 @@ download_flux_schemas() {
   rm -f "${tmp_archive}"
 }
 
+# ensure_flux_schemas - make the schemas available: cache, else download; with
+# FLUX_VALIDATE_ALLOW_NO_FLUX_SCHEMAS=1 a failure only warns instead of stopping.
 ensure_flux_schemas() {
   if has_local_flux_schemas; then
     echo "[flux-validate] using cached Flux schemas at ${SCHEMA_DIR}"
@@ -94,19 +117,20 @@ ensure_flux_schemas() {
   return 1
 }
 
-# Candidate files and directories are collected in two lists and de-duplicated with sort -u.
+# Candidate directories are collected in a list and de-duplicated with sort -u.
 # Plain lists, not associative arrays or readarray: macOS ships bash 3.2, which has neither.
 # Every list is a temporary file, and every command that fills one is checked: a `< <(cmd)`
 # process substitution would hide a failing find or sort, and the hook would quietly validate less.
 DIR_LIST="$(mktemp)"
-YAML_LIST="$(mktemp)"
 FOUND="$(mktemp)"
 SORTED="$(mktemp)"
-trap 'rm -f "${DIR_LIST}" "${YAML_LIST}" "${FOUND}" "${SORTED}"' EXIT
+trap 'rm -f "${DIR_LIST}" "${FOUND}" "${SORTED}"' EXIT
 
 # fail <message> - print the message and stop the hook.
 fail() { echo "[flux-validate] $1" >&2; exit 1; }
 
+# add_kustomize_parents <path> - list every directory from <path> up to the repository root that
+# holds a kustomization: a change to one file can break each of them.
 add_kustomize_parents() {
   local path="$1"
   local abs_path
@@ -140,19 +164,10 @@ if [[ $# -gt 0 ]]; then
     fi
 
     if [[ "${changed}" =~ \.ya?ml$ ]]; then
-      if [[ -f "${REPO_ROOT}/${changed}" ]]; then
-        printf '%s\n' "${REPO_ROOT}/${changed}" >> "${YAML_LIST}"
-      fi
       add_kustomize_parents "${changed}"
     fi
   done
 else
-  find "${FLUX_ROOT}" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0 > "${FOUND}" \
-    || fail "find of the YAML files under flux/ failed"
-  while IFS= read -r -d '' yaml_file; do
-    printf '%s\n' "${yaml_file}" >> "${YAML_LIST}"
-  done < "${FOUND}"
-
   find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0 > "${FOUND}" \
     || fail "find of the kustomizations under flux/ failed"
   while IFS= read -r -d '' kfile; do
@@ -160,39 +175,31 @@ else
   done < "${FOUND}"
 fi
 
-if [[ ! -s "${YAML_LIST}" && ! -s "${DIR_LIST}" ]]; then
+if [[ ! -s "${DIR_LIST}" ]]; then
   echo "[flux-validate] No Flux manifests to validate."
   exit 0
 fi
 
-YAML_FILES=()
-sort -u "${YAML_LIST}" > "${SORTED}" || fail "sort of the YAML file list failed"
-while IFS= read -r f; do YAML_FILES+=("${f}"); done < "${SORTED}"
 TARGET_DIRS=()
 sort -u "${DIR_LIST}" > "${SORTED}" || fail "sort of the kustomization list failed"
 while IFS= read -r d; do TARGET_DIRS+=("${d}"); done < "${SORTED}"
-
-echo "[flux-validate] validating YAML syntax with yq"
-for yaml_file in ${YAML_FILES[@]+"${YAML_FILES[@]}"}; do
-  rel_file="${yaml_file#${REPO_ROOT}/}"
-  echo "[flux-validate] yq ${rel_file}"
-  yq e 'true' "${yaml_file}" >/dev/null
-done
 
 if [[ ${#TARGET_DIRS[@]} -eq 0 ]]; then
   echo "[flux-validate] No kustomizations affected."
   exit 0
 fi
 
-ensure_flux_schemas
-
-run_kubeconform=1
 kubeconform_config=(-strict -ignore-missing-schemas -schema-location default)
-if has_local_flux_schemas; then
-  kubeconform_config+=(-schema-location "${SCHEMA_ROOT}")
-elif [[ "${ALLOW_NO_FLUX_SCHEMAS}" == "1" ]]; then
-  echo "[flux-validate] WARNING: skipping kubeconform (no local schemas available in fallback mode)."
-  run_kubeconform=0
+if [[ ${run_kubeconform} -eq 1 ]]; then
+  ensure_flux_schemas
+  if has_local_flux_schemas; then
+    kubeconform_config+=(-schema-location "${SCHEMA_ROOT}")
+  elif [[ "${ALLOW_NO_FLUX_SCHEMAS}" == "1" ]]; then
+    echo "[flux-validate] WARNING: skipping kubeconform (no local schemas available in fallback mode)."
+    run_kubeconform=0
+  fi
+else
+  echo "[flux-validate] kubeconform not installed: building only; the schema check runs in CI (Flux Diff)."
 fi
 
 failed=0
@@ -204,7 +211,7 @@ for dir in ${TARGET_DIRS[@]+"${TARGET_DIRS[@]}"}; do
   echo "[flux-validate] kustomize ${rel_dir}"
 
   set +e
-  rendered="$(kustomize build "${dir}" "${kustomize_flags[@]}" 2>&1)"
+  rendered="$(kubectl kustomize "${dir}" "${kustomize_flags[@]}" 2>&1)"
   build_status=$?
   set -e
 

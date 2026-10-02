@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
+# configure-repo.sh - point a copy of the platform repository at your own GitHub owner and repo.
+#
+# The repository has the original owner's names written into docs/, flux/ and infra/terraform/:
+# the Git URL Flux syncs from (https and ssh forms) and the GHCR image names of the backend and
+# frontend. This script finds every file that contains them and rewrites them in place, so Flux
+# follows your repository and pulls your images. Run it once, by hand, after copying the
+# repository (docs/hetzner.md), then review the diff and commit it.
+#
+# Usage: scripts/configure-repo.sh --github-owner <owner> [--github-repo <repo>]   (repo defaults to sre)
+# Needs rg (ripgrep) to find the files and perl to rewrite them.
+# Changes: files under docs/, flux/ and infra/terraform/ in your working copy; nothing in a cluster.
 set -euo pipefail
 
+# usage - print how to call the script.
 usage() {
   cat <<'EOF'
 usage: scripts/configure-repo.sh --github-owner <owner> [--github-repo <repo>]
@@ -43,12 +55,15 @@ if [[ -z "${GITHUB_OWNER}" ]]; then
   exit 2
 fi
 
+# The names the files contain today - the ones to replace.
 OLD_OWNER="ldbl"
 OLD_REPO="sre"
 
 NEW_HTTPS_REPO_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git"
 NEW_SSH_REPO_URL="ssh://git@github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git"
 
+# Every file that mentions one of the old names (rg -l prints file names only). A plain while-read
+# loop instead of mapfile, so the script also runs with macOS's bash 3.2.
 FILES=()
 while IFS= read -r f; do FILES+=("$f"); done < <(
   rg -l --fixed-strings \

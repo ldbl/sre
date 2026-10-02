@@ -15,6 +15,15 @@
 #      the flux-system namespace. Removing Flux first left every Flux object's finalizer unprocessed.
 # Everything left over is reported loudly. Terraform continues either way (on_failure = continue),
 # so the log lines here are the only warning.
+#
+# Usage: flux-pre-destroy.sh <kubeconfig> [namespaces, comma-separated]
+#   Called by the destroy-time provisioner of null_resource.flux_pre_destroy in
+#   infra/terraform/{hcloud_cluster,kind_cluster}/main.tf - not meant to be run by hand.
+# Needs kubectl (and jq only for the last-resort namespace finalize). It talks only to the cluster in
+# the kubeconfig it is given (--kubeconfig), never to the current context.
+# Changes the cluster: it suspends Flux, stops Kyverno, deletes the webhooks, the given namespaces
+# and every PVC. Env: PRE_DESTROY_PV_TIMEOUT / PRE_DESTROY_NS_TIMEOUT (seconds, default 300 / 180).
+# Without kubectl, the kubeconfig or a reachable cluster it warns and exits 0 - nothing to clean.
 
 set -o errexit
 set -o nounset
@@ -25,6 +34,7 @@ TARGET_NAMESPACES_CSV="${2:-flux-system,develop,staging,production,observability
 PV_TIMEOUT="${PRE_DESTROY_PV_TIMEOUT:-300}"
 NS_TIMEOUT="${PRE_DESTROY_NS_TIMEOUT:-180}"
 
+# log MESSAGE / warn MESSAGE - progress on stdout, problems on stderr, both prefixed.
 log() {
   echo "[flux-pre-destroy] $*"
 }
@@ -33,10 +43,12 @@ warn() {
   echo "[flux-pre-destroy] WARNING: $*" >&2
 }
 
+# kc ARGS... - kubectl against the cluster being destroyed, with a timeout so a dying API cannot hang it.
 kc() {
   kubectl --kubeconfig="${KUBECONFIG_PATH}" --request-timeout=30s "$@"
 }
 
+# api_exists RESOURCE - true when the cluster serves that resource type (e.g. a Flux CRD is installed).
 api_exists() {
   kc api-resources -o name 2>/dev/null | grep -qx "$1"
 }
@@ -57,6 +69,8 @@ wait_until_empty() {
   return 1
 }
 
+# suspend_flux - set spec.suspend on every Kustomization, HelmRelease and ImageUpdateAutomation,
+# so Flux stops re-creating what the next steps delete (its controllers keep running).
 suspend_flux() {
   local resource
   log "suspending Flux reconciliation"
@@ -86,6 +100,8 @@ remove_flux() {
   wait_for_namespaces flux-system
 }
 
+# remove_admission_webhooks - stop Kyverno and delete every admission webhook, so no webhook whose
+# backend is already gone can block the deletes that follow.
 remove_admission_webhooks() {
   # Kyverno re-registers its webhooks while it runs - stop it first.
   if kc get namespace kyverno >/dev/null 2>&1; then
@@ -96,6 +112,8 @@ remove_admission_webhooks() {
   kc delete validatingwebhookconfigurations,mutatingwebhookconfigurations --all >/dev/null 2>&1 || true
 }
 
+# delete_volumes - delete every PVC and wait until the PersistentVolumes are gone; on timeout list
+# the ones left (on Hetzner they would outlive the cluster and keep being billed).
 delete_volumes() {
   log "deleting the remaining PersistentVolumeClaims (the CSI driver removes their volumes)"
   kc delete pvc --all -A --wait=false >/dev/null 2>&1 || true
@@ -107,6 +125,7 @@ delete_volumes() {
   fi
 }
 
+# delete_namespaces NS... - start deleting each namespace without waiting for it.
 delete_namespaces() {  # namespace...
   local ns
   for ns in "$@"; do
@@ -115,6 +134,7 @@ delete_namespaces() {  # namespace...
   done
 }
 
+# wait_for_namespaces NS... - wait up to NS_TIMEOUT for them to disappear; unblock the ones still there.
 wait_for_namespaces() {  # namespace...
   local ns
   if wait_until_empty "${NS_TIMEOUT}" get namespace "$@" -o name --ignore-not-found=true; then
@@ -160,16 +180,20 @@ unblock_namespace() {
   fi
 }
 
+# --- main ---
+# Without kubectl, a kubeconfig or a reachable API there is nothing this script can clean: warn and
+# let Terraform go on (exit 0), as the provisioner continues on failure anyway.
+SKIPPED="skipped: suspend Flux, stop Kyverno, remove admission webhooks, delete the namespaces and PVCs, wait for the PersistentVolumes, clear stuck finalizers, remove Flux"
 if ! command -v kubectl >/dev/null 2>&1; then
-  warn "kubectl not found - no cluster-side cleanup; volumes created by the cluster may be left behind"
+  warn "kubectl not found - no cluster-side cleanup (${SKIPPED}); volumes created by the cluster may be left behind"
   exit 0
 fi
 if [[ -z "${KUBECONFIG_PATH}" || ! -f "${KUBECONFIG_PATH}" ]]; then
-  warn "kubeconfig '${KUBECONFIG_PATH}' not found - no cluster-side cleanup; volumes created by the cluster may be left behind"
+  warn "kubeconfig '${KUBECONFIG_PATH}' not found - no cluster-side cleanup (${SKIPPED}); volumes created by the cluster may be left behind"
   exit 0
 fi
 if ! kc version >/dev/null 2>&1; then
-  warn "cluster not reachable - no cluster-side cleanup; volumes created by the cluster may be left behind"
+  warn "cluster not reachable - no cluster-side cleanup (${SKIPPED}); volumes created by the cluster may be left behind"
   exit 0
 fi
 
@@ -203,6 +227,8 @@ for ns in ${namespaces[@]+"${namespaces[@]}"}; do
   if [[ "${ns}" == flux-system ]]; then flux_namespace=true; else app_namespaces+=("${ns}"); fi
 done
 
+# The order is the point (see the header): stop Flux and the webhooks, delete the app namespaces and
+# volumes while the cluster can still clean up, and remove Flux last.
 suspend_flux
 remove_admission_webhooks
 if (( ${#app_namespaces[@]} > 0 )); then

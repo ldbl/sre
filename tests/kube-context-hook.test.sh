@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Tests scripts/agent-hooks/kube-context-hook.sh - it only reads text, no cluster is touched.
 # Run: tests/kube-context-hook.test.sh   (pre-commit runs it when the hook changes)
+# Each case feeds one command line to the hook on stdin, the way an AI agent's pre-command hook
+# does, and checks the verdict: exit 2 = block, exit 0 = allow, anything else = an error in the hook.
+# Exit 0 when every case passes, 1 otherwise.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOK="${ROOT}/scripts/agent-hooks/kube-context-hook.sh"
 FAILED=0
 
-# check <allow|block> <command text>
+# check <allow|block> <command text> - run the hook on the text and compare its verdict with the expected one.
 check() {
   local want="$1" cmd="$2" rc=0
   printf '%s' "${cmd}" | "${HOOK}" >/dev/null 2>&1 || rc=$?

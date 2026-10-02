@@ -2,10 +2,22 @@
 set -euo pipefail
 
 # Helper script to create and encrypt secrets with SOPS
+#
+# sops-encrypt-secret.sh - write a Kubernetes Secret for flux/secrets/<environment>/ without the
+# plaintext ever touching the repository. It writes a Secret template into a private temp directory,
+# opens it in your editor, encrypts it with sops (the key comes from the matching rule in
+# .sops.yaml) and saves only the encrypted file as flux/secrets/<environment>/<name>.yaml. Flux
+# decrypts it in the cluster. An existing secret is opened with `sops edit` instead.
+#
+# Run by hand (Chapter 04). Usage: scripts/sops-encrypt-secret.sh ENVIRONMENT SECRET_NAME [NAMESPACE]
+# Needs: sops, and your public key in .sops.yaml (scripts/sops-setup.sh --local for the kind profile).
+# Changes: one file under flux/secrets/<environment>/ - you add it to that kustomization.yaml and
+# commit it yourself. Nothing in a cluster.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# usage - print the arguments, examples and workflow.
 usage() {
   cat <<EOF
 Usage: $0 ENVIRONMENT SECRET_NAME [NAMESPACE]
@@ -43,6 +55,8 @@ NOTE:
 EOF
 }
 
+# create_and_encrypt <environment> <secret name> [namespace] - the whole workflow: check the target
+# directory, edit an existing secret or create, edit and encrypt a new one.
 create_and_encrypt() {
   local env="$1"
   local secret_name="$2"
@@ -80,6 +94,7 @@ create_and_encrypt() {
   local temp_file="${work_dir}/${secret_name}.yaml"
   local encrypted_tmp="${work_dir}/${secret_name}.enc.yaml"
 
+  # umask 077: the template (plaintext) is readable by you only.
   umask 077
   cat > "${temp_file}" <<EOF
 apiVersion: v1

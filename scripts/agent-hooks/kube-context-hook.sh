@@ -20,10 +20,15 @@
 # Deliberately simple: it splits the command on ; && || | and newlines and looks
 # at the first word of each part. It is a seatbelt against the common mistake,
 # not a shell parser - `bash -c "..."` or a script that calls kubectl is not seen.
+#
+# Needs only bash and sed (macOS and Linux). Changes nothing; it only reads stdin.
+# Tested by tests/kube-context-hook.test.sh (pre-commit runs it when this file changes).
 set -euo pipefail
 
 command_text="$(cat)"
 
+# block <reason> - print the reason and the rule for the agent, and exit 2 (the agent's hook
+# treats exit 2 as "do not run the command").
 block() {
   echo "[kube-context-hook] blocked: $1" >&2
   echo "[kube-context-hook] rule: pass --context <name> on every kubectl/flux command; never change the current context" >&2
@@ -37,6 +42,7 @@ parts="${parts//||/${nl}}"
 parts="${parts//;/${nl}}"
 parts="${parts//|/${nl}}"
 
+# Check every part on its own: one kubectl without --context anywhere in a chain blocks the whole command.
 while IFS= read -r part; do
   # Tabs count as spaces; drop leading spaces and VAR=value prefixes, then take the first word.
   part="${part//$'\t'/ }"

@@ -3,6 +3,20 @@ set -euo pipefail
 
 # SOPS + age setup script for Flux
 # This script helps with initial SOPS configuration
+#
+# sops-setup.sh - set up the age key that SOPS encrypts with and Flux decrypts with.
+#   - the private key lives in age.agekey at the repository root (git-ignored, never committed);
+#   - its public half goes into .sops.yaml, so `sops` knows whom to encrypt for;
+#   - a copy of the private key goes into the cluster as the Secret flux-system/sops-age, so Flux
+#     can decrypt what is committed.
+# The course uses `--local` (Chapter 00): it reuses the key the kind module already generated,
+# registers it for flux/secrets/local/ only and checks that the cluster holds the same key.
+# The other modes are the manual steps for a platform key.
+#
+# Usage: scripts/sops-setup.sh --local | --generate | --create-secret | --update-config | --all
+# Needs: age, sops, kubectl; KUBE_CONTEXT names the cluster (default kind-sre-control-plane).
+# Changes: age.agekey (only when it is missing, or on a confirmed --generate), .sops.yaml (--local),
+# the sops-age Secret in the cluster (--create-secret, --all, --local when the Secret is missing).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -12,6 +26,7 @@ AGE_KEY_FILE="${REPO_ROOT}/age.agekey"
 # another terminal or an AI agent may have switched to a different cluster.
 # KUBE_CONTEXT=hetzner-sre-control-plane for the Hetzner cluster.
 KUBE_CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
+# k <kubectl args> - kubectl against KUBE_CONTEXT; the only way this script talks to a cluster.
 k() { kubectl --context "${KUBE_CONTEXT}" "$@"; }
 
 echo "🔐 SOPS + age Setup for Flux"
@@ -44,6 +59,8 @@ check_tools() {
 }
 
 # Generate age key if it doesn't exist
+# (an existing key is replaced only after you confirm, and kept as a timestamped .bak first -
+# files encrypted for the old key need it to open).
 generate_age_key() {
     if [[ -f "${AGE_KEY_FILE}" ]]; then
         echo "⚠️  age key already exists at: ${AGE_KEY_FILE}"
@@ -77,6 +94,7 @@ generate_age_key() {
 }
 
 # Create sops-age secret in Kubernetes
+# (in KUBE_CONTEXT, from age.agekey; an existing Secret is replaced only after you confirm).
 create_k8s_secret() {
     if [[ ! -f "${AGE_KEY_FILE}" ]]; then
         echo "❌ Age key not found at: ${AGE_KEY_FILE}"
@@ -119,7 +137,7 @@ create_k8s_secret() {
         fi
     fi
 
-    # Create secret
+    # Create secret - the key is read from the file on stdin, never put on the command line.
     k create secret generic sops-age \
         --namespace=flux-system \
         --from-file=age.agekey=/dev/stdin < "${AGE_KEY_FILE}"
@@ -129,6 +147,7 @@ create_k8s_secret() {
 }
 
 # Update .sops.yaml with public key
+# (prints the public key and what to put in .sops.yaml; it does not edit the file).
 update_sops_config() {
     if [[ ! -f "${AGE_KEY_FILE}" ]]; then
         echo "❌ Age key not found at: ${AGE_KEY_FILE}"
@@ -206,6 +225,7 @@ EOF
 }
 
 # Main
+# main <option> - run the steps of one option (see usage).
 main() {
     case "${1:-}" in
         --generate)

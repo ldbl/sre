@@ -24,6 +24,11 @@
 #
 # The cluster: -c, else $KUBE_CONTEXT, else kind-sre-control-plane. Every kubectl call names it
 # (--context) - the pod is created and deleted there, never on the shared current context (Chapter 01).
+#
+# (Lines 2-26 above are also the --help text: usage() prints them. Keep notes for readers below.)
+# Run by hand in the labs (Chapter 00 on). Needs: kubectl and jq.
+# Changes: creates one pod in the namespace; a one-off pod is deleted at the end, a --daemon pod stays.
+# Exit code: the command's own; 124 when the pod did not finish within LAB_POD_TIMEOUT (default 120s).
 set -euo pipefail
 
 NAMESPACE=""
@@ -36,6 +41,7 @@ NAME=""
 TIMEOUT="${LAB_POD_TIMEOUT:-120}"
 CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
 
+# usage - print the header comment of this file (lines 2-26) as help, then exit 1.
 usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
 while [ $# -gt 0 ]; do
@@ -73,6 +79,7 @@ else
   CMD_JSON="$(printf '%s\0' "$@" | jq -cRs 'split("\u0000") | .[:-1]')"
 fi
 
+# Memory: request = limit when -m is given; otherwise empty, and the namespace LimitRange decides.
 RESOURCES_JSON="{}"
 if [ -n "$MEMORY" ]; then
   RESOURCES_JSON="{\"requests\": {\"memory\": \"${MEMORY}\"}, \"limits\": {\"memory\": \"${MEMORY}\"}}"
@@ -84,6 +91,9 @@ if [ ${#LABELS[@]} -gt 0 ]; then
   LABEL_JSON="$(printf '%s\0' "${LABELS[@]}" | jq -cRs 'split("\u0000") | .[:-1] | map(capture("^(?<k>[^=]+)=(?<v>.*)$") | {(.k): .v}) | add // {}')"
 fi
 
+# The pod spec kubectl run cannot express with flags: everything Pod Security "restricted" requires
+# (non-root user, no privilege escalation, no capabilities, RuntimeDefault seccomp) plus a read-only
+# root filesystem with a writable /tmp.
 OVERRIDES="$(cat <<JSON
 {
   "metadata": {"labels": ${LABEL_JSON}},
@@ -116,12 +126,14 @@ JSON
 
 k -n "$NAMESPACE" run "$NAME" --image="$IMAGE" --restart=Never --overrides="$OVERRIDES" >/dev/null
 
+# --daemon: wait until the pod is Ready and print its name, for kubectl exec.
 if [ "$DAEMON" -eq 1 ]; then
   k -n "$NAMESPACE" wait --for=condition=Ready "pod/$NAME" --timeout="${TIMEOUT}s" >/dev/null
   echo "$NAME"
   exit 0
 fi
 
+# One-off: poll once a second until the pod has finished (Succeeded or Failed), up to TIMEOUT.
 phase=""
 for _ in $(seq 1 "$TIMEOUT"); do
   phase="$(k -n "$NAMESPACE" get pod "$NAME" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
@@ -129,6 +141,7 @@ for _ in $(seq 1 "$TIMEOUT"); do
   sleep 1
 done
 
+# Print the output, keep the container's exit code, then delete the pod (without waiting for it).
 k -n "$NAMESPACE" logs "$NAME" 2>/dev/null || true
 exit_code="$(k -n "$NAMESPACE" get pod "$NAME" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo 1)"
 k -n "$NAMESPACE" delete pod "$NAME" --wait=false >/dev/null 2>&1 || true

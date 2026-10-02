@@ -11,7 +11,10 @@
 # A broken input (a failed kustomize build, a missing or duplicate HPA, a missing request/limit)
 # stops the run at once with a message; rule violations are collected and reported together.
 #
-# Runs in pre-commit and in the Flux Diff workflow. Needs kustomize and yq (v4).
+# Runs in pre-commit and in the Flux Diff workflow. Needs kubectl (for `kubectl kustomize`) and yq (v4).
+# Usage: scripts/check-app-resources.sh   (no arguments - it renders every app, CNPG and quota overlay)
+# Read-only: it changes no file and no cluster; it prints the worst case per namespace and exits 1
+# on any problem.
 set -euo pipefail
 # set -e also inside $(...) (bash >= 4.4); macOS /bin/bash 3.2 lacks it, the explicit checks still catch errors
 shopt -s inherit_errexit 2>/dev/null || true
@@ -19,7 +22,7 @@ shopt -s inherit_errexit 2>/dev/null || true
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-for tool in kustomize yq; do
+for tool in kubectl yq; do
   command -v "${tool}" >/dev/null || { echo "check-app-resources: ${tool} is required" >&2; exit 1; }
 done
 
@@ -27,8 +30,10 @@ envs=(develop staging production)
 apps=(backend frontend)
 failures=()
 
+# die MESSAGE - stop at once: used for broken input, not for rule violations.
 die() { echo "check-app-resources: $*" >&2; exit 1; }
 
+# app_overlay APP ENV -> the overlay directory (the frontend keeps its overlays one level deeper).
 app_overlay() { # app env
   if [[ "$1" == frontend ]]; then echo "flux/apps/frontend/overlays/$2"; else echo "flux/apps/$1/$2"; fi
 }
@@ -39,7 +44,7 @@ yqs() { yq -N "$1" | sed -e '/^$/d' -e '/^---$/d'; }
 
 # kustomize build, failing loudly. Callers assign with a plain `var="$(render ...)"` so that
 # `set -e` stops the script when the build fails (a `local` or a here-string would hide it).
-render() { kustomize build "$1" || die "kustomize build $1 failed"; }
+render() { kubectl kustomize "$1" || die "kustomize build $1 failed"; }
 
 # CPU quantity -> millicores ("250m" -> 250, "1" -> 1000, "0.5" -> 500); anything else stops the run
 to_milli() {
@@ -112,9 +117,12 @@ worst_case_pods() {
   echo $((max + surge))
 }
 
+# Names of the four numbers pod_resources returns, in the same order - for the messages.
 labels=("requests.cpu (m)" "requests.memory (Mi)" "limits.cpu (m)" "limits.memory (Mi)")
 
 # Render every app overlay once; the checks below reuse it.
+# declare_render NAME VALUE / get_render APP ENV - store and read a render in a variable named
+# render_<app>_<env> (bash 3.2 has no associative arrays).
 declare_render() { printf -v "$1" '%s' "$2"; }
 for app in "${apps[@]}"; do
   for env in "${envs[@]}"; do
@@ -139,7 +147,8 @@ for app in "${apps[@]}"; do
   done
 done
 
-# 3: quota budget per namespace
+# 3: quota budget per namespace - add up the worst case of every app and Postgres, then compare
+# it with the namespace's ResourceQuota.
 for env in "${envs[@]}"; do
   need=(0 0 0 0)
   need_pods=0
@@ -154,6 +163,7 @@ for env in "${envs[@]}"; do
     breakdown+=("${app} ${pods}x")
   done
 
+  # Postgres: every CNPG instance is one more pod with the Cluster's resources.
   cnpg="$(render "flux/infrastructure/data/cnpg-clusters/${env}")"
   instances="$(yqs 'select(.kind == "Cluster") | .spec.instances' <<<"${cnpg}")"
   [[ "${instances}" =~ ^[1-9][0-9]*$ ]] || die "cnpg ${env}: expected one Cluster with a positive spec.instances, got '${instances}'"
@@ -165,6 +175,7 @@ for env in "${envs[@]}"; do
   need_pods=$((need_pods + instances))
   breakdown+=("postgres ${instances}x")
 
+  # What the namespace allows: the ResourceQuota's hard limits.
   quota="$(render "flux/infrastructure/resource-management/${env}")"
   IFS=$'\t' read -r qrc qrm qlc qlm <<<"$(yqs 'select(.kind == "ResourceQuota") | .spec.hard | [."requests.cpu", ."requests.memory", ."limits.cpu", ."limits.memory"] | @tsv' <<<"${quota}")"
   have=()

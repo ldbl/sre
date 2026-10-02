@@ -2,6 +2,18 @@
 
 # Load sensitive env vars from .env.local and SSH keys (without storing secrets in git).
 # Usage: source ./load-env.sh
+#
+# For the Hetzner (Cloud track) Terraform run from a workstation. The secrets live in .env.local
+# next to this script (git-ignored); this file turns them into the variables the tools read:
+#   - TF_VAR_* for the hcloud_cluster module (Hetzner token, GHCR and Flux Git tokens, backup keys,
+#     the SOPS age key read from ~/.ssh/age.agekey, the node SSH public key from ~/.ssh);
+#   - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY from the R2 keys, for the Terraform state backend.
+# It also adds the node SSH private key to ssh-agent, because kube-hetzner signs in to the nodes
+# through the agent. The local kind cluster needs none of this.
+#
+# It must be sourced, not run: exported variables only reach the shell that sources the file.
+# Works in bash and zsh. Needs: .env.local, ssh-add/ssh-keygen. Changes: variables in your shell,
+# keys in your ssh-agent; no files, no cluster.
 
 # Detect if the script is sourced (bash/zsh) so we can avoid closing the shell.
 sourced=0
@@ -15,6 +27,8 @@ if [ "${sourced}" -eq 0 ]; then
   echo "Warning: script not sourced; exports won't persist. Use: source ./load-env.sh"
 fi
 
+# die <message> - print the message and stop: `return` when sourced (exit would close your
+# terminal), `exit` when run as a script.
 die() {
   echo "$1"
   if [ "${sourced}" -eq 1 ]; then
@@ -53,6 +67,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   die "Aborting: ${ENV_FILE} not found."
 fi
 
+# set -a exports every variable the file defines, so .env.local can be plain KEY=value lines.
 set -a
 # shellcheck source=/dev/null
 source "${ENV_FILE}"
@@ -81,6 +96,7 @@ export TF_VAR_uptrace_dsn="${UPTRACE_DSN:-}"
 export TF_VAR_cloudflare_api_token="${CLOUDFLARE_API_TOKEN:-}"
 export TF_VAR_cloudflare_account_id="${CLOUDFLARE_ACCOUNT_ID:-}"
 
+# Only the AGE-SECRET-KEY-... line of the key file: the file also holds comment lines.
 if [[ -f "${AGE_PRIV_KEY}" ]]; then
   TF_VAR_sops_age_key="$(grep -o 'AGE-SECRET-KEY-[a-zA-Z0-9]*' "${AGE_PRIV_KEY}")"
   export TF_VAR_sops_age_key
@@ -98,6 +114,8 @@ fi
 
 # The node private key is never a Terraform variable (it would land in the plan and the state):
 # kube-hetzner signs in through ssh-agent, so load the key there once.
+# Add the key only when its fingerprint is not in the agent yet, so sourcing twice does not ask
+# for the passphrase again.
 if [[ -f "${SSH_PRIV_PATH}" ]]; then
   if ! ssh-add -l 2>/dev/null | grep -qF "$(ssh-keygen -lf "${SSH_PUB_PATH}" | awk '{print $2}')"; then
     ssh-add "${SSH_PRIV_PATH}" || die "Could not add ${SSH_PRIV_PATH} to ssh-agent - Terraform cannot reach the nodes"

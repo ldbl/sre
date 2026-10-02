@@ -8,6 +8,13 @@
 # pod, and it must never land on whatever the shared current context is (Chapter 01).
 # Exit codes: 0 = all pass, 1 = one or more failures, 2 = no or unknown context
 # Output: TAP-like format (test name + pass/fail)
+#
+# Usage: make smoke-test   (or KUBE_CONTEXT=<context> bash tests/smoke-test.sh)
+# Runs by hand as the baseline check of every chapter (Chapter 00), and in the Hetzner e2e workflow
+# with KUBE_CONTEXT=hetzner-sre-control-plane.
+# What it checks: Flux, the backend and frontend in develop, a request to the backend, the generated
+# secrets, cert-manager Certificates and the CNPG clusters. It changes nothing in the cluster except
+# one short-lived probe pod (smoke-curl-<time>-<random> in develop), which it deletes again.
 set -Eeuo pipefail
 
 KUBE_CONTEXT="${KUBE_CONTEXT:-}"
@@ -23,6 +30,7 @@ export KUBE_CONTEXT
 echo "# cluster: $KUBE_CONTEXT"
 
 # The only way this script talks to a cluster.
+# k / f ARGS... - kubectl / flux against KUBE_CONTEXT.
 k() { kubectl --context "$KUBE_CONTEXT" "$@"; }
 f() { flux --context "$KUBE_CONTEXT" "$@"; }
 
@@ -30,6 +38,7 @@ PASS=0
 FAIL=0
 TOTAL=0
 
+# pass NAME / fail NAME - count the result and print one TAP line.
 pass() {
   TOTAL=$((TOTAL + 1))
   PASS=$((PASS + 1))
@@ -42,6 +51,7 @@ fail() {
   echo "not ok $TOTAL - $1"
 }
 
+# run_test NAME COMMAND... - run the command quietly; exit 0 is a pass, anything else a fail.
 run_test() {
   local name="$1"
   shift
@@ -71,9 +81,11 @@ done
 # and Traefik may reach the backend) and a restricted-PSS-compliant spec.
 # No `--rm -i`: attaching to a pod that exits in <1s races and reports a
 # timeout; create it, wait for completion, read the exit status, delete it.
+# smoke_curl - true when the probe pod's curl to the backend's /healthz succeeded (waits up to 60s).
+# The pod gets a unique name, so two runs never collide and no pod of anyone else is deleted.
 smoke_curl() {
-  local ns="develop" pod="smoke-curl"
-  k -n "$ns" delete pod "$pod" --ignore-not-found --wait=true >/dev/null 2>&1
+  local ns="develop" pod
+  pod="smoke-curl-$(date +%s)-$RANDOM"
   k run "$pod" --image=curlimages/curl --labels=app=frontend --restart=Never -n "$ns" \
     --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl","command":["curl","-sf","-m","10","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
   local phase=""

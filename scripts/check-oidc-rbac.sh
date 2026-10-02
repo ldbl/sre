@@ -11,22 +11,27 @@
 #   - a role that may patch Kustomizations/HelmReleases comes with the field-limiting admission
 #     policy oidc-flux-operator-fields in Deny (RBAC alone would allow spec.sourceRef/patches/values)
 #
-# Runs in pre-commit (rbac/ and dex/) and in the Flux Diff workflow. Needs kustomize and yq (v4).
+# Runs in pre-commit (rbac/ and dex/) and in the Flux Diff workflow. Needs kubectl (for `kubectl kustomize`) and yq (v4).
+# Usage: scripts/check-oidc-rbac.sh   (no arguments)
+# Read-only: it renders the RBAC folder and reads the Dex HelmRelease; it changes no file and no
+# cluster. All rule violations are printed together; exit 1 when there is at least one.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-for tool in kustomize yq; do
+for tool in kubectl yq; do
   command -v "${tool}" >/dev/null || { echo "check-oidc-rbac: ${tool} is required" >&2; exit 1; }
 done
 
 rbac_dir=flux/infrastructure/security/rbac
 dex_release=flux/infrastructure/security/dex/release.yaml
+# The only groups that may log in, as Dex sends them ("org:team"), sorted - compared as one string.
 allowed_groups="safeops-course:admins
 safeops-course:members"
 failures=()
 
+# die MESSAGE - stop at once: the input could not be read, so no verdict is possible.
 die() {
   echo "check-oidc-rbac: $*" >&2
   exit 1
@@ -34,13 +39,16 @@ die() {
 
 # Every query is a plain assignment so a yq/kustomize failure stops the script instead of
 # feeding an empty list to a loop and printing OK.
-rendered="$(kustomize build "${rbac_dir}")" || die "kustomize build ${rbac_dir} failed"
+rendered="$(kubectl kustomize "${rbac_dir}")" || die "kustomize build ${rbac_dir} failed"
 
+# The teams the Dex GitHub connector lets in, as "org:team" - the group names the API server sees.
 # shellcheck disable=SC2016 # $org is a yq variable, not shell
 dex_groups="$(yq -N '.spec.values.config.connectors[] | select(.type == "github") | .config.orgs[]
   | .name as $org | .teams[] | $org + ":" + .' "${dex_release}")" || die "cannot read the Dex teams from ${dex_release}"
 dex_groups="$(sort <<<"${dex_groups}")"
 
+# Collect the facts the rules below judge: Group subjects, write bindings outside develop,
+# roles with sensitive grants, roles that may write Flux objects, and the field-limiting policy.
 group_subjects="$(yq -N '.subjects[]? | select(.kind == "Group") | .name' <<<"${rendered}")" \
   || die "cannot read the Group subjects"
 

@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
+# guard-terraform-plan.sh - "plan, read, apply that plan, soon" made mechanical (Chapter 02).
+#
+#   plan  - terraform init + plan -out <planfile>, and a <planfile>.meta file with the time the
+#           plan was made.
+#   apply - refuses without the plan file and its metadata, or when the plan is older than
+#           --max-age-minutes (default 120). Otherwise applies exactly that plan file, then deletes
+#           it and its metadata: the plan is spent and holds sensitive values in plain text.
+#           A refused or failed apply keeps both.
+#
+# It does not know whether anyone read the plan, and editing the .meta file fools it: on a
+# workstation it is a seatbelt, not a lock. CI enforces the same rule with a hash and age check.
+#
+# Runs from the Makefiles (make kind-plan / kind-apply, hcloud-plan / hcloud-apply, and the
+# per-module make plan / make apply) and by hand. Needs: terraform.
+# Changes: the Terraform state and infrastructure (apply), the plan and .meta files in --dir.
 set -euo pipefail
 
+# usage - print the help text.
 usage() {
   cat <<'EOF'
 usage:
@@ -34,6 +50,7 @@ WORKDIR=""
 PLAN_FILE="tfplan"
 MAX_AGE_MINUTES="120"
 
+# Parse the options after the mode.
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dir)
@@ -90,6 +107,8 @@ case "${MODE}" in
   plan)
     terraform -chdir="${WORKDIR}" init -input=false
     terraform -chdir="${WORKDIR}" plan -input=false -lock-timeout=5m -out "${PLAN_FILE}"
+    # The metadata the apply step reads, as key=value data: when the plan was made, for which
+    # directory and plan file.
     {
       echo "created_at_epoch=$(date +%s)"
       echo "workdir=${WORKDIR}"

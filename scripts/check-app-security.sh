@@ -12,16 +12,20 @@
 #   - a Deployment targeted by an HPA sets no spec.replicas (the HPA owns the count; a value in Git
 #     makes Flux reset what the HPA scaled on every reconcile)
 #
-# Runs in pre-commit (flux/apps/**) and in the Flux Diff workflow. Needs kustomize and yq (v4).
+# Runs in pre-commit (flux/apps/**) and in the Flux Diff workflow. Needs kubectl (for `kubectl kustomize`) and yq (v4).
+# Usage: scripts/check-app-security.sh   (no arguments - it always checks all six overlays)
+# Read-only: it renders the overlays locally and changes no file and no cluster. Every problem is
+# collected first and printed together; exit 1 when there is at least one.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
-for tool in kustomize yq; do
+for tool in kubectl yq; do
   command -v "${tool}" >/dev/null || { echo "check-app-security: ${tool} is required" >&2; exit 1; }
 done
 
+# The overlays Flux deploys: one per app and environment.
 overlays=(
   flux/apps/backend/develop
   flux/apps/backend/staging
@@ -50,11 +54,14 @@ backend_env() {
 }
 
 for overlay in "${overlays[@]}"; do
-  if ! rendered="$(kustomize build "${overlay}" 2>&1)"; then
+  # Render the overlay exactly as Flux would build it; every rule below reads this output.
+  if ! rendered="$(kubectl kustomize "${overlay}" 2>&1)"; then
     failures+=("${overlay}: kustomize build failed: ${rendered}")
     continue
   fi
 
+  # Rule: automountServiceAccountToken: false on every Deployment - and count the Deployments,
+  # so an overlay that renders none fails instead of passing with nothing checked.
   deployments=0
   while IFS=$'\t' read -r name automount; do
     [[ -z "${name}" ]] && continue
@@ -92,6 +99,7 @@ for overlay in "${overlays[@]}"; do
          (.securityContext.seccompProfile.type | tostring), ($pod.securityContext.seccompProfile.type | tostring)]
       | @tsv' <<<"${rendered}")
 
+  # Rule: for every Deployment an HPA scales, no spec.replicas in Git.
   while IFS= read -r target; do
     [[ -z "${target}" ]] && continue
     replicas="$(yq "select(.kind == \"Deployment\" and .metadata.name == \"${target}\") | .spec.replicas" <<<"${rendered}")"
@@ -100,6 +108,7 @@ for overlay in "${overlays[@]}"; do
     fi
   done < <(yq 'select(.kind == "HorizontalPodAutoscaler" and .spec.scaleTargetRef.kind == "Deployment") | .spec.scaleTargetRef.name' <<<"${rendered}")
 
+  # Rules for the backend only: PPROF_ENABLED off, CHAOS_ENABLED as expected for the environment.
   if [[ "${overlay}" == flux/apps/backend/* ]]; then
     pprof="$(backend_env "${rendered}" PPROF_ENABLED)"
     chaos="$(backend_env "${rendered}" CHAOS_ENABLED)"
