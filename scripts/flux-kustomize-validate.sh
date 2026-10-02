@@ -119,8 +119,15 @@ ensure_flux_schemas() {
 
 # Candidate directories are collected in a list and de-duplicated with sort -u.
 # Plain lists, not associative arrays or readarray: macOS ships bash 3.2, which has neither.
+# Every list is a temporary file, and every command that fills one is checked: a `< <(cmd)`
+# process substitution would hide a failing find or sort, and the hook would quietly validate less.
 DIR_LIST="$(mktemp)"
-trap 'rm -f "${DIR_LIST}"' EXIT
+FOUND="$(mktemp)"
+SORTED="$(mktemp)"
+trap 'rm -f "${DIR_LIST}" "${FOUND}" "${SORTED}"' EXIT
+
+# fail <message> - print the message and stop the hook.
+fail() { echo "[flux-validate] $1" >&2; exit 1; }
 
 # add_kustomize_parents <path> - list every directory from <path> up to the repository root that
 # holds a kustomization: a change to one file can break each of them.
@@ -161,9 +168,11 @@ if [[ $# -gt 0 ]]; then
     fi
   done
 else
+  find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0 > "${FOUND}" \
+    || fail "find of the kustomizations under flux/ failed"
   while IFS= read -r -d '' kfile; do
     dirname "${kfile}" >> "${DIR_LIST}"
-  done < <(find "${FLUX_ROOT}" -type f \( -name 'kustomization.yaml' -o -name 'kustomization.yml' \) -print0)
+  done < "${FOUND}"
 fi
 
 if [[ ! -s "${DIR_LIST}" ]]; then
@@ -172,7 +181,8 @@ if [[ ! -s "${DIR_LIST}" ]]; then
 fi
 
 TARGET_DIRS=()
-while IFS= read -r d; do TARGET_DIRS+=("${d}"); done < <(sort -u "${DIR_LIST}")
+sort -u "${DIR_LIST}" > "${SORTED}" || fail "sort of the kustomization list failed"
+while IFS= read -r d; do TARGET_DIRS+=("${d}"); done < "${SORTED}"
 
 if [[ ${#TARGET_DIRS[@]} -eq 0 ]]; then
   echo "[flux-validate] No kustomizations affected."
