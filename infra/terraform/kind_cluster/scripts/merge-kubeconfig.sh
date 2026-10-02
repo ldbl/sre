@@ -16,8 +16,10 @@ DEFAULT_KCFG="$HOME/.kube/config"
 mkdir -p "$HOME/.kube"
 TMP_MERGE="$(mktemp)"
 if [[ -f "$DEFAULT_KCFG" ]]; then
-  # Work on a copy, so a failure halfway never leaves ~/.kube/config half-edited.
-  TMP_OLD="$(mktemp)"
+  # Work on a copy, so a failure halfway never leaves ~/.kube/config half-edited. The copy sits next
+  # to the original: kubectl resolves relative certificate and key paths from the file's directory.
+  TMP_OLD="$(mktemp "$HOME/.kube/config.merge.XXXXXX")"
+  trap 'rm -f "$TMP_OLD" "$TMP_MERGE"' EXIT
   cp "$DEFAULT_KCFG" "$TMP_OLD"
   names() { kubectl config view --kubeconfig "$NEW_KCFG" -o jsonpath="$1" | tr ' ' '\n' | sed '/^$/d'; }
   existing() { kubectl config view --kubeconfig "$TMP_OLD" -o jsonpath="$1" | tr ' ' '\n'; }

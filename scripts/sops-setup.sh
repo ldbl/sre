@@ -233,14 +233,26 @@ main() {
             else
                 echo "🔑 Using existing key: ${AGE_KEY_FILE}"
             fi
-            update_local_sops_rule
-            # infra/terraform/kind_cluster already created sops-age from this
-            # key file; only create it when it is missing (no prompts - this
-            # runs inside course labs and CI).
+            # The cluster side first: .sops.yaml is changed only once the cluster is known to hold
+            # this key, so a failure here leaves the configuration untouched.
+            # infra/terraform/kind_cluster already created sops-age from this key file; only create
+            # it when it is missing (no prompts - this runs inside course labs and CI).
             if k -n flux-system get secret sops-age &> /dev/null; then
                 # Present is not enough: it must hold THIS key, or Flux cannot decrypt what you encrypt.
-                if k -n flux-system get secret sops-age -o jsonpath='{.data.age\.agekey}' | base64 -d \
-                    | cmp -s - "${AGE_KEY_FILE}"; then
+                # Each step is checked on its own, so a read error is never mistaken for a mismatch.
+                if ! encoded="$(k -n flux-system get secret sops-age -o jsonpath='{.data.age\.agekey}')"; then
+                    echo "❌ could not read the sops-age secret in ${KUBE_CONTEXT}"
+                    exit 1
+                fi
+                if [[ -z "${encoded}" ]]; then
+                    echo "❌ the sops-age secret in ${KUBE_CONTEXT} has no age.agekey field"
+                    exit 1
+                fi
+                if ! printf '%s' "${encoded}" | base64 -d > /dev/null 2>&1; then
+                    echo "❌ the age.agekey field of sops-age in ${KUBE_CONTEXT} is not valid base64"
+                    exit 1
+                fi
+                if printf '%s' "${encoded}" | base64 -d | cmp -s - "${AGE_KEY_FILE}"; then
                     echo "✅ sops-age secret in ${KUBE_CONTEXT} holds this key (created by Terraform)"
                 else
                     echo "❌ sops-age secret in ${KUBE_CONTEXT} holds a DIFFERENT key than ${AGE_KEY_FILE}"
@@ -251,6 +263,7 @@ main() {
             else
                 create_k8s_secret
             fi
+            update_local_sops_rule
             ;;
         -h|--help)
             usage

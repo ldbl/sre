@@ -30,7 +30,8 @@ destroy: ## Destroy cluster: delete the kind cluster, prove it is gone, then emp
 	else \
 		echo "    no kind cluster $(CLUSTER_NAME) - nothing to delete"; \
 	fi; \
-	if kind get clusters 2>/dev/null | grep -qx '$(CLUSTER_NAME)'; then \
+	clusters="$$(kind get clusters 2>/dev/null)" || { echo "ERROR: 'kind get clusters' failed after the delete - cannot prove the cluster is gone, the state is kept."; exit 1; }; \
+	if printf '%s\n' "$$clusters" | grep -qx '$(CLUSTER_NAME)'; then \
 		echo "ERROR: kind cluster $(CLUSTER_NAME) still exists - the state is kept."; exit 1; \
 	fi
 	@echo "==> Cleaning up Terraform state..."
