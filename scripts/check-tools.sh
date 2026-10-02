@@ -60,8 +60,6 @@ hint() {
     make:*)            echo "apt install build-essential" ;;
     jq:Darwin)         echo "brew install jq  | https://jqlang.org/download/" ;;
     jq:*)              echo "apt install jq  | https://jqlang.org/download/" ;;
-    python3:Darwin)    echo "xcode-select --install or brew install python  | https://www.python.org/downloads/" ;;
-    python3:*)         echo "apt install python3" ;;
     *)                 echo "" ;;
   esac
 }
@@ -110,8 +108,7 @@ check sops       ""               "sops --version"
 check age-keygen ""               "age-keygen --version"
 check pre-commit ""               "pre-commit --version"
 check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
-check jq         ""               "jq --version"        # the AI agent's kube-context hook reads the command with jq (Chapter 01)
-check python3    ""               "python3 --version"   # scripts/lab-pod.sh builds the pod spec with it
+check jq         ""               "jq --version"        # the AI agent's kube-context hook (Chapter 01) and scripts/lab-pod.sh
 
 # Docker must not only be installed but running - the kind nodes are containers.
 if command -v docker >/dev/null 2>&1; then
