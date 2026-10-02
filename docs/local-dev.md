@@ -33,7 +33,7 @@ Images are pulled from `ghcr.io/safeops-course/*`; no registry credentials are n
 - `curl`, `tar`, and `unzip` available on your workstation
 - Go 1.24+ and Node.js 20+ with npm for backend/frontend development
 - `make` (GNU make recommended)
-- Terraform 1.11+, `kubectl`, `pre-commit` and `checkov` (the Terraform security hook fails without it) - `make check-tools` checks that every tool is installed, and its minimum version where one is set (checkov: installed, any version)
+- Terraform 1.11+, `kubectl`, `pre-commit`, `checkov` (the Terraform security hook fails without it) and `jq` (the AI agent's kube-context hook, Chapter 01) - `make check-tools` checks that every tool is installed, and its minimum version where one is set (checkov: installed, any version)
 
 ## Provision the Cluster with Terraform
 Use the Terraform module under `infra/terraform/kind_cluster/` to create (or destroy) the local kind cluster. The module codifies the multi-node topology directly in Terraform, automatically merges the generated kubeconfig into `~/.kube/config`, and bootstraps Flux via Flux Operator + `FluxInstance`.
