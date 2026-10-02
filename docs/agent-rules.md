@@ -69,3 +69,18 @@ value, stay out of both. The agent proposes and plans; a person reads the plan a
 | Never commit, paste or upload a state or a plan file (`*.tfstate*`, `tfplan`, `tfplan.meta`, `*.tfplan`). | `.gitignore`, and the `no-secrets` pre-commit hook plus the Secrets guard CI job refuse them even when added with `git add -f`. Pasting into a chat: instruction only. |
 | A plan that destroys or replaces something holding data, or creates something that should already exist: stop and report, do not apply. | Instruction only - the person reading the plan is the check. |
 | Check drift before and after a change (`make kind-drift`). Exit `2` with no code change is drift: report it, do not "fix" it by applying. | Instruction only. |
+
+## Chapter 04 - Secrets stay encrypted in Git, and a leaked one is burned
+
+SOPS encrypts the values of a Secret before they are committed; Flux decrypts them in the cluster with
+the key in `flux-system/sops-age`. Encrypting needs only the public key in `.sops.yaml`; decrypting
+needs the private key (`age.agekey` on kind). A value that was ever pushed in plaintext is public -
+rewriting history does not take it back, only replacing it at its source does.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| A new secret is created only with `scripts/sops-encrypt-secret.sh` (or `sops edit` for an existing file) - never written as plaintext, never added to an encrypted file with a text editor. | The `sops-encrypted` pre-commit hook and the Secrets guard CI job refuse a file under `flux/secrets/` without SOPS metadata or with a plaintext value. The hook runs before the push; CI only before the merge - a pushed branch is already public. |
+| Never commit with `--no-verify`. | Instruction only - CI repeats the checks, but after the push. |
+| Never read, print, copy or commit a private key (`*.agekey`), and never print decrypted values (`sops -d`, `kubectl get secret -o yaml`) into a chat or a log. | Committing: `.gitignore`, plus the `no-secrets` hook and the Secrets guard CI job (`*.agekey`). Reading and printing: instruction only. |
+| Never create, edit or delete `flux-system/sops-age` with `kubectl`; a key change goes through `make kind-plan`, read by a person, then `make kind-apply`. | Instruction only on kind. On Hetzner the OIDC roles cannot write Secrets in `flux-system`; Terraform owns the object. |
+| A value that may have leaked: stop and report. Revoking it at its source and replacing it is a person's decision. | Instruction only. |
