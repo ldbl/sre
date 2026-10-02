@@ -58,6 +58,8 @@ hint() {
     git:*)             echo "apt install git" ;;
     make:Darwin)       echo "xcode-select --install" ;;
     make:*)            echo "apt install build-essential" ;;
+    jq:Darwin)         echo "brew install jq  | https://jqlang.org/download/" ;;
+    jq:*)              echo "apt install jq  | https://jqlang.org/download/" ;;
     *)                 echo "" ;;
   esac
 }
@@ -100,6 +102,7 @@ check sops       ""               "sops --version"
 check age-keygen ""               "age-keygen --version"
 check pre-commit ""               "pre-commit --version"
 check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
+check jq         ""               "jq --version"        # the AI agent's kube-context hook reads the command with jq (Chapter 01)
 
 # Docker must not only be installed but running - the kind nodes are containers.
 if command -v docker >/dev/null 2>&1; then
