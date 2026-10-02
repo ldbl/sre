@@ -154,7 +154,13 @@ update_sops_config() {
         exit 1
     fi
 
-    PUBLIC_KEY=$(grep "# public key:" "${AGE_KEY_FILE}" | cut -d: -f2 | tr -d ' ')
+    # The public half of the FIRST key in the file - the one new secrets are encrypted for. During a
+    # key rotation (Chapter 04) the file holds two keys, the new one first and the old one second, so
+    # the cluster can still open the files that are not re-encrypted yet.
+    if ! PUBLIC_KEY=$(age-keygen -y "${AGE_KEY_FILE}" | head -n 1) || [[ "${PUBLIC_KEY}" != age1* ]]; then
+        echo "❌ could not read a public key from ${AGE_KEY_FILE}"
+        exit 1
+    fi
     SOPS_CONFIG="${REPO_ROOT}/.sops.yaml"
 
     echo "📝 Update .sops.yaml with public key:"
@@ -173,7 +179,13 @@ update_local_sops_rule() {
         echo "❌ Age key not found at: ${AGE_KEY_FILE}"
         exit 1
     fi
-    PUBLIC_KEY=$(grep "# public key:" "${AGE_KEY_FILE}" | cut -d: -f2 | tr -d ' ')
+    # The public half of the FIRST key in the file - the one new secrets are encrypted for. During a
+    # key rotation (Chapter 04) the file holds two keys, the new one first and the old one second, so
+    # the cluster can still open the files that are not re-encrypted yet.
+    if ! PUBLIC_KEY=$(age-keygen -y "${AGE_KEY_FILE}" | head -n 1) || [[ "${PUBLIC_KEY}" != age1* ]]; then
+        echo "❌ could not read a public key from ${AGE_KEY_FILE}"
+        exit 1
+    fi
     SOPS_CONFIG="${REPO_ROOT}/.sops.yaml"
 
     if ! grep -q "path_regex: flux/secrets/local/" "${SOPS_CONFIG}"; then
@@ -276,8 +288,8 @@ main() {
                     echo "✅ sops-age secret in ${KUBE_CONTEXT} holds this key (created by Terraform)"
                 else
                     echo "❌ sops-age secret in ${KUBE_CONTEXT} holds a DIFFERENT key than ${AGE_KEY_FILE}"
-                    echo "   Flux could not decrypt what you encrypt now. Rebuild the cluster with this key"
-                    echo "   (Chapter 00, Tear Down and Rebuild), or replace the secret: $0 --create-secret"
+                    echo "   Flux could not decrypt what you encrypt now. Changed the key file (a rotation)?"
+                    echo "   Send it to the cluster: make kind-plan, read the plan, make kind-apply."
                     exit 1
                 fi
             else

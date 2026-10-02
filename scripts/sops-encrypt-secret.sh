@@ -17,6 +17,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# Encrypting needs only the public key from .sops.yaml; editing an existing file decrypts it first and
+# needs the private key. sops looks for it in SOPS_AGE_KEY_FILE - default to the repository's own
+# age.agekey (the kind key), unless you point it elsewhere.
+if [[ -z "${SOPS_AGE_KEY_FILE:-}" && -f "${REPO_ROOT}/age.agekey" ]]; then
+  export SOPS_AGE_KEY_FILE="${REPO_ROOT}/age.agekey"
+fi
+
 # usage - print the arguments, examples and workflow.
 usage() {
   cat <<EOF
@@ -146,10 +153,9 @@ EOF
   echo "✅ Encrypted secret created: ${output_file}"
   echo
   echo "Next steps:"
-  echo "  1. Add to kustomization: edit ${secrets_dir}/kustomization.yaml"
-  echo "  2. Uncomment: # - ${secret_name}.yaml"
-  echo "  3. Commit: git add ${output_file} && git commit -m 'Add ${secret_name} for ${env}'"
-  echo "  4. Push: git push"
+  echo "  1. List it under resources: in ${secrets_dir}/kustomization.yaml:  - ${secret_name}.yaml"
+  echo "  2. Commit both: git add ${output_file} ${secrets_dir}/kustomization.yaml && git commit -m 'Add ${secret_name} for ${env}'"
+  echo "  3. Push: git push"
 }
 
 # Main

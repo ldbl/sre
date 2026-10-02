@@ -91,7 +91,7 @@ variable "sops_age_key" {
 }
 
 variable "sops_age_key_revision" {
-  description = "Bump after rotating sops_age_key: the key is write-only, so Terraform re-sends it only when this number changes."
+  description = "Bump after rotating sops_age_key: the key is write-only, so Terraform re-sends it only when this number changes. Not needed for the local profile key file - a new age.agekey changes the revision by itself (see main.tf)."
   type        = number
   default     = 1
 }

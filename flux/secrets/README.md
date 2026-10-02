@@ -91,6 +91,18 @@ sops error:
 
 ## Key rotation
 
+Each file is encrypted in two layers: sops encrypts the values with a random **data key**, and
+encrypts that data key for every age recipient (the `sops:` block at the end of the file). Two
+commands work on those layers:
+
+- `sops updatekeys -y <file>` - re-encrypts the **data key** for the recipients `.sops.yaml` names
+  now. The values stay byte for byte the same, still under the old data key.
+- `sops rotate -i <file>` - a **new data key**, every value re-encrypted with it. Recipients unchanged.
+
+A rotation needs both. After `updatekeys` alone, whoever holds the old key can take an old commit,
+recover the data key from it, and read the current file - and every value `sops edit` adds later,
+because editing keeps the data key.
+
 **Routine rotation** - the old key is not known to be compromised:
 
 1. `age-keygen -o age-new.agekey` and store the private half where the old one lives (vault, the
@@ -98,12 +110,32 @@ sops error:
 2. Give the cluster **both** keys for the transition: an age key file may hold several
    `AGE-SECRET-KEY-...` lines. Pass both as `sops_age_key`, raise `sops_age_key_revision` (write-only
    values are only re-sent when the revision changes), apply.
-3. Put the new public key into `.sops.yaml`, then re-encrypt every file for it:
-   `sops updatekeys -y <file>` (`sops rotate` only renews the data key; it does not change recipients).
+3. Put the new public key into `.sops.yaml`, then for every file: `sops updatekeys -y <file>` and
+   `sops rotate -i <file>`.
 4. Commit, push, wait until every `secrets-*` Kustomization is Ready.
 5. Remove the old key from `sops_age_key`, raise the revision again, apply.
+
+**Your key on kind** - the same steps, with files instead of a vault (Chapter 04 lab):
+
+```bash
+export SOPS_AGE_KEY_FILE="$PWD/age.agekey"
+cp age.agekey age-old.agekey
+age-keygen -o age-new.agekey
+cat age-new.agekey age-old.agekey > age.agekey   # both keys, the NEW one first
+make kind-plan && make kind-apply                # read the plan: only sops-age changes
+scripts/sops-setup.sh --local                    # registers the FIRST key in .sops.yaml
+sops updatekeys -y flux/secrets/local/<file>.yaml && sops rotate -i flux/secrets/local/<file>.yaml
+git add .sops.yaml flux/secrets/local && git commit -m "rotate the kind age key" && git push
+cp age-new.agekey age.agekey && make kind-plan && make kind-apply   # the cluster drops the old key
+rm age-old.agekey age-new.agekey
+```
+
+The kind module needs no revision number: for the local profile the revision follows the key file, so
+a changed `age.agekey` is re-sent on the next apply (an in-place update of `kubernetes_secret_v1.sops_age`
+in the plan; the key itself never shows).
 
 **After a leak** of the private key, re-encrypting is not enough: anyone with the old key can still
 open every encrypted file already in the Git history. Rotate the key as above **and replace every value
 it protected** at its source (API tokens, passwords, deploy keys), then encrypt the new values. The
-platform key was rotated this way on 2026-09-26, after it leaked through a CI artifact.
+platform key was rotated this way on 2026-09-26, after it leaked through a CI artifact; every platform
+file was encrypted from scratch, so each has a new data key.
