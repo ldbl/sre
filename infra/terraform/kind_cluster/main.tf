@@ -485,7 +485,11 @@ resource "kubernetes_secret_v1" "ghcr_credentials" {
 # so it IS in the (local) state - the local provider has no ephemeral file source, and the file
 # only exists after the first apply. Acceptable for a throwaway dev key; use sops_age_key for a
 # real one.
-# After rotating sops_age_key, bump sops_age_key_revision so Terraform re-sends it.
+# Terraform re-sends a write-only value only when data_wo_revision changes. For the local profile
+# the revision follows the key file: the first 8 hex digits of its SHA-256, read as a number. A new
+# age.agekey (a rotation, Chapter 04) therefore reaches the cluster on the next apply, and the plan
+# shows it as an in-place update of this Secret - with no number to remember, and no drift on later
+# plans. For a key passed in sops_age_key, bump sops_age_key_revision after rotating it.
 resource "kubernetes_secret_v1" "sops_age" {
   depends_on = [null_resource.flux_instance, null_resource.age_key]
 
@@ -499,7 +503,7 @@ resource "kubernetes_secret_v1" "sops_age" {
   data_wo = {
     "age.agekey" = var.sops_age_key != "" ? var.sops_age_key : data.local_file.age_key[0].content
   }
-  data_wo_revision = var.sops_age_key_revision
+  data_wo_revision = var.sops_age_key_revision + (var.local_profile ? parseint(substr(sha256(data.local_file.age_key[0].content), 0, 8), 16) : 0)
 }
 
 # The secret used to be optional (count); keep the existing object instead of recreating it.
