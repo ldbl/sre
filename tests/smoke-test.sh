@@ -12,8 +12,10 @@
 # Usage: make smoke-test   (or KUBE_CONTEXT=<context> bash tests/smoke-test.sh)
 # Runs by hand as the baseline check of every chapter (Chapter 00), and in the Hetzner e2e workflow
 # with KUBE_CONTEXT=hetzner-sre-control-plane.
-# What it checks: Flux, the backend and frontend in develop, a request to the backend, the generated
-# secrets, cert-manager Certificates and the CNPG clusters. It changes nothing in the cluster except
+# What it checks: Flux (every Kustomization Ready and none suspended), the backend and frontend in
+# develop, a request to the backend, the generated secrets, cert-manager Certificates (skipped where
+# cert-manager is not installed, as on kind) and the CNPG clusters. A check that cannot read its
+# objects, or finds none, fails - an empty answer is never "all healthy". It changes nothing in the cluster except
 # one short-lived probe pod (smoke-curl-<time>-<random> in develop), which it deletes again.
 set -Eeuo pipefail
 
@@ -65,9 +67,18 @@ run_test() {
 # --- 1. Flux health ---
 run_test "Flux check passes" f check
 
-# shellcheck disable=SC2016  # the inner shell expands the exported KUBE_CONTEXT
-run_test "All Kustomizations are ready" \
-  bash -c 'kubectl --context "$KUBE_CONTEXT" get kustomizations.kustomize.toolkit.fluxcd.io -n flux-system -o jsonpath="{.items[*].status.conditions[?(@.type==\"Ready\")].status}" | tr " " "\n" | grep -v True | wc -l | grep -q "^0$"'
+# kustomizations_ready - true when the Kustomizations can be listed, there is at least one, every
+# one is Ready=True and none is suspended. A suspended one keeps showing Ready while it ignores Git
+# (Chapter 03), so Ready alone would call a stopped delivery healthy.
+kustomizations_ready() {
+  local rows
+  rows="$(k get kustomizations.kustomize.toolkit.fluxcd.io -A \
+    -o jsonpath='{range .items[*]}{.metadata.name} {.spec.suspend} {.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')" || return 1
+  [ -n "$rows" ] || return 1
+  # Every row must read "<name> <false or empty> True".
+  ! printf '%s\n' "$rows" | awk '$2 == "true" || $NF != "True" { bad = 1 } END { exit !bad }'
+}
+run_test "All Kustomizations are Ready and none is suspended" kustomizations_ready
 
 # --- 2. Core deployments available ---
 for deploy in frontend backend; do
@@ -107,14 +118,42 @@ for secret in backend-secrets app-postgres-app; do
 done
 
 # --- 5. Certificates valid ---
-# shellcheck disable=SC2016  # the inner shell expands the exported KUBE_CONTEXT
-run_test "cert-manager Certificate resources are Ready" \
-  bash -c 'kubectl --context "$KUBE_CONTEXT" get certificates -A -o jsonpath="{.items[*].status.conditions[?(@.type==\"Ready\")].status}" | tr " " "\n" | grep -v True | wc -l | grep -q "^0$"'
+# skip NAME REASON - a check that does not apply to this cluster: counted as passed, marked # SKIP.
+skip() {
+  TOTAL=$((TOTAL + 1))
+  PASS=$((PASS + 1))
+  echo "ok $TOTAL - $1 # SKIP $2"
+}
+# certificates_ready - true when the Certificates can be listed, there is at least one and every
+# one is Ready=True.
+certificates_ready() {
+  local states
+  states="$(k get certificates.cert-manager.io -A -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}')" || return 1
+  [ -n "$states" ] || return 1
+  # A here-string, not a pipe: `grep -q` stops at the first match, and with pipefail a writer killed
+  # by SIGPIPE would make the pipeline fail - which `!` would turn into "healthy".
+  ! grep -qvx True <<< "$states"
+}
+# cert-manager runs only on the Hetzner cluster (the local profile has no public address).
+# Discovery must succeed first: a failing API is a failed check, not "cert-manager is not installed".
+if ! api_resources="$(k api-resources -o name 2>/dev/null)"; then
+  fail "cert-manager Certificate resources are Ready (API discovery failed)"
+elif grep -qx 'certificates.cert-manager.io' <<< "$api_resources"; then
+  run_test "cert-manager Certificate resources are Ready" certificates_ready
+else
+  skip "cert-manager Certificate resources are Ready" "cert-manager is not installed on this cluster"
+fi
 
 # --- 6. CNPG clusters healthy ---
-# shellcheck disable=SC2016  # the inner shell expands the exported KUBE_CONTEXT
-run_test "CNPG clusters are Running" \
-  bash -c 'kubectl --context "$KUBE_CONTEXT" get clusters.postgresql.cnpg.io -A -o jsonpath="{range .items[*]}{.status.phase}{\"\\n\"}{end}" | grep -v "^Cluster in healthy state$" | grep -v "^$" | wc -l | grep -q "^0$"'
+# cnpg_healthy - true when the CNPG clusters can be listed, there is at least one and every one
+# reports "Cluster in healthy state".
+cnpg_healthy() {
+  local phases
+  phases="$(k get clusters.postgresql.cnpg.io -A -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}')" || return 1
+  [ -n "$phases" ] || return 1
+  ! grep -qvx 'Cluster in healthy state' <<< "$phases"
+}
+run_test "CNPG clusters are healthy" cnpg_healthy
 
 # --- Summary ---
 echo ""
