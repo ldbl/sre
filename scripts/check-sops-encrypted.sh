@@ -10,7 +10,8 @@
 # `git commit --no-verify` skips hooks).
 #
 # Usage: scripts/check-sops-encrypted.sh [FILE...]    # no FILE: every flux/secrets/**/*.yaml
-# Read-only: it never decrypts or changes a file - it only reads them. Needs git and awk; not sops.
+# Read-only: it never decrypts or changes a file - it only reads them, and it prints file and key names,
+# never a value. Needs git and awk; not sops. Tests: tests/check-sops-encrypted.test.sh
 
 set -Eeuo pipefail
 
@@ -47,18 +48,24 @@ for f in "${files[@]}"; do
   fi
 
   # Leaf values under the top-level data:/stringData: blocks must all be ENC[...].
-  plain=$(awk '
+  plain=$(awk -v q="'" '
     /^[^[:space:]#]/ {
-      in_block = ($0 ~ /^(data|stringData):/)
+      # YAML allows the key in quotes too: "stringData": is the same key as stringData:.
+      in_block = ($0 ~ ("^[\"" q "]?(data|stringData)[\"" q "]?:"))
       # sops never writes an inline value here (`stringData: {token: x}`) - anything after the colon
-      # other than a comment is plaintext the block scan below would not see.
-      if (in_block) { rest = $0; sub(/^[^:]+:[[:space:]]*/, "", rest); if (rest != "" && rest !~ /^#/) print "(inline " $1 " " rest ")" }
+      # other than a comment is plaintext the block scan below would not see. Only the key is
+      # reported: the value itself must never reach a log (CI logs of this repository are public).
+      if (in_block) {
+        rest = $0; sub(/^[^:]+:[[:space:]]*/, "", rest)
+        key = $0; sub(/:.*/, "", key); gsub("[\"" q "]", "", key)
+        if (rest != "" && rest !~ /^#/) print "(inline value under " key ")"
+      }
       next
     }
     in_block && /^[[:space:]]+[^[:space:]#][^:]*:/ {
       value = $0
       sub(/^[[:space:]]+[^:]+:[[:space:]]*/, "", value)
-      if (value !~ /^ENC\[/) { key = $0; sub(/:.*/, "", key); gsub(/^[[:space:]]+/, "", key); print key }
+      if (value !~ /^ENC\[/) { key = $0; sub(/:.*/, "", key); gsub(/^[[:space:]]+/, "", key); gsub("[\"" q "]", "", key); print key }
     }
   ' "$f")
   if [[ -n "$plain" ]]; then
