@@ -4,8 +4,10 @@
 # shared history and forces a force-push; a new commit on top is the safe way to fix it.
 #
 # Runs at the prepare-commit-msg stage (.pre-commit-config.yaml). Git calls that hook with
-# <message file> <source> <sha>: for an amend the source is "commit" and the sha is the commit
-# being amended.
+# <message file> <source> <sha>; through pre-commit the source and sha arrive as environment
+# variables instead (see below). For an amend the source is "commit" and the sha is the commit
+# being amended. Note: `git commit --no-verify` does not skip this stage. Tests:
+# tests/prevent-amend-after-push.test.sh
 # Usage: called by git through pre-commit, not by hand. Needs git; changes nothing.
 set -Eeuo pipefail
 
@@ -14,10 +16,14 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 git remote 2>/dev/null | grep -q . || exit 0
 git rev-parse HEAD >/dev/null 2>&1 || exit 0
 
-# Only block amend operations ($2 == "commit" in prepare-commit-msg)
-[[ "${2:-}" == "commit" ]] || exit 0
+# Only block amend operations: the message source is "commit" and the object is the commit being
+# amended. Git passes them as $2 and $3; pre-commit does not - it puts them into
+# PRE_COMMIT_COMMIT_MSG_SOURCE and PRE_COMMIT_COMMIT_OBJECT_NAME. Reading only $2 made the hook pass
+# every amend when pre-commit ran it - the way make install-hooks installs it.
+source="${PRE_COMMIT_COMMIT_MSG_SOURCE:-${2:-}}"
+[[ "${source}" == "commit" ]] || exit 0
 
-target_sha="${3:-HEAD}"
+target_sha="${PRE_COMMIT_COMMIT_OBJECT_NAME:-${3:-HEAD}}"
 
 # Any remote-tracking branch that contains the commit means it was pushed. Symbolic refs
 # ("origin/HEAD -> origin/main") are left out so the same branch is not counted twice.

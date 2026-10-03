@@ -52,6 +52,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: prevent-amend-after-push-test
+        name: amend guard tests (throw-away repository, no GitHub)
+        entry: tests/prevent-amend-after-push.test.sh
+        language: script
+        files: ^(scripts/prevent-amend-after-push\.sh|tests/prevent-amend-after-push\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: check-sops-encrypted-test
         name: sops-encrypted check tests (throw-away repository, no sops)
         entry: tests/check-sops-encrypted.test.sh
