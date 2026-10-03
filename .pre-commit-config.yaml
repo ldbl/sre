@@ -52,6 +52,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: check-sops-encrypted-test
+        name: sops-encrypted check tests (throw-away repository, no sops)
+        entry: tests/check-sops-encrypted.test.sh
+        language: script
+        files: ^(scripts/check-sops-encrypted\.sh|tests/check-sops-encrypted\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh

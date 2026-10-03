@@ -103,7 +103,7 @@ A rotation needs both. After `updatekeys` alone, whoever holds the old key can t
 recover the data key from it, and read the current file - and every value `sops edit` adds later,
 because editing keeps the data key.
 
-**Routine rotation** - the old key is not known to be compromised:
+**Routine rotation** - the old key is not known to be compromised, and nobody who held it has lost the right to read the secrets (an old key, a scheduled rotation):
 
 1. `age-keygen -o age-new.agekey` and store the private half where the old one lives (vault, the
    GitHub secret `SOPS_AGE_KEY`).
@@ -135,7 +135,8 @@ a changed `age.agekey` is re-sent on the next apply (an in-place update of `kube
 in the plan; the key itself never shows).
 
 **After a leak** of the private key, re-encrypting is not enough: anyone with the old key can still
-open every encrypted file already in the Git history. Rotate the key as above **and replace every value
+open every encrypted file already in the Git history. The same holds when someone who held the key
+leaves - they keep a copy - so treat it as a leak, and also remove their own access. Rotate the key as above **and replace every value
 it protected** at its source (API tokens, passwords, deploy keys), then encrypt the new values. The
 platform key was rotated this way on 2026-09-26, after it leaked through a CI artifact; every platform
 file was encrypted from scratch, so each has a new data key.
