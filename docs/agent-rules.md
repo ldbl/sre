@@ -104,3 +104,21 @@ rewriting history does not take it back, only replacing it at its source does.
 | Never create, edit or delete `flux-system/sops-age` with `kubectl` - Terraform owns it on both clusters. On kind, a key change is `make kind-plan`, read by a person, then `make kind-apply`. | Instruction only on kind. |
 | On Hetzner, a key change is a pull request that raises the default of `sops_age_key_revision` in `infra/terraform/hcloud_cluster/variables.tf` (the key itself is the GitHub secret `SOPS_AGE_KEY`, changed by a person); the Terraform workflow plans it after the merge and applies only after a person approves that plan. | The OIDC roles cannot write Secrets in `flux-system`; the apply job waits for approval in the `production` environment and applies only the approved plan. |
 | A value that may have leaked: stop and report. Revoking it at its source and replacing it is a person's decision. | Instruction only. |
+
+## Chapter 05 - A green pull request is only as good as the checks that ran
+
+Every check runs twice: as a hook on the workstation (make install-hooks), and in CI on the pull
+request, because `git commit --no-verify` skips the first. GitHub lets a pull request merge when its
+*required* checks pass. A required check that failed, was cancelled or never started blocks the merge -
+but a job skipped by its `if:` counts as passed, and a workflow skipped by a path or branch filter
+leaves its required check waiting forever. Every other check stops nothing: cancelled, skipped or
+missing, the merge button stays green. And a Terraform apply is a deliberate, approved run, never a
+side effect of a merge.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never `git commit --no-verify`, never `git push --no-verify`, and never amend or force-push a commit that is already pushed. | Amend after push: the `prevent-amend-after-push` hook (it runs even with `--no-verify`). The checks `--no-verify` skips: the Pre-commit CI job on the pull request. Push to `main`: the pre-push branch guard and, on the platform, the ruleset. |
+| Report a pull request as ready only when every check ran and passed. A cancelled, skipped or missing check is not green - resolve it, or say which one and why, before calling the pull request ready. | Required checks of the ruleset block the merge until they pass (a job skipped by its `if:` counts as passed); every other check: instruction only. |
+| Never start a Terraform apply (Run workflow with "apply"), never approve or reject a deployment. | The environment `production` requires a person's approval; starting the run: instruction only. |
+| Never cancel or re-run someone else's workflow run, even one that blocks the queue - report it with its link. | Instruction only. |
+| Never change the ruleset, required checks, environments or repository settings. | Needs repository admin rights; for an agent with them: instruction only. |
