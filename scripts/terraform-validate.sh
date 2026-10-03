@@ -25,29 +25,43 @@ mkdir -p "${TF_PLUGIN_CACHE_DIR}"
 
 # Terraform does not guarantee that the plugin cache is safe for two inits at once (a commit hook
 # and `make validate` in another terminal). One run at a time holds a lock directory next to the
-# cache - mkdir is atomic, and unlike flock it exists on macOS and Linux. A lock older than 15
-# minutes is left over from a killed run and is taken over; otherwise wait up to 5 minutes.
+# cache: mkdir is atomic, and unlike flock it exists on macOS and Linux. The lock records the PID of
+# its owner. A lock is reclaimed only when that process no longer exists (a killed run); a live
+# owner is waited for, up to 5 minutes. On exit a run removes the lock only if it is still its own.
 lock_dir="${TF_PLUGIN_CACHE_DIR}.lock"
 lock_held=""
 waited=0
 until mkdir "${lock_dir}" 2>/dev/null; do
-  if [ -n "$(find "${lock_dir}" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then
-    echo "terraform-validate: removing a stale lock ${lock_dir}" >&2
-    rm -rf "${lock_dir}"
+  owner="$(cat "${lock_dir}/pid" 2>/dev/null || true)"
+  # No pid yet: the owner is between mkdir and writing it - wait like for any owner.
+  if [ -n "${owner}" ] && ! ps -p "${owner}" >/dev/null 2>&1; then
+    echo "terraform-validate: reclaiming the lock of a run that is gone (pid ${owner})" >&2
+    # Move it away first (atomic), so two waiting runs cannot both reclaim it.
+    if mv "${lock_dir}" "${lock_dir}.stale.$$" 2>/dev/null; then
+      rm -rf "${lock_dir}.stale.$$"
+    fi
     continue
   fi
   if [ "${waited}" -ge 300 ]; then
-    echo "terraform-validate: another run holds ${lock_dir} for 5 minutes - giving up" >&2
+    echo "terraform-validate: pid ${owner:-?} holds ${lock_dir} for 5 minutes - giving up" >&2
     exit 1
   fi
   sleep 2
   waited=$((waited + 2))
 done
+echo "$$" > "${lock_dir}/pid"
 lock_held=1
+
+# release_lock - remove the lock only if it still records this run's PID.
+release_lock() {
+  if [ -n "${lock_held}" ] && [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$$" ]; then
+    rm -rf "${lock_dir}"
+  fi
+}
 
 data_dir=""
 # On every exit: the current module's data dir (init or validate may fail) and the lock.
-trap 'if [ -n "${data_dir}" ]; then rm -rf "${data_dir}"; fi; if [ -n "${lock_held}" ]; then rmdir "${lock_dir}" 2>/dev/null || true; fi' EXIT
+trap 'if [ -n "${data_dir}" ]; then rm -rf "${data_dir}"; fi; release_lock' EXIT
 for dir in infra/terraform/kind_cluster infra/terraform/hcloud_cluster infra/terraform/state-lab; do
   echo "terraform validate: ${dir}"
   data_dir="$(mktemp -d)"
