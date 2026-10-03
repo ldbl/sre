@@ -16,6 +16,9 @@ env:
 concurrency:
   group: terraform-hcloud
   cancel-in-progress: false
+  # queue: max - runs wait in order instead of the older pending one being cancelled (the default
+  # keeps one pending run and cancels the rest - that is how PR plans were lost in Sep 2026).
+  queue: max
 
 permissions:
   contents: read

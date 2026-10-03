@@ -69,8 +69,11 @@ jobs:
           fi
           echo "result=success" >> "$GITHUB_OUTPUT"
 
+      # Only for pull requests from this repository: a fork's token is read-only, the comment would
+      # fail and turn the required check red although the validation passed. The validation above
+      # still runs - and fails - for fork pull requests.
       - name: Comment on PR
-        if: always()
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
