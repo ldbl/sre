@@ -65,6 +65,7 @@ flux/
   secrets/           # SOPS-encrypted secrets
 backend/             # Go reference service (health, metrics, chaos endpoints)
 frontend/            # Vue 3 SRE dashboard (Vite + Tailwind + nginx)
+labs/                # Lab manifests applied by hand (never by Flux), e.g. labs/network-policies (Chapter 06)
 scripts/             # Pre-commit hooks, automation scripts
   docs/                # Platform runbooks, architecture notes, and repo pointers
 ```
