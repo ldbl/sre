@@ -1,15 +1,10 @@
 name: Flux Diff
 
 on:
+  # Every pull request, without a path filter, so "validate" can be a required check: a required
+  # check that does not start on some pull requests leaves them waiting forever. It needs no secrets
+  # and takes about a minute.
   pull_request:
-    # The manifests, and everything that checks them: a change to a check must prove itself here too.
-    paths:
-      - "flux/**"
-      - "scripts/flux-kustomize-validate.sh"
-      - "scripts/check-app-security.sh"
-      - "scripts/check-app-resources.sh"
-      - "scripts/check-oidc-rbac.sh"
-      - ".github/workflows/flux-diff.yml"
 
 permissions:
   contents: read
@@ -20,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Setup Flux CLI
         # Pinned to the commit of the Flux release the platform runs (v2.9.5, as in hetzner-e2e.yml):
@@ -74,8 +69,11 @@ jobs:
           fi
           echo "result=success" >> "$GITHUB_OUTPUT"
 
+      # Only for pull requests from this repository: a fork's token is read-only, the comment would
+      # fail and turn the required check red although the validation passed. The validation above
+      # still runs - and fails - for fork pull requests.
       - name: Comment on PR
-        if: always()
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

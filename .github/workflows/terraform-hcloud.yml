@@ -8,12 +8,14 @@ name: Terraform - Hetzner
 # merge left an apply waiting, and a forgotten one held the concurrency group (and with it destroy
 # and the e2e check) for days. Changes under flux/ are delivered by Flux itself.
 # End-to-end check: hetzner-e2e.yml.
+#
+# The job "terraform-plan-gate" runs on every pull request, so it can be a required check: it passes
+# when the pull request does not touch the Hetzner Terraform, or when its plan succeeded - and fails
+# when the plan failed or was cancelled. A path filter on the workflow would leave pull requests
+# without the check, waiting forever for a required check that never starts.
 
 on:
   pull_request:
-    paths:
-      - "infra/terraform/hcloud_cluster/**"
-      - ".github/workflows/terraform-hcloud*.yml"
   push:
     branches: [main]
     paths:
@@ -30,16 +32,55 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
-concurrency:
-  group: terraform-hcloud
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
 jobs:
-  plan:
+  # Does this run concern the Hetzner Terraform? Pushes to main come here only through the path filter
+  # above and manual runs always do; a pull request does when it changes these paths.
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      terraform: ${{ steps.diff.outputs.terraform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Changed paths
+        id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "terraform=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A failing git diff must not read as "nothing changed": check it on its own.
+          if ! changed="$(git diff --name-only "$BASE_SHA"...HEAD)"; then
+            echo "::error::git diff against the base commit failed"
+            exit 1
+          fi
+          if grep -qE '^(infra/terraform/hcloud_cluster/|\.github/workflows/terraform-hcloud)' <<< "$changed"; then
+            echo "terraform=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "terraform=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  plan:
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    # Job-level, not workflow-level: a pull request without Terraform changes must not wait in the
+    # queue that the plans, the applies, the destroy and the e2e check share (never two runs on the
+    # same state).
+    concurrency:
+      group: terraform-hcloud
+      cancel-in-progress: false
+      # queue: max - runs wait in order instead of the older pending one being cancelled (the default
+      # keeps one pending run and cancels the rest - that is how PR plans were lost in Sep 2026).
+      queue: max
     env:
       # "true" only for a manual run from main with "apply" ticked - the only run that applies.
       APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply && github.ref == 'refs/heads/main' }}
@@ -54,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Setup kubectl
         run: |
@@ -62,7 +103,7 @@ jobs:
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.16.4"
           terraform_wrapper: false
@@ -191,7 +232,7 @@ jobs:
 
       - name: Upload encrypted tfplan
         if: env.APPLY == 'true' && steps.plan.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: terraform-hcloud-tfplan
           path: |
@@ -207,6 +248,12 @@ jobs:
     # Approval: the "production" environment requires a reviewer (Settings > Environments). The job
     # waits in the run page ("Review deployments") - no issue, no third-party action with a token.
     environment: production
+    concurrency:
+      group: terraform-hcloud
+      cancel-in-progress: false
+      # queue: max - runs wait in order instead of the older pending one being cancelled (the default
+      # keeps one pending run and cancels the rest - that is how PR plans were lost in Sep 2026).
+      queue: max
 
     defaults:
       run:
@@ -214,7 +261,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Setup kubectl
         run: |
@@ -222,7 +269,7 @@ jobs:
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.16.4"
 
@@ -244,7 +291,7 @@ jobs:
         run: terraform init -input=false
 
       - name: Download tfplan artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: terraform-hcloud-tfplan
           path: infra/terraform/hcloud_cluster
@@ -285,3 +332,32 @@ jobs:
           # ephemeral: not in the saved plan, so the apply must be given it again
           TF_VAR_sops_age_key: ${{ secrets.SOPS_AGE_KEY }}
         run: terraform apply -input=false -lock-timeout=5m tfplan
+
+  # The required check of a pull request (add "terraform-plan-gate" to the ruleset on main). It runs
+  # on every pull request: green when the pull request does not touch the Hetzner Terraform, or when
+  # its plan succeeded; red when the plan failed, was cancelled or did not run although it should.
+  # A pull request from a fork gets no secrets, so a fork's Terraform change fails here.
+  terraform-plan-gate:
+    needs: [changes, plan]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Plan result
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          TERRAFORM: ${{ needs.changes.outputs.terraform }}
+          PLAN: ${{ needs.plan.result }}
+        run: |
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::could not tell whether this pull request changes the Hetzner Terraform (changes: $CHANGES)"
+            exit 1
+          fi
+          if [ "$TERRAFORM" != "true" ]; then
+            echo "No Hetzner Terraform change - nothing to plan."
+            exit 0
+          fi
+          if [ "$PLAN" != "success" ]; then
+            echo "::error::the Terraform plan of this pull request did not succeed (plan: $PLAN)"
+            exit 1
+          fi
+          echo "The Terraform plan of this pull request succeeded."

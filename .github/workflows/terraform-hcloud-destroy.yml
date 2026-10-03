@@ -16,6 +16,9 @@ env:
 concurrency:
   group: terraform-hcloud
   cancel-in-progress: false
+  # queue: max - runs wait in order instead of the older pending one being cancelled (the default
+  # keeps one pending run and cancels the rest - that is how PR plans were lost in Sep 2026).
+  queue: max
 
 permissions:
   contents: read
@@ -42,7 +45,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Setup kubectl (needed for FluxInstance cleanup via Terraform)
         run: |
@@ -50,7 +53,7 @@ jobs:
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.16.4"
 
