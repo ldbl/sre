@@ -76,7 +76,8 @@ Flux keeps the cluster equal to Git: at every reconcile it undoes a change made 
 what was deleted, and - where `prune: true` is set, as on every Kustomization here except the one for
 CRDs - deletes what was removed from Git. Single objects can opt out with Flux annotations: the
 environment namespaces carry `kustomize.toolkit.fluxcd.io/prune: Disabled`, so removing one from Git
-never deletes it with everything in it. A fix that is not in Git does not last. A
+never deletes the Namespace - and with it everything inside. The objects inside are still pruned by
+their own Kustomizations when they are removed from Git. A fix that is not in Git does not last. A
 suspended Kustomization keeps the hand change - and ignores every later commit, security fixes
 included, while it still shows `READY True`.
 
