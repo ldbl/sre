@@ -1,0 +1,53 @@
+name: Pre-commit
+
+# Every pre-commit hook, on every pull request and every push to main. The hooks run on the
+# workstation first (make install-hooks), but `git commit --no-verify`, or a clone without the hooks
+# installed, skips them there - and before this workflow nothing ran shellcheck, yamllint, checkov,
+# terraform validate or the script tests anywhere else. The rules stay in .pre-commit-config.yaml;
+# this workflow only runs them, so the workstation and CI can never disagree about what is checked.
+#
+# No path filter on purpose: a required check that does not run on some pull requests leaves them
+# waiting forever. Skipped here: master-branch-check - CI checks out a detached commit, and the
+# branch rule is enforced by the repository ruleset instead.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      # The versions the Makefile pins for the workstation (TERRAFORM_VERSION, KUBECTL_VERSION).
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.4"
+          terraform_wrapper: false
+
+      - name: Setup kubectl
+        run: |
+          curl -sLO "https://dl.k8s.io/release/v1.36.5/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+
+      # checkov: the terraform-security hook fails without it (it is a required tool, not optional).
+      - name: Install pre-commit and checkov
+        run: pip install pre-commit==4.6.2 checkov==3.3.20
+
+      - name: Run every hook on every file
+        env:
+          SKIP: master-branch-check
+        run: pre-commit run --all-files --show-diff-on-failure
