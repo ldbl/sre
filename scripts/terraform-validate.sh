@@ -23,8 +23,31 @@ set -e
 export TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-${HOME}/.terraform.d/plugin-cache}"
 mkdir -p "${TF_PLUGIN_CACHE_DIR}"
 
+# Terraform does not guarantee that the plugin cache is safe for two inits at once (a commit hook
+# and `make validate` in another terminal). One run at a time holds a lock directory next to the
+# cache - mkdir is atomic, and unlike flock it exists on macOS and Linux. A lock older than 15
+# minutes is left over from a killed run and is taken over; otherwise wait up to 5 minutes.
+lock_dir="${TF_PLUGIN_CACHE_DIR}.lock"
+lock_held=""
+waited=0
+until mkdir "${lock_dir}" 2>/dev/null; do
+  if [ -n "$(find "${lock_dir}" -maxdepth 0 -mmin +15 2>/dev/null)" ]; then
+    echo "terraform-validate: removing a stale lock ${lock_dir}" >&2
+    rm -rf "${lock_dir}"
+    continue
+  fi
+  if [ "${waited}" -ge 300 ]; then
+    echo "terraform-validate: another run holds ${lock_dir} for 5 minutes - giving up" >&2
+    exit 1
+  fi
+  sleep 2
+  waited=$((waited + 2))
+done
+lock_held=1
+
 data_dir=""
-trap 'if [ -n "${data_dir}" ]; then rm -rf "${data_dir}"; fi' EXIT
+# On every exit: the current module's data dir (init or validate may fail) and the lock.
+trap 'if [ -n "${data_dir}" ]; then rm -rf "${data_dir}"; fi; if [ -n "${lock_held}" ]; then rmdir "${lock_dir}" 2>/dev/null || true; fi' EXIT
 for dir in infra/terraform/kind_cluster infra/terraform/hcloud_cluster infra/terraform/state-lab; do
   echo "terraform validate: ${dir}"
   data_dir="$(mktemp -d)"
