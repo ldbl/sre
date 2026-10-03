@@ -1,15 +1,10 @@
 name: Flux Diff
 
 on:
+  # Every pull request, without a path filter, so "validate" can be a required check: a required
+  # check that does not start on some pull requests leaves them waiting forever. It needs no secrets
+  # and takes about a minute.
   pull_request:
-    # The manifests, and everything that checks them: a change to a check must prove itself here too.
-    paths:
-      - "flux/**"
-      - "scripts/flux-kustomize-validate.sh"
-      - "scripts/check-app-security.sh"
-      - "scripts/check-app-resources.sh"
-      - "scripts/check-oidc-rbac.sh"
-      - ".github/workflows/flux-diff.yml"
 
 permissions:
   contents: read
