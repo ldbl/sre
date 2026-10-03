@@ -122,3 +122,18 @@ side effect of a merge.
 | Never start a Terraform apply (Run workflow with "apply"), never approve or reject a deployment. | The environment `production` requires a person's approval; starting the run: instruction only. |
 | Never cancel or re-run someone else's workflow run, even one that blocks the queue - report it with its link. | Instruction only. |
 | Never change the ruleset, required checks, environments or repository settings. | Needs repository admin rights; for an agent with them: instruction only. |
+
+## Chapter 06 - The default is nothing; every path is written down
+
+In each environment namespace a `default-deny-all` isolates every pod, and one policy per path allows
+exactly what the platform needs. Policies only add allowances: one "allow everything" policy undoes all
+the others. A pod's labels are its network identity - a pod labelled `app=frontend` gets the frontend's
+paths. Flux sets back a changed policy it manages, but never removes a policy created by hand.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Change NetworkPolicies only in Git, through a pull request; read `flux diff` for every environment the `base` feeds. Never apply, edit or delete one in an environment namespace by hand. | On Hetzner the OIDC roles may write only in `develop`. Flux sets back a changed or deleted policy it manages - not one created by hand, which stays: instruction only. |
+| To fix a blocked connection, propose the exact pair - source labels, target labels, port, both directions - never an empty `from`/`to`, a `podSelector: {}` without ports, or a new `0.0.0.0/0` rule. | The review of the pull request; no check refuses them: instruction only. |
+| Diagnose before proposing: run `scripts/np-probe.sh` (DNS and TCP separately) and report which policies select the source and the target. | Instruction only. |
+| Never give a pod the labels of another application to get through a policy. | Instruction only; on Hetzner pods can be created only in `develop`. |
+| Experiments go into the namespace `lab`, and what you created there is deleted afterwards. | Instruction only. |
