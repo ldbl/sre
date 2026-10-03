@@ -88,15 +88,9 @@ smoke-test: ## Smoke tests against KUBE_CONTEXT (default: the local kind cluster
 	KUBE_CONTEXT=$(KUBE_CONTEXT) bash tests/smoke-test.sh
 
 validate: ## Validate every Terraform module (no backend, no credentials)
-	@# A throw-away data dir per module: a .terraform left by a real init would make even
-	@# -backend=false read the real state (with whatever credentials the shell has).
-	@for d in $(KIND_DIR) $(HCLOUD_DIR) infra/terraform/state-lab; do \
-	  echo "==> $$d"; \
-	  data=$$(mktemp -d); \
-	  TF_DATA_DIR=$$data terraform -chdir=$$d init -input=false -backend=false >/dev/null && \
-	  TF_DATA_DIR=$$data terraform -chdir=$$d validate; rc=$$?; rm -rf "$$data"; \
-	  [ $$rc -eq 0 ] || exit $$rc; \
-	done
+	@# The same script as the pre-commit hook: a throw-away data dir per module (a real .terraform
+	@# would make even -backend=false read the state), providers from a shared plugin cache.
+	@scripts/terraform-validate.sh
 
 terraform-hcloud-init: ## Terraform init for Hetzner cluster
 	@$(MAKE) -C infra/terraform/hcloud_cluster init
