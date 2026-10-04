@@ -20,14 +20,17 @@ fresh_copy() {
   cp -R "${ROOT}/flux/apps" "${WORK}/repo/flux/"
 }
 
-# run_case NAME EXPECTED(pass|fail) SED_EXPRESSION - apply the edit to the production backend
-# overlay of a fresh copy, run the check, compare.
+# run_case NAME EXPECTED(pass|fail) SED_EXPRESSION [YQ_EXPRESSION] - apply the edit(s) to the production
+# backend overlay of a fresh copy, run the check, compare.
 run_case() {
-  local name="$1" expected="$2" edit="$3" file got
+  local name="$1" expected="$2" edit="$3" yq_edit="${4:-}" file got
   fresh_copy
   file="${WORK}/repo/flux/apps/backend/production/kustomization.yaml"
   if [[ -n "${edit}" ]]; then
     sed -i.bak -e "${edit}" "${file}" && rm -f "${file}.bak"
+  fi
+  if [[ -n "${yq_edit}" ]]; then
+    yq -i "${yq_edit}" "${file}"
   fi
   if "${WORK}/repo/scripts/check-image-tags.sh" >/dev/null 2>&1; then got=pass; else got=fail; fi
   if [[ "${got}" == "${expected}" ]]; then
@@ -43,5 +46,7 @@ run_case "a staging tag in production" fail 's/newTag: production-/newTag: stagi
 run_case "a malformed production tag" fail 's/newTag: production-v[^ ]*/newTag: production-latest/'
 run_case "the setter comment removed" fail 's/ # {"$imagepolicy": "production:backend:tag"}//'
 run_case "the setter names another environment" fail 's/"production:backend:tag"/"staging:backend:tag"/'
+run_case "a second image with a tag and no ImagePolicy of its name" fail "" '.images += [{"name": "sidecar", "newTag": "v1"}]'
+run_case "a second image that only renames, without a tag" pass "" '.images += [{"name": "sidecar", "newName": "ghcr.io/example/sidecar"}]'
 
 exit "${FAILED}"

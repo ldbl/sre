@@ -10,9 +10,9 @@
 #     environment;
 #   - a missing or wrong setter comment: automation no longer updates the environment, and nothing
 #     says so.
-# For every app overlay this check reads the sibling image-policy.yaml and fails when newTag does not
-# match its filterTags.pattern, or when the setter comment does not name that policy
-# ("<namespace>:<name>:tag").
+# For every images[] entry with a newTag, this check finds the ImagePolicy of the same name in the same
+# directory and fails when newTag does not match its filterTags.pattern, or when the setter comment does
+# not name that policy ("<namespace>:<name>:tag").
 #
 # Runs in pre-commit (and with it in the CI `hooks` job). Needs yq (v4).
 # Usage: scripts/check-image-tags.sh   (no arguments; reads the overlays under flux/apps)
@@ -27,32 +27,46 @@ command -v yq >/dev/null || { echo "check-image-tags: yq is required (make check
 failures=()
 checked=0
 
-# Every overlay that sets an image tag; its ImagePolicy sits next to it.
+# Every overlay that sets an image tag. Each entry of images[] with a newTag is checked against the
+# ImagePolicy in the same directory whose metadata.name is the image's name (backend -> backend).
 while IFS= read -r kustomization; do
   dir="$(dirname "${kustomization}")"
-  policy="${dir}/image-policy.yaml"
-  if [[ ! -f "${policy}" ]]; then
-    failures+=("${kustomization}: sets newTag but has no image-policy.yaml next to it")
-    continue
-  fi
+  count="$(yq '.images | length' "${kustomization}")"
+  for ((i = 0; i < count; i++)); do
+    name="$(yq ".images[${i}].name" "${kustomization}")"
+    tag="$(yq ".images[${i}].newTag" "${kustomization}")"
+    [[ "${tag}" == "null" ]] && continue   # an entry that only renames the image sets no tag
+    setter="$(yq ".images[${i}].newTag | line_comment" "${kustomization}")"
 
-  tag="$(yq '.images[0].newTag' "${kustomization}")"
-  setter="$(yq '.images[0].newTag | line_comment' "${kustomization}")"
-  pattern="$(yq '.spec.filterTags.pattern' "${policy}")"
-  policy_ref="$(yq '.metadata.namespace + ":" + .metadata.name' "${policy}")"
+    # The policy for this image: an ImagePolicy document named like the image, in this directory.
+    policy=""
+    for candidate in "${dir}"/*.yaml; do
+      if [[ "$(yq ea "select(.kind == \"ImagePolicy\" and .metadata.name == \"${name}\") | .metadata.name" "${candidate}")" == "${name}" ]]; then
+        policy="${candidate}"
+        break
+      fi
+    done
+    if [[ -z "${policy}" ]]; then
+      failures+=("${kustomization}: image '${name}' sets newTag but ${dir} has no ImagePolicy named '${name}'")
+      continue
+    fi
 
-  # The ImagePolicy pattern uses a named group, (?P<ts>...), for Flux; bash regex (ERE) has only plain
-  # groups, so drop the name - what the pattern accepts stays the same.
-  ere="${pattern//\(\?P<[a-z]*>/(}"
+    pattern="$(yq ea "select(.kind == \"ImagePolicy\" and .metadata.name == \"${name}\") | .spec.filterTags.pattern" "${policy}")"
+    policy_ref="$(yq ea "select(.kind == \"ImagePolicy\" and .metadata.name == \"${name}\") | .metadata.namespace + \":\" + .metadata.name" "${policy}")"
 
-  if [[ ! "${tag}" =~ ${ere} ]]; then
-    failures+=("${kustomization}: newTag '${tag}' does not match ${policy} (${pattern})")
-  fi
-  expected_setter="{\"\$imagepolicy\": \"${policy_ref}:tag\"}"
-  if [[ "${setter}" != "${expected_setter}" ]]; then
-    failures+=("${kustomization}: the newTag line must end with # ${expected_setter} (got: '${setter}')")
-  fi
-  checked=$((checked + 1))
+    # The ImagePolicy pattern uses a named group, (?P<ts>...), for Flux; bash regex (ERE) has only plain
+    # groups, so drop the name - what the pattern accepts stays the same.
+    ere="${pattern//\(\?P<[a-z]*>/(}"
+
+    if [[ ! "${tag}" =~ ${ere} ]]; then
+      failures+=("${kustomization}: image '${name}' newTag '${tag}' does not match ${policy} (${pattern})")
+    fi
+    expected_setter="{\"\$imagepolicy\": \"${policy_ref}:tag\"}"
+    if [[ "${setter}" != "${expected_setter}" ]]; then
+      failures+=("${kustomization}: image '${name}': the newTag line must end with # ${expected_setter} (got: '${setter}')")
+    fi
+    checked=$((checked + 1))
+  done
 done < <(grep -l 'newTag:' flux/apps/*/*/kustomization.yaml flux/apps/*/overlays/*/kustomization.yaml 2>/dev/null | sort)
 
 if [[ "${checked}" -eq 0 && ${#failures[@]} -eq 0 ]]; then
@@ -65,4 +79,4 @@ if [[ ${#failures[@]} -gt 0 ]]; then
   printf '  - %s\n' "${failures[@]}" >&2
   exit 1
 fi
-echo "check-image-tags: OK (${checked} overlays)"
+echo "check-image-tags: OK (${checked} image tags)"
