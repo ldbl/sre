@@ -1,3 +1,8 @@
+# The lab namespace's per-container rules, the same shape as develop/staging/production:
+# defaults for a container that names no resources, and a min/max that refuses a container outside
+# them when the pod is created (labs/resource-management/50-over-limitrange.yaml). The default
+# memory request is smaller than in the environments (32Mi, not 64Mi) so that many small lab pods
+# fit in the lab quota.
 ---
 apiVersion: v1
 kind: LimitRange
@@ -13,3 +18,9 @@ spec:
       default:
         cpu: 250m
         memory: 256Mi
+      min:
+        cpu: 10m
+        memory: 32Mi
+      max:
+        cpu: 500m
+        memory: 512Mi

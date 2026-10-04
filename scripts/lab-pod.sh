@@ -8,7 +8,7 @@
 # exit code - the labs use it instead of hand-written overrides.
 #
 # Usage:
-#   scripts/lab-pod.sh -n <namespace> [-c <context>] [-i <image>] [-l key=value]... [-u <uid>] [-m <memory>] -- <command...>
+#   scripts/lab-pod.sh -n <namespace> [-c <context>] [-i <image>] [-l key=value]... [-u <uid>] -- <command...>
 #   scripts/lab-pod.sh -n <namespace> [-c <context>] [-i <image>] [-l key=value]... --daemon [<name>]
 #
 # Examples:
@@ -18,8 +18,8 @@
 #   scripts/lab-pod.sh -n develop --daemon np-debug
 #
 # Defaults: image busybox:1.36, uid 65532, read-only root filesystem with a
-# writable /tmp. -m sets memory request = limit (e.g. -m 64Mi for an OOM
-# drill); otherwise the namespace LimitRange defaults apply. Pods are deleted after a one-off run; --daemon pods stay until
+# writable /tmp (16Mi); CPU and memory come from the namespace LimitRange
+# defaults. Pods are deleted after a one-off run; --daemon pods stay until
 # you delete them.
 #
 # The cluster: -c, else $KUBE_CONTEXT, else kind-sre-control-plane. Every kubectl call names it
@@ -34,7 +34,6 @@ set -euo pipefail
 NAMESPACE=""
 IMAGE="busybox:1.36"
 UID_NUM="65532"
-MEMORY=""
 LABELS=()
 DAEMON=0
 NAME=""
@@ -51,7 +50,6 @@ while [ $# -gt 0 ]; do
     -i) IMAGE="$2"; shift 2 ;;
     -l) LABELS+=("$2"); shift 2 ;;
     -u) UID_NUM="$2"; shift 2 ;;
-    -m) MEMORY="$2"; shift 2 ;;
     --daemon) DAEMON=1; shift; if [ $# -gt 0 ] && [ "$1" != "--" ]; then NAME="$1"; shift; fi ;;
     --) shift; break ;;
     -h|--help) usage ;;
@@ -79,12 +77,6 @@ else
   CMD_JSON="$(printf '%s\0' "$@" | jq -cRs 'split("\u0000") | .[:-1]')"
 fi
 
-# Memory: request = limit when -m is given; otherwise empty, and the namespace LimitRange decides.
-RESOURCES_JSON="{}"
-if [ -n "$MEMORY" ]; then
-  RESOURCES_JSON="{\"requests\": {\"memory\": \"${MEMORY}\"}, \"limits\": {\"memory\": \"${MEMORY}\"}}"
-fi
-
 LABEL_JSON="{}"
 if [ ${#LABELS[@]} -gt 0 ]; then
   # key=value pairs to a JSON object; the value may itself contain "=".
@@ -93,7 +85,7 @@ fi
 
 # The pod spec kubectl run cannot express with flags: everything Pod Security "restricted" requires
 # (non-root user, no privilege escalation, no capabilities, RuntimeDefault seccomp) plus a read-only
-# root filesystem with a writable /tmp.
+# root filesystem with a writable /tmp, capped at 16Mi like every emptyDir on the platform.
 OVERRIDES="$(cat <<JSON
 {
   "metadata": {"labels": ${LABEL_JSON}},
@@ -109,7 +101,6 @@ OVERRIDES="$(cat <<JSON
       "name": "${NAME}",
       "image": "${IMAGE}",
       "command": ${CMD_JSON},
-      "resources": ${RESOURCES_JSON},
       "securityContext": {
         "runAsNonRoot": true,
         "allowPrivilegeEscalation": false,
@@ -118,7 +109,7 @@ OVERRIDES="$(cat <<JSON
       },
       "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}]
     }],
-    "volumes": [{"name": "tmp", "emptyDir": {}}]
+    "volumes": [{"name": "tmp", "emptyDir": {"sizeLimit": "16Mi"}}]
   }
 }
 JSON

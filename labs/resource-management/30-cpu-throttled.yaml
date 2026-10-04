@@ -1,0 +1,43 @@
+# Chapter 08 lab: CPU over the limit is not killed - it is throttled.
+# The container spins for 10 seconds with a 50m limit (5% of one core). The kernel's CFS scheduler
+# gives it 5ms in every 100ms period and pauses it for the rest. Nothing appears in the events and
+# the pod is not restarted; the only trace is the cgroup counter the container prints at the end:
+# nr_throttled (periods in which it was paused) and throttled_usec (total time paused).
+# On the platform the same counter is the Prometheus metric container_cpu_cfs_throttled_periods_total.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spinner
+  namespace: lab
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: spinner
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          end=$(( $(date +%s) + 10 ))
+          while [ "$(date +%s)" -lt "$end" ]; do :; done
+          grep -E "^(nr_periods|nr_throttled|throttled_usec)" /sys/fs/cgroup/cpu.stat
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 32Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]

@@ -1,0 +1,37 @@
+# Chapter 08 lab: one container asking for more than the namespace allows a single container.
+# The lab LimitRange (flux/infrastructure/lab/limitrange.yaml) sets max cpu 500m per container; this
+# one asks for a 1-core limit. Unlike the quota (40-over-quota.yaml), the refusal comes straight back
+# from kubectl apply - a bare pod has no ReplicaSet in between - and nothing is created:
+#   pods "too-big" is forbidden: maximum cpu usage per Container is 500m, but limit is 1
+# The quota guards the namespace's total; the LimitRange guards each container.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: too-big
+  namespace: lab
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: too-big
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 10"]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 32Mi
+        limits:
+          cpu: "1"
+          memory: 32Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]

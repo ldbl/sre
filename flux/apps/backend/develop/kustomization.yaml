@@ -33,6 +33,8 @@ patches:
                 env:
                   - name: CHAOS_ENABLED
                     value: "true"
+  # Develop runs smaller than production (the base); scripts/check-app-resources.sh keeps production
+  # >= develop and staging == production, and checks the worst case against each namespace quota.
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/cpu

@@ -1,7 +1,7 @@
 # Chapter 07 lab: a different failure - "Permission denied". Here the root filesystem is writable
 # (readOnlyRootFilesystem: false, for this comparison only), but the process runs as UID 65532 and
-# /etc belongs to root. The kernel refuses the write because of file ownership, not because the
-# filesystem is read-only. The answer is not root: it is a writable path the user owns - a volume,
+# /etc is root:root with mode 755, so UID 65532 falls under "other" (r-x). The kernel refuses the
+# write because of the permission bits, not because the filesystem is read-only. The answer is not root: it is a writable path the user owns - a volume,
 # or an image that gives the app's user its own directory (and fsGroup for volumes that need it).
 ---
 apiVersion: v1
