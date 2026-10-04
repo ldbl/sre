@@ -200,3 +200,19 @@ minutes; kind has no automation, and a tag changes there only by a commit.
 | Never change a running image by hand (`kubectl set image`, `kubectl rollout undo`): Flux owns the Deployment and sets it back. Change `newTag` through a pull request. | Flux (reconcile); RBAC on Hetzner (the everyday sign-in only reads production). |
 | Keep each overlay's `newTag` matching its own environment's ImagePolicy, with the setter comment `# {"$imagepolicy": "<namespace>:<name>:tag"}`. | `scripts/check-image-tags.sh` in pre-commit and CI. |
 | A production rollback on Hetzner is not a revert of `newTag` alone - the automation writes the newest tag back. Pin the production ImagePolicy's pattern to the known-good tag and set `newTag` to it in one pull request; restore the pattern in another once the fix is promoted. | Instruction only (reviewed in the pull request). |
+
+## Chapter 11 - An alert is a request for a person to act
+
+Backend alerts are computed per namespace on user requests only (probes and `/metrics` left out),
+on the error budget's burn rate with two windows and a traffic floor
+(`flux/infrastructure/observability/kube-prometheus-stack/monitoring/backend-slo-rules.yaml`).
+Alertmanager routes production and any other critical alert to `production`, the rest to `nonprod`;
+a critical backend alert mutes the backend warnings of its environment
+(`flux/infrastructure/observability/alerting/routing/routing.yaml`). At rest only `Watchdog` fires.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never add an alert that does not name an action, an urgency and a first check - internal signals go on a dashboard. | Review of the rules in Git; silence at rest (only `Watchdog` fires on an idle cluster). |
+| Measure the backend on user requests per environment - never on all requests, never across environments. | The recording rules in `backend-slo-rules.yaml` (review). |
+| Never lower a threshold or remove the traffic floor to make an alert fire in a test - generate the condition, or post a test alert to Alertmanager. | Instruction only. |
+| Never route an alert to a receiver nobody reads, and never mute a channel instead of removing the noise. | The routes are in Git (review). |
