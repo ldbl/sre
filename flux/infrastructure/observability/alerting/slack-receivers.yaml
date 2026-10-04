@@ -1,0 +1,28 @@
+# Platform only: Slack for the two receivers of routing/routing.yaml. Production alerts go to the
+# production channel, everything else to the non-production one; the message names the environment,
+# the severity, what users see, the first check and the runbook.
+#
+# To enable it: put the two incoming-webhook URLs into flux/secrets/observability/alertmanager-slack.yaml
+# (SOPS; see alertmanager-slack.yaml.example there), list that file in its kustomization.yaml, and list
+# this patch in ../kustomization.yaml. Until then the alerts are routed, grouped and visible in
+# Alertmanager, but nobody is notified - an AlertmanagerConfig that points at a missing Secret is
+# rejected whole, so the patch stays out until the Secret exists.
+- op: replace
+  path: /spec/receivers
+  value:
+    - name: production
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack
+            key: production
+          sendResolved: true
+          title: '[{{ .Status | toUpper }}] {{ .CommonLabels.namespace }} - {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          text: '{{ range .Alerts }}*{{ .Annotations.summary }}*{{ "\n" }}{{ .Annotations.description }}{{ "\n" }}Runbook: {{ .Annotations.runbook_url }}{{ "\n" }}{{ end }}'
+    - name: nonprod
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack
+            key: nonprod
+          sendResolved: true
+          title: '[{{ .Status | toUpper }}] {{ .CommonLabels.namespace }} - {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})'
+          text: '{{ range .Alerts }}*{{ .Annotations.summary }}*{{ "\n" }}{{ .Annotations.description }}{{ "\n" }}Runbook: {{ .Annotations.runbook_url }}{{ "\n" }}{{ end }}'

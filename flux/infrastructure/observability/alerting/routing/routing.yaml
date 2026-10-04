@@ -1,0 +1,73 @@
+# Who hears about an alert - the same routes on kind and on the platform.
+#   production                    -> receiver "production" (the production channel)
+#   develop, staging              -> receiver "nonprod"    (the non-production channel)
+#   any other critical alert      -> "production" (cluster-wide trouble: a node, storage, Flux)
+#   any other warning             -> "nonprod"
+# Watchdog and InfoInhibitor are left out: Watchdog is the heartbeat (watchdog-heartbeat.yaml),
+# InfoInhibitor only mutes info-level alerts.
+#
+# Noise rules:
+#   - one notification per environment and alert name (group_by), re-sent every 4h in production and
+#     12h elsewhere while it still fires - not on every evaluation;
+#   - a critical backend alert mutes the backend warnings of the same environment (inhibitRules): when
+#     users already fail (BackendErrorBudgetBurnFast) or nothing is ready (BackendNoReadyPods), a slow
+#     burn or a latency warning adds nothing - one incident, one notification.
+#
+# The receivers here have no integration: on kind the alerts are routed and grouped, and the
+# Alertmanager API shows which receiver each group went to. The platform adds Slack to the same two
+# receivers (../slack-receivers.yaml). Chapter 14 moves delivery to the Guardian.
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: safeops-routing
+  labels:
+    alertmanagerconfig: safeops
+spec:
+  route:
+    receiver: nonprod
+    matchers:
+      - name: alertname
+        value: Watchdog|InfoInhibitor
+        matchType: "!~"
+    groupBy: [namespace, alertname]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 12h
+    routes:
+      - receiver: production
+        matchers:
+          - name: namespace
+            value: production
+            matchType: "="
+        repeatInterval: 4h
+      - receiver: nonprod
+        matchers:
+          - name: namespace
+            value: develop|staging
+            matchType: "=~"
+      - receiver: production
+        matchers:
+          - name: severity
+            value: critical
+            matchType: "="
+        repeatInterval: 4h
+  inhibitRules:
+    - sourceMatch:
+        - name: severity
+          value: critical
+          matchType: "="
+        - name: component
+          value: backend
+          matchType: "="
+      targetMatch:
+        - name: severity
+          value: warning
+          matchType: "="
+        - name: component
+          value: backend
+          matchType: "="
+      equal: [namespace]
+  receivers:
+    - name: production
+    - name: nonprod

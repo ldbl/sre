@@ -1,0 +1,7 @@
+# The alert routes, shared by kind (Kustomization alerting-routing in the local profile) and the
+# platform (../kustomization.yaml).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - routing.yaml
