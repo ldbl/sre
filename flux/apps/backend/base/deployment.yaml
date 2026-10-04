@@ -68,12 +68,22 @@ spec:
           value: "${LOG_LEVEL}"
         - name: SERVICE_NAME
           value: "backend"
-        - name: SERVICE_VERSION
-          value: "v1.0.0"
+        # No SERVICE_VERSION: the backend reports the version baked into the image (the same as
+        # /version), so every span says which release produced it.
         - name: DEPLOYMENT_ENVIRONMENT
           value: "${ENVIRONMENT}"
+        # Where a span came from: the cluster, the namespace (= the environment) and the pod - set from
+        # the downward API, so traces can be filtered per environment and per pod.
+        - name: K8S_NAMESPACE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "k8s.cluster.name=${cluster_name}"
+          value: "k8s.cluster.name=${cluster_name},k8s.namespace.name=$(K8S_NAMESPACE_NAME),k8s.pod.name=$(K8S_POD_NAME)"
         - name: UPTRACE_DSN
           valueFrom:
             secretKeyRef:
