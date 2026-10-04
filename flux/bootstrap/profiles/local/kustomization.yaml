@@ -19,6 +19,7 @@ resources:
   - minio.yaml
   - secrets-local.yaml
   - lab.yaml
+  - alerting-routing.yaml
 patches:
   # Point the self-managing Kustomization at this profile, not at the base.
   - target: { kind: Kustomization, name: flux-system }

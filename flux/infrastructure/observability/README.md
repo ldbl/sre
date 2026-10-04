@@ -131,26 +131,36 @@ Pre-configured dashboard showing:
 SLO recording and burn-rate rules:
 - `flux/infrastructure/observability/kube-prometheus-stack/monitoring/backend-slo-rules.yaml`
 
-Configured alerts:
+Principle: every alert names an action and has a reason for its urgency; at rest only `Watchdog` fires.
+All backend rules are per namespace and count user requests only (not `/healthz`, `/readyz`, `/livez`,
+`/metrics`). Configured alerts:
 
-| Alert Name | Severity | Threshold | Description |
-|------------|----------|-----------|-------------|
-| `BackendHighErrorRate` | warning | >5% errors for 5m | Service experiencing elevated error rate |
-| `BackendCriticalErrorRate` | critical | >10% errors for 2m | Service experiencing critical error rate |
-| `BackendHighLatency` | warning | p95 >1s for 5m | Service latency is high |
-| `BackendServiceDown` | critical | up=0 for 1m | Service is not responding |
-| `BackendHighMemoryUsage` | warning | >0.8GB for 5m | Memory usage is high |
-| `BackendHighGoroutines` | warning | >10k for 5m | Too many goroutines (possible leak) |
-| `BackendPodRestarting` | warning | restarts >0 for 5m | Pod is restarting frequently |
-| `BackendSLOErrorBudgetBurnCritical` | critical | burn rate >14.4x | Fast error-budget burn for 99.5% SLO |
-| `BackendSLOErrorBudgetBurnWarning` | warning | burn rate >6x | Sustained error-budget burn for 99.5% SLO |
+| Alert Name | Severity | Fires when | Action |
+|------------|----------|------------|--------|
+| `BackendErrorBudgetBurnFast` | critical | >7.2% of user requests fail over 1h and 5m (14.4x the 99.5% budget), min traffic | users are failing: check the last change and the error logs |
+| `BackendErrorBudgetBurnSlow` | warning | >3% fail over 6h and 30m (6x), min traffic | plan the fix before the budget is gone |
+| `BackendNoReadyPods` | critical | no available backend replica for 2m | restore the service: read the pod status |
+| `BackendLatencyHigh` | warning | user p95 >1s for 10m, min traffic | find the slow route, then its trace |
+| `BackendNearMemoryLimit` | warning | working set >90% of the limit for 15m | a leak or a size - before OOMKilled (Chapter 08) |
+
+Left to the default rules: lost scrapes (`TargetDown`), restarting pods (`KubePodCrashLooping`).
+Disabled in `kube-prometheus-stack/base/release.yaml`: scraping and rules for etcd, scheduler,
+controller manager and kube-proxy (neither kind nor k3s exposes them), and `KubeHpaMaxedOut`
+(develop/staging run HPAs with min = max on purpose).
 
 ### Alert Routing Path
 
-- Prometheus rules define detection logic and severity.
-- `k8s-ai-monitor` consumes cluster context and Prometheus metrics, then sends actionable alerts.
-- Alertmanager is disabled in this stack.
-- For OpsGenie, configure `k8s-ai-monitor` webhook destination to your OpsGenie-compatible endpoint (direct integration or relay).
+- Prometheus rules define detection logic and severity; Alertmanager routes and groups
+  (`alerting/routing/routing.yaml`, on kind and on the platform):
+  - `production` alerts and any other critical alert -> receiver `production`
+  - `develop`/`staging` alerts and any other warning -> receiver `nonprod`
+  - one notification per environment and alert name; a critical backend alert mutes the backend
+    warnings of the same environment
+- On the platform the two receivers post to Slack (`alerting/slack-receivers.yaml`, enabled once
+  the SOPS Secret `alertmanager-slack` exists). On kind they have no integration; the Alertmanager API
+  shows where each alert group went.
+- `Watchdog` goes to Healthchecks.io as a heartbeat (`alerting/watchdog-heartbeat.yaml`, platform only).
+- Chapter 14 moves delivery to `k8s-ai-monitor`, which watches Alertmanager.
 
 ## Metrics Reference
 

@@ -1,3 +1,13 @@
+# Backend alerts besides the error budget (backend-slo-rules.yaml). Each one names an action:
+#   BackendNoReadyPods     - nobody can be served in that environment: restore it now (critical)
+#   BackendLatencyHigh     - users wait: find the slow route before it turns into errors (warning)
+#   BackendNearMemoryLimit - a container is close to OOMKilled: a leak or a size (Chapter 08) (warning)
+# Left out on purpose, because they ask for no action of their own:
+#   - a scrape that fails (up == 0) is lost telemetry, not a down service: the default TargetDown
+#     reports it, and BackendNoReadyPods covers the service itself;
+#   - restarts: the default KubePodCrashLooping reports a pod that keeps restarting;
+#     a single restart is not an incident;
+#   - goroutine counts and other internals belong on the dashboard, for diagnosis.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -12,106 +22,42 @@ spec:
     - name: backend.rules
       interval: 30s
       rules:
-        # High error rate alert
-        - alert: BackendHighErrorRate
-          expr: |
-            (
-              sum(rate(app_http_requests_total{job="backend",status=~"5.."}[5m]))
-              / clamp_min(sum(rate(app_http_requests_total{job="backend"}[5m])), 1e-9)
-            ) > 0.05
-          for: 5m
-          labels:
-            severity: warning
-            component: backend
-          annotations:
-            summary: "Backend service has high error rate"
-            description: "Backend error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
-
-        # Critical error rate alert
-        - alert: BackendCriticalErrorRate
-          expr: |
-            (
-              sum(rate(app_http_requests_total{job="backend",status=~"5.."}[5m]))
-              / clamp_min(sum(rate(app_http_requests_total{job="backend"}[5m])), 1e-9)
-            ) > 0.10
+        - alert: BackendNoReadyPods
+          expr: kube_deployment_status_replicas_available{deployment="backend",namespace=~"develop|staging|production"} == 0
           for: 2m
           labels:
             severity: critical
             component: backend
           annotations:
-            summary: "Backend service has critical error rate"
-            description: "Backend error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
+            summary: "{{ $labels.namespace }}: no backend pod is ready - every request fails"
+            description: "The backend Deployment in {{ $labels.namespace }} has no available replica for 2 minutes. First check: kubectl get pods -l app=backend in {{ $labels.namespace }} - the reason is in the pod status (CrashLoopBackOff, OOMKilled, ImagePullBackOff, Pending)."
+            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
 
-        # High latency alert (p95)
-        - alert: BackendHighLatency
+        - alert: BackendLatencyHigh
           expr: |
-            histogram_quantile(0.95,
-              sum(rate(app_http_request_duration_seconds_bucket{job="backend"}[5m])) by (le)
-            ) > 1
-          for: 5m
+            backend:user_latency_p95:rate5m > 1
+            and backend:user_requests:rate5m > 0.05
+          for: 10m
           labels:
             severity: warning
             component: backend
           annotations:
-            summary: "Backend service has high latency"
-            description: "Backend p95 latency is {{ $value }}s (threshold: 1s)"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
+            summary: "{{ $labels.namespace }}: backend p95 latency {{ $value | humanizeDuration }}"
+            description: "One in twenty user requests to the backend in {{ $labels.namespace }} takes longer than 1s, for 10 minutes. First check: the slow route in the latency panel by path, then its trace (the database span or an outbound call)."
+            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
 
-        # Service down alert
-        - alert: BackendServiceDown
-          expr: up{job="backend"} == 0
-          for: 1m
-          labels:
-            severity: critical
-            component: backend
-          annotations:
-            summary: "Backend service is down"
-            description: "Backend service {{ $labels.instance }} is down"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
-
-        # High memory usage
-        - alert: BackendHighMemoryUsage
+        - alert: BackendNearMemoryLimit
           expr: |
-            (
-              process_resident_memory_bytes{job="backend"}
-              /
-              1024 / 1024 / 1024
-            ) > 0.8
-          for: 5m
+            max by (namespace, pod) (
+              container_memory_working_set_bytes{namespace=~"develop|staging|production",container="backend"}
+              / on (namespace, pod, container)
+              kube_pod_container_resource_limits{resource="memory",container="backend"}
+            ) > 0.9
+          for: 15m
           labels:
             severity: warning
             component: backend
           annotations:
-            summary: "Backend service has high memory usage"
-            description: "Backend memory usage is {{ $value }}GB (threshold: 0.8GB)"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
-
-        # Too many goroutines
-        - alert: BackendHighGoroutines
-          expr: go_goroutines{job="backend"} > 10000
-          for: 5m
-          labels:
-            severity: warning
-            component: backend
-          annotations:
-            summary: "Backend has too many goroutines"
-            description: "Backend has {{ $value }} goroutines (threshold: 10000)"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
-
-        # Pod restarts
-        - alert: BackendPodRestarting
-          expr: |
-            rate(kube_pod_container_status_restarts_total{
-              namespace=~"develop|staging|production",
-              pod=~"backend-.*"
-            }[15m]) > 0
-          for: 5m
-          labels:
-            severity: warning
-            component: backend
-          annotations:
-            summary: "Backend pod is restarting frequently"
-            description: "Backend pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting"
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }}: backend at {{ $value | humanizePercentage }} of its memory limit"
+            description: "The working set has stayed above 90% of the memory limit for 15 minutes; the next allocation may be OOMKilled. First check: does it level off (a size) or climb (a leak)? Chapter 08."
+            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"

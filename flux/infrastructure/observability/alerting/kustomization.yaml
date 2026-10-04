@@ -1,6 +1,14 @@
 ---
+# Platform alerting: the shared routes, the Watchdog heartbeat and (once its Secret exists) Slack.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: observability
 resources:
+  - routing
   - watchdog-heartbeat.yaml
+# Enable when flux/secrets/observability/alertmanager-slack.yaml exists (see slack-receivers.yaml):
+# patches:
+#   - path: slack-receivers.yaml
+#     target:
+#       kind: AlertmanagerConfig
+#       name: safeops-routing

@@ -1,0 +1,19 @@
+# The alert routes on kind: the same AlertmanagerConfig as the platform, without Slack (the platform's
+# `alerting` Kustomization, which adds the heartbeat and Slack, is removed in this profile). The
+# Alertmanager API shows which receiver - production or nonprod - each alert group went to.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: alerting-routing
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/observability/alerting/routing
+  prune: true
+  wait: true
+  dependsOn:
+    - name: observability

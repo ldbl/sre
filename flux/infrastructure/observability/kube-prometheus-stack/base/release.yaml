@@ -114,6 +114,32 @@ spec:
           cpu: 100m
           memory: 256Mi
 
+    # Control-plane components neither cluster lets Prometheus scrape: kind binds etcd, the scheduler,
+    # the controller manager and kube-proxy to localhost, and k3s (Hetzner) runs them inside one binary.
+    # Scraping them only produced TargetDown and etcd alerts that fired at rest - noise that teaches
+    # people to ignore alerts. Their health shows through the API server and the nodes.
+    kubeEtcd:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeControllerManager:
+      enabled: false
+    kubeProxy:
+      enabled: false
+
+    # Default rules: every alert must call for an action. The rules for the components above go with
+    # them; KubeHpaMaxedOut fires for every HPA whose min equals its max - develop and staging run
+    # that way on purpose (Chapter 09), so it would fire forever and mean nothing.
+    defaultRules:
+      rules:
+        etcd: false
+        kubeControllerManager: false
+        kubeProxy: false
+        kubeSchedulerAlerting: false
+        kubeSchedulerRecording: false
+      disabled:
+        KubeHpaMaxedOut: true
+
     # Node exporter - collect node metrics
     nodeExporter:
       enabled: true

@@ -1,3 +1,16 @@
+# Backend SLO: 99.5% of user requests succeed (error budget 0.5%), per environment.
+#
+# What is measured: requests a user makes - not the kubelet's probes (/healthz, /readyz, /livez) or
+# Prometheus's own scrapes (/metrics). On an idle cluster those are all the traffic there is; counting
+# them would dilute a real failure into a small percentage. Everything is kept per namespace, so a
+# drill in develop never moves production's numbers, and healthy traffic in one environment never
+# hides a failure in another.
+#
+# How it alerts: on how fast the budget burns (Google SRE workbook, "Alerting on SLOs"), not on
+# every spike. Each alert needs a long window (the burn is real) and a short one (it is still going
+# on), and a minimum of traffic - with three requests a minute or fewer, one failed request would be
+# a third of everything; a complete outage is caught by BackendNoReadyPods instead.
+# No requests at all means no ratio and no alert: missing traffic is not a burning budget.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -12,56 +25,73 @@ spec:
     - name: backend.slo.recording
       interval: 30s
       rules:
-        - record: backend:error_rate5m
+        # User requests per second, per namespace (probes and scrapes left out).
+        - record: backend:user_requests:rate5m
+          expr: sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics"}[5m]))
+        - record: backend:user_requests:rate30m
+          expr: sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics"}[30m]))
+        - record: backend:user_requests:rate1h
+          expr: sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics"}[1h]))
+        - record: backend:user_requests:rate6h
+          expr: sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics"}[6h]))
+
+        # Share of user requests that failed with a 5xx. "or vector(0)"-style padding is not used on
+        # purpose: with no 5xx series the ratio is absent, and so is the alert.
+        - record: backend:user_error_ratio:rate5m
           expr: |
-            sum(rate(app_http_requests_total{job="backend",status=~"5.."}[5m]))
-            /
-            clamp_min(sum(rate(app_http_requests_total{job="backend"}[5m])), 1e-9)
-        - record: backend:error_rate30m
+            sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics",status=~"5.."}[5m]))
+            / backend:user_requests:rate5m
+        - record: backend:user_error_ratio:rate30m
           expr: |
-            sum(rate(app_http_requests_total{job="backend",status=~"5.."}[30m]))
-            /
-            clamp_min(sum(rate(app_http_requests_total{job="backend"}[30m])), 1e-9)
-        - record: backend:error_rate1h
+            sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics",status=~"5.."}[30m]))
+            / backend:user_requests:rate30m
+        - record: backend:user_error_ratio:rate1h
           expr: |
-            sum(rate(app_http_requests_total{job="backend",status=~"5.."}[1h]))
-            /
-            clamp_min(sum(rate(app_http_requests_total{job="backend"}[1h])), 1e-9)
-        - record: backend:availability30m
-          expr: 1 - backend:error_rate30m
-        - record: backend:latency_p95_5m
+            sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics",status=~"5.."}[1h]))
+            / backend:user_requests:rate1h
+        - record: backend:user_error_ratio:rate6h
+          expr: |
+            sum by (namespace) (rate(app_http_requests_total{job="backend",path!~"/healthz|/readyz|/livez|/metrics",status=~"5.."}[6h]))
+            / backend:user_requests:rate6h
+
+        # p95 latency of user requests, per namespace.
+        - record: backend:user_latency_p95:rate5m
           expr: |
             histogram_quantile(0.95,
-              sum(rate(app_http_request_duration_seconds_bucket{job="backend"}[5m])) by (le)
-            )
+              sum by (namespace, le) (rate(app_http_request_duration_seconds_bucket{job="backend",path!~"/healthz|/readyz|/livez|/metrics"}[5m])))
+
     - name: backend.slo.alerts
       interval: 30s
       rules:
-        - alert: BackendSLOErrorBudgetBurnCritical
+        # Fast burn: at 14.4x the allowed rate the whole month's budget is gone in about two days.
+        # Act now: users are failing. Pages (critical).
+        - alert: BackendErrorBudgetBurnFast
           expr: |
-            backend:error_rate5m > (14.4 * 0.005)
-            and
-            backend:error_rate1h > (14.4 * 0.005)
-          for: 5m
+            backend:user_error_ratio:rate5m > (14.4 * 0.005)
+            and backend:user_error_ratio:rate1h > (14.4 * 0.005)
+            and backend:user_requests:rate5m > 0.05
+          for: 2m
           labels:
             severity: critical
             component: backend
             slo: availability
           annotations:
-            summary: "Backend error budget burn is critical"
-            description: "Fast burn-rate alert for 99.5% SLO (error budget 0.5%)."
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
-        - alert: BackendSLOErrorBudgetBurnWarning
+            summary: "{{ $labels.namespace }}: backend users are failing - {{ $value | humanizePercentage }} of requests in the last 5m"
+            description: "More than 7.2% of user requests to the backend in {{ $labels.namespace }} fail with a 5xx, over the last hour and still in the last 5 minutes. First check: the backend's error logs and the last change - a promotion or a config change (Chapter 10)."
+            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
+
+        # Slow burn: at 6x the budget is gone in five days. Not urgent tonight - plan a fix (warning).
+        - alert: BackendErrorBudgetBurnSlow
           expr: |
-            backend:error_rate30m > (6 * 0.005)
-            and
-            backend:error_rate1h > (6 * 0.005)
+            backend:user_error_ratio:rate30m > (6 * 0.005)
+            and backend:user_error_ratio:rate6h > (6 * 0.005)
+            and backend:user_requests:rate30m > 0.05
           for: 15m
           labels:
             severity: warning
             component: backend
             slo: availability
           annotations:
-            summary: "Backend error budget burn is elevated"
-            description: "Sustained burn-rate alert for 99.5% SLO (error budget 0.5%)."
-            runbook: "docs/course/chapter-09-observability/runbook-incident-debug.md"
+            summary: "{{ $labels.namespace }}: backend error budget burning - {{ $value | humanizePercentage }} of requests over 30m"
+            description: "More than 3% of user requests to the backend in {{ $labels.namespace }} have failed over the last 6 hours. Not an outage: find the failing route in the backend logs and plan the fix before the budget is gone."
+            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
