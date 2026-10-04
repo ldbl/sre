@@ -65,8 +65,7 @@ spec:
           value: "${ENVIRONMENT}"
         - name: CLUSTER_NAME
           value: "${cluster_name}"
-        - name: VERSION
-          value: "v1.0.0"
+        # No VERSION: the image reports its own tag (frontend Dockerfile: ENV VERSION=${APP_VERSION}).
         livenessProbe:
           httpGet:
             path: /health
