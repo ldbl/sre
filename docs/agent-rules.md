@@ -206,13 +206,16 @@ minutes; kind has no automation, and a tag changes there only by a commit.
 Backend alerts are computed per namespace on user requests only (probes and `/metrics` left out),
 on the error budget's burn rate with two windows and a traffic floor
 (`flux/infrastructure/observability/kube-prometheus-stack/monitoring/backend-slo-rules.yaml`).
-Alertmanager routes production and any other critical alert to `production`, the rest to `nonprod`;
-a critical backend alert mutes the backend warnings of its environment
-(`flux/infrastructure/observability/alerting/routing/routing.yaml`). At rest only `Watchdog` fires.
+Alertmanager routes production and any other critical alert to `production`, the other alerts the route
+matches to `nonprod`; `Watchdog` is left out and goes to Healthchecks.io as a heartbeat, `InfoInhibitor`
+is left out because it only mutes info-level alerts. A critical backend alert mutes the backend warnings
+of its environment (`flux/infrastructure/observability/alerting/routing/routing.yaml`). Without user
+traffic the backend alerts stay quiet; other alerts still fire on their own condition (for example
+`CertificateExpiringSoon`) - on a healthy idle cluster only `Watchdog` fires.
 
 | Rule for the agent | What enforces it |
 |---|---|
-| Never add an alert that does not name an action, an urgency and a first check - internal signals go on a dashboard. | Review of the rules in Git; silence at rest (only `Watchdog` fires on an idle cluster). |
+| Never add an alert that does not name an action, an urgency and a first check - internal signals go on a dashboard. | Review of the rules in Git; silence at rest (only `Watchdog` fires on a healthy idle cluster). |
 | Measure the backend on user requests per environment - never on all requests, never across environments. | The recording rules in `backend-slo-rules.yaml` (review). |
 | Never lower a threshold or remove the traffic floor to make an alert fire in a test - generate the condition, or post a test alert to Alertmanager. | Instruction only. |
 | Never route an alert to a receiver nobody reads, and never mute a channel instead of removing the noise. | The routes are in Git (review). |
