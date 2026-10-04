@@ -135,5 +135,5 @@ paths. Flux sets back a changed policy it manages, but never removes a policy cr
 | Change NetworkPolicies only in Git, through a pull request; read `flux diff` for every environment the `base` feeds. Never apply, edit or delete one in an environment namespace by hand. | On Hetzner the OIDC roles may write only in `develop`. Flux sets back a changed or deleted policy it manages - not one created by hand, which stays: instruction only. |
 | To fix a blocked connection, propose the exact pair - source labels, target labels, port, both directions - never an empty `from`/`to`, a `podSelector: {}` without ports, or a new `0.0.0.0/0` rule. | The review of the pull request; no check refuses them: instruction only. |
 | Diagnose before proposing: run `scripts/np-probe.sh` (DNS and TCP separately) and report which policies select the source and the target. | Instruction only. |
-| Never give a pod the labels of another application to get through a policy. | Instruction only; on Hetzner pods can be created only in `develop`. |
+| Never give a pod the labels of another application to get through a policy. | Instruction only; on Hetzner the everyday OIDC sign-in can create pods only in `develop`. |
 | Experiments go into the namespace `lab`, and what you created there is deleted afterwards. | Instruction only. |
