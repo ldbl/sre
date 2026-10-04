@@ -41,6 +41,13 @@ done
 [ -n "${NAMESPACE}" ] && [ $# -eq 2 ] || usage
 HOST="$1"
 PORT="$2"
+# A port is a number from 1 to 65535 - anything else would fail inside the pod and read as "TCP blocked".
+case "${PORT}" in
+  ''|*[!0-9]*) echo "np-probe: invalid port '${PORT}'" >&2; usage ;;
+esac
+if [ "${PORT}" -lt 1 ] || [ "${PORT}" -gt 65535 ]; then
+  echo "np-probe: invalid port '${PORT}'" >&2; usage
+fi
 
 # Inside the pod (busybox): resolve first and stop there if it fails; then try TCP to the port.
 # The exit code carries the answer out of the pod - lab-pod.sh returns the command's own.
