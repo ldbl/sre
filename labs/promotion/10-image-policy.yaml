@@ -1,0 +1,34 @@
+# Chapter 10 lab: what Flux image automation would pick for production - read-only, in the lab namespace.
+# The ImageRepository scans the public tags of ghcr.io/safeops-course/backend (no credentials needed);
+# the ImagePolicy uses the production policy's exact pattern (flux/apps/backend/production/
+# image-policy.yaml) and picks the tag with the highest timestamp. digestReflectionPolicy: Always
+# also records the digest the tag points to now - a tag is a name that can be moved; the digest
+# names the content.
+# On Hetzner the same policy feeds ImageUpdateAutomation, which writes the picked tag into Git every
+# five minutes. Nothing here writes to Git or touches an environment; kind has no automation.
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: backend
+  namespace: lab
+spec:
+  image: ghcr.io/safeops-course/backend
+  interval: 10m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: backend-production
+  namespace: lab
+spec:
+  imageRepositoryRef:
+    name: backend
+  filterTags:
+    pattern: '^production-v[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 10m

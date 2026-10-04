@@ -65,7 +65,7 @@ flux/
   secrets/           # SOPS-encrypted secrets
 backend/             # Go reference service (health, metrics, chaos endpoints)
 frontend/            # Vue 3 SRE dashboard (Vite + Tailwind + nginx)
-labs/                # Lab manifests applied by hand (never by Flux): labs/network-policies (Chapter 06), labs/security-context (Chapter 07), labs/resource-management (Chapter 08), labs/availability (Chapter 09)
+labs/                # Lab manifests applied by hand (never by Flux): labs/network-policies (Chapter 06), labs/security-context (Chapter 07), labs/resource-management (Chapter 08), labs/availability (Chapter 09), labs/promotion (Chapter 10)
 scripts/             # Pre-commit hooks, automation scripts
   docs/                # Platform runbooks, architecture notes, and repo pointers
 ```
@@ -116,6 +116,11 @@ scripts/             # Pre-commit hooks, automation scripts
   --oidc-extra-scope=email --oidc-extra-scope=groups` (int128/kubelogin; the API server maps the user from
   `email` and groups from `groups` - without these scopes the token has neither; the Dex client
   `kubernetes` is public - no secret, PKCE).
+- Image tags: each overlay's `images[].newTag` matches its own environment's `image-policy.yaml` pattern and
+  ends with the setter comment `# {"$imagepolicy": "<env>:<app>:tag"}` (`scripts/check-image-tags.sh`,
+  pre-commit). Production images are never built - `promote-production.yml` (backend/frontend repos)
+  re-tags a staging image (same digest). On Hetzner a rollback pins the production ImagePolicy pattern to
+  the good tag (a revert of newTag alone is rewritten by ImageUpdateAutomation); kind has no automation.
 - NetworkPolicies use `default-deny-all` — new services need explicit ingress/egress rules from `traefik` namespace
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;

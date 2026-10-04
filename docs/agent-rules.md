@@ -182,6 +182,21 @@ node upgrade, kured before a reboot - not rolling updates (the Deployment strate
 | Rule for the agent | What enforces it |
 |---|---|
 | Never put `spec.replicas` in Git for a Deployment an HPA scales. | `scripts/check-app-security.sh` in pre-commit and Flux Diff. |
-| Never drain a node without a plan: first a dry run that names the cluster with `--context` and the node explicitly - `kubectl drain --dry-run=server --ignore-daemonsets --delete-emptydir-data --timeout=...` - and the PDBs of every namespace on that node (`kubectl get pdb -A`, again with `--context`), not only the namespace you are working in; a real drain only with the owner's yes, and `uncordon` after. | Instruction only. |
+| Never drain a node without a plan: first a dry run that names the cluster with `--context` and the node explicitly - on kind `kubectl --context kind-sre-control-plane drain sre-control-plane-worker --dry-run=server --ignore-daemonsets --delete-emptydir-data --timeout=20s` - and the PDBs of every namespace on that node (`kubectl get pdb -A`, again with `--context`), not only the namespace you are working in; a real drain only with the owner's yes, and `uncordon` after. | Instruction only. |
 | Never lower or delete a PodDisruptionBudget to let a drain through. Report which PDB blocks and why - only after reading its status (`kubectl get pdb -A -o yaml` with `--context`: `currentHealthy`, `desiredHealthy`, `expectedPods` and the `DisruptionAllowed` condition): too few healthy pods (a rollout, a crash), a budget as strict as the replica count, or a replacement with nowhere to run. | The PDBs are in Git (review); Flux sets a hand edit back. |
 | Do not promise node redundancy: check where the replicas run (`-o wide`) and how many schedulable nodes there are. | Instruction only. |
+
+## Chapter 10 - Promote the tested artifact, never rebuild it
+
+Develop and staging are built from their branches; production is never built. The backend and frontend
+repositories' `promote-production.yml` re-tags a tested `staging-...` image as `production-...` with
+`docker buildx imagetools create` - the same index digest. On Hetzner, an ImagePolicy per environment
+picks the newest matching tag and ImageUpdateAutomation writes it into the overlay's `newTag` every five
+minutes; kind has no automation, and a tag changes there only by a commit.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never build or push an image for production; promote a staging tag that was tested, and prove it by digest: the staging and production tags (`docker buildx imagetools inspect`) and the running pods (`status.containerStatuses[].imageID`) show the same index digest. | Production images come only from `promote-production.yml` (re-tag); instruction for the proof. |
+| Never change a running image by hand (`kubectl set image`, `kubectl rollout undo`): Flux owns the Deployment and sets it back. Change `newTag` through a pull request. | Flux (reconcile); RBAC on Hetzner (the everyday sign-in only reads production). |
+| Keep each overlay's `newTag` matching its own environment's ImagePolicy, with the setter comment `# {"$imagepolicy": "<namespace>:<name>:tag"}`. | `scripts/check-image-tags.sh` in pre-commit and CI. |
+| A production rollback on Hetzner is not a revert of `newTag` alone - the automation writes the newest tag back. Pin the production ImagePolicy's pattern to the known-good tag and set `newTag` to it in one pull request; restore the pattern in another once the fix is promoted. | Instruction only (reviewed in the pull request). |

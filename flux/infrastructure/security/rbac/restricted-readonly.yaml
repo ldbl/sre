@@ -60,6 +60,14 @@ rules:
       - helmrepositories
       - helmcharts
     verbs: ["get", "list", "watch"]
+  # Image automation - read-only: which tag the ImagePolicy picks decides whether a rollback of
+  # newTag lasts (Chapter 10)
+  - apiGroups: ["image.toolkit.fluxcd.io"]
+    resources:
+      - imagerepositories
+      - imagepolicies
+      - imageupdateautomations
+    verbs: ["get", "list", "watch"]
   # CNPG — read-only
   - apiGroups: ["postgresql.cnpg.io"]
     resources:
