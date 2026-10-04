@@ -1,9 +1,11 @@
-# Chapter 08 lab: a Deployment that asks for more CPU than the namespace quota allows.
-# The lab quota (flux/infrastructure/lab/resourcequota.yaml) caps the sum of CPU requests at 1 core;
-# this pod asks for 2. The API server accepts the Deployment - the quota checks pods, not
-# Deployments - and the ReplicaSet's attempts to create the pod are refused. The refusal is a
-# FailedCreate event on the ReplicaSet ("exceeded quota: compute-quota"); the Deployment only shows
-# 0/1 ready. The same happens in develop/staging/production.
+# Chapter 08 lab: a Deployment whose pods together ask for more CPU than the namespace quota allows.
+# The lab quota (flux/infrastructure/lab/resourcequota.yaml) caps the sum of CPU requests at 1 core.
+# Each of the three pods asks for 400m - under the LimitRange's 500m per container, so one pod alone
+# is fine - but three need 1200m. The API server accepts the Deployment (the quota checks pods, not
+# Deployments); the ReplicaSet creates two pods (800m) and its attempts to create the third are
+# refused. The refusal is a FailedCreate event on the ReplicaSet ("exceeded quota: compute-quota");
+# the Deployment only shows 2/3 ready. The same happens in develop/staging/production.
+# Pods that have finished (Succeeded or Failed) no longer count against the quota.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -11,7 +13,7 @@ metadata:
   name: greedy
   namespace: lab
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: greedy
@@ -33,10 +35,10 @@ spec:
           command: ["sh", "-c", "while true; do sleep 3600; done"]
           resources:
             requests:
-              cpu: "2"
+              cpu: 400m
               memory: 32Mi
             limits:
-              cpu: "2"
+              cpu: 400m
               memory: 32Mi
           securityContext:
             allowPrivilegeEscalation: false
