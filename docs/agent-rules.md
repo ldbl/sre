@@ -154,3 +154,19 @@ limits Restricted does not require.
 | Every emptyDir gets a `sizeLimit`. | `scripts/check-app-security.sh`. |
 | Never set `automountServiceAccountToken: true` on an app that does not call the Kubernetes API. | `scripts/check-app-security.sh`. |
 | Never relabel a namespace's Pod Security level (`pod-security.kubernetes.io/enforce`) to get a pod in. | On Hetzner the OIDC roles cannot write namespaces; the labels are in Git (review). On kind: instruction only. |
+
+## Chapter 08 - Resources are a budget, not a guess
+
+Every app container names its CPU and memory requests (what the scheduler reserves and the quota
+counts) and limits (the ceiling: memory over it is OOMKilled, CPU over it is throttled). Each
+namespace has a LimitRange (defaults and a per-container min/max) and a ResourceQuota (the total).
+`check-app-resources.sh` keeps staging equal to production, production at least develop, and the
+worst case - every app at its HPA maximum plus the rolling-update surge, plus Postgres - inside
+each namespace's quota.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never remove a request or limit, and never raise a limit to make an OOMKilled pod start: first read the container status (`reason: OOMKilled`) and the memory it really uses. | `scripts/check-app-resources.sh` (a missing request/limit stops it) in pre-commit and Flux Diff; Kyverno `require-requests-limits` reports it (audit). |
+| Tell the three apart before acting: OOMKilled (container status, exit 137), eviction (pod status `Evicted`, node pressure), throttling (no event - only the CFS metrics). | Instruction only. |
+| Change staging and production resources together, and never let production get less than develop. | `scripts/check-app-resources.sh`. |
+| Never raise a namespace quota to fit a change: show the worst case it has to hold, and let the owner decide. | Quotas are in Git (review); `scripts/check-app-resources.sh` prints the worst case per namespace. |

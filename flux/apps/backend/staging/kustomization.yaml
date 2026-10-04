@@ -18,23 +18,6 @@ images:
     newName: ${image_registry}/backend
     newTag: staging-v0.0.0-165ecab-1790509191 # {"$imagepolicy": "staging:backend:tag"}
 patches:
-  # Same resources as production (pre-production parity; scripts/check-app-resources.sh).
-  - patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "100m"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/memory
-        value: "128Mi"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: "250m"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: "256Mi"
-    target:
-      kind: Deployment
-      name: backend
   # Chaos labs (Ch11/13/14/15/19) use /panic and the probe toggles here. Production keeps the base: off.
   - patch: |-
       apiVersion: apps/v1
