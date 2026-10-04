@@ -108,9 +108,16 @@ spec:
         - name: tmp
           mountPath: /tmp
       volumes:
+      # Every writable path is an emptyDir with a size limit. It is not a quota that stops the write:
+      # the kubelet measures the volume on a schedule and evicts the pod once it is over the limit -
+      # a very fast writer can still fill the node's disk before that. Measured at rest: 0-4 KB.
+      # cache: nginx buffers request bodies there; run: the pid file; tmp: scratch.
       - name: cache
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 64Mi
       - name: run
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 1Mi
       - name: tmp
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 16Mi

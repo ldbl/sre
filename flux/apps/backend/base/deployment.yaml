@@ -150,8 +150,14 @@ spec:
         - name: cache
           mountPath: /home/app/.cache
       volumes:
+      # Every writable path is an emptyDir with a size limit. It is not a quota that stops the write:
+      # the kubelet measures the volume on a schedule and evicts the pod once it is over the limit -
+      # a very fast writer can still fill the node's disk before that. It bounds a slow leak and makes
+      # the pod's budget explicit. /tmp holds request bodies Go buffers to disk - measured at 0 KB at
+      # rest, so 64Mi leaves room for uploads.
       - name: tmp
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 64Mi
       - name: cache
         emptyDir:
           sizeLimit: 10Mi

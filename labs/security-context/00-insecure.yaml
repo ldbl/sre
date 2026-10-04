@@ -1,0 +1,15 @@
+# Chapter 07 lab: a pod with no security settings at all - root, every default capability, privilege
+# escalation allowed, no seccomp, a writable root filesystem. It is never started: the lab only asks
+# the API server what it would say (--dry-run=server). In develop, Pod Security "restricted" refuses
+# it; in the namespace lab, which only warns, it would be accepted with a list of warnings.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: insecure-app
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "id"]

@@ -65,7 +65,7 @@ flux/
   secrets/           # SOPS-encrypted secrets
 backend/             # Go reference service (health, metrics, chaos endpoints)
 frontend/            # Vue 3 SRE dashboard (Vite + Tailwind + nginx)
-labs/                # Lab manifests applied by hand (never by Flux), e.g. labs/network-policies (Chapter 06)
+labs/                # Lab manifests applied by hand (never by Flux): labs/network-policies (Chapter 06), labs/security-context (Chapter 07)
 scripts/             # Pre-commit hooks, automation scripts
   docs/                # Platform runbooks, architecture notes, and repo pointers
 ```
@@ -120,7 +120,8 @@ scripts/             # Pre-commit hooks, automation scripts
 - App security rules (enforced by `scripts/check-app-security.sh` in pre-commit and Flux Diff): every app
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;
   every container runs non-root with a read-only root filesystem, no privilege escalation, capabilities
-  drop ALL and seccomp RuntimeDefault (admission only audits these);
+  drop ALL and seccomp RuntimeDefault (Pod Security restricted enforces all but the read-only root filesystem
+  at admission); every emptyDir has a sizeLimit;
   backend `PPROF_ENABLED` is `"false"` in Git;
   `CHAOS_ENABLED` is explicit - `"true"` only in develop/staging, `"false"` in production.
   `scripts/security-smoke.sh BASE_URL [HOST]` checks the public path from outside (no secrets on /api/env,

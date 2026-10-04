@@ -137,3 +137,20 @@ paths. Flux sets back a changed policy it manages, but never removes a policy cr
 | Diagnose before proposing: run `scripts/np-probe.sh` (DNS and TCP separately) and report which policies select the source and the target. | Instruction only. |
 | Never give a pod the labels of another application to get through a policy. | Instruction only; on Hetzner the everyday OIDC sign-in can create pods only in `develop`. |
 | Experiments go into the namespace `lab`, and what you created there is deleted afterwards. | Instruction only. |
+
+## Chapter 07 - A container gets only what it needs
+
+Every app container runs as a non-root user, on a read-only root filesystem, without privilege
+escalation, with every capability dropped, under the RuntimeDefault seccomp profile, and without a
+service account token. Writable paths are declared emptyDir volumes with a size limit. Pod Security
+"restricted" refuses a pod without most of these when it is created; `check-app-security.sh`
+refuses the regression in the pull request, including the read-only root filesystem and the size
+limits Restricted does not require.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never weaken a security setting to make an app start - no root, no `privileged`, no added capabilities, no writable root filesystem. Find the path the app needs and add a writable volume for it. | Pod Security "restricted" in develop, staging and production (at admission); `scripts/check-app-security.sh` in pre-commit and Flux Diff (in the pull request). |
+| Tell "Read-only file system" from "Permission denied": the first needs a writable mount, the second a path the app's user owns. Neither is fixed with root. | Instruction only. |
+| Every emptyDir gets a `sizeLimit`. | `scripts/check-app-security.sh`. |
+| Never set `automountServiceAccountToken: true` on an app that does not call the Kubernetes API. | `scripts/check-app-security.sh`. |
+| Never relabel a namespace's Pod Security level (`pod-security.kubernetes.io/enforce`) to get a pod in. | On Hetzner the OIDC roles cannot write namespaces; the labels are in Git (review). On kind: instruction only. |

@@ -4,7 +4,12 @@
 #   - every Deployment: automountServiceAccountToken: false (the apps never call the Kubernetes API)
 #   - every container (and init container): runAsNonRoot, readOnlyRootFilesystem, no privilege
 #     escalation, capabilities drop ALL, seccomp RuntimeDefault - the container value wins over
-#     the pod's, as in Kubernetes (admission only audits these, so this is where a regression stops)
+#     the pod's, as in Kubernetes. Pod Security "restricted" (enforced on develop, staging and
+#     production) also refuses a pod without the non-root, escalation, capabilities and seccomp
+#     settings - but only when it is created, in the cluster. This check stops the same regression
+#     in the pull request, and adds what Restricted does not require: readOnlyRootFilesystem.
+#   - every emptyDir volume has a sizeLimit (an unlimited one can grow until the node's disk is full;
+#     the kubelet evicts a pod over its limit when it next measures - a budget, not a quota)
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
 #     "false" in production
@@ -98,6 +103,18 @@ for overlay in "${overlays[@]}"; do
          ((.securityContext.capabilities.drop // []) | join(",")),
          (.securityContext.seccompProfile.type | tostring), ($pod.securityContext.seccompProfile.type | tostring)]
       | @tsv' <<<"${rendered}")
+
+  # Rule: every emptyDir has a sizeLimit - a writable path is the price of a read-only root
+  # filesystem, and it must not be able to fill the node's disk.
+  # shellcheck disable=SC2016 # $d below is a yq variable, not a shell one
+  while IFS=$'\t' read -r dep vol limit; do
+    [[ -z "${vol}" ]] && continue
+    if [[ "${limit}" == "null" || -z "${limit}" ]]; then
+      failures+=("${overlay}: Deployment ${dep} emptyDir volume ${vol} must set a sizeLimit")
+    fi
+  done < <(yq 'select(.kind == "Deployment") | .metadata.name as $d
+      | (.spec.template.spec.volumes // [])[] | select(has("emptyDir"))
+      | [$d, .name, (.emptyDir.sizeLimit | tostring)] | @tsv' <<<"${rendered}")
 
   # Rule: for every Deployment an HPA scales, no spec.replicas in Git.
   while IFS= read -r target; do
