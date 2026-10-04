@@ -20,6 +20,13 @@ spec:
           podSelector:
             matchLabels:
               k8s-app: kube-dns
+        # The same CoreDNS under the label newer distributions put on it - as in the platform's policy.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: coredns
       ports:
         - protocol: UDP
           port: 53

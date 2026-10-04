@@ -13,7 +13,8 @@
 # Example: scripts/np-probe.sh -n develop -l app=frontend backend 80
 #
 # Output, one line: "DNS ok (10.96.1.73), TCP open" | "DNS ok (...), TCP blocked" | "DNS FAILED".
-# Exit code: 0 TCP open, 1 TCP blocked, 2 DNS failed, 3 usage error.
+# Exit code: 0 TCP open, 1 TCP blocked, 2 DNS failed, 3 usage error, 4 no verdict (the probe pod
+# did not run - its output is printed).
 # Runs a one-off pod through scripts/lab-pod.sh (Pod Security restricted, deleted afterwards).
 # Changes nothing else. Needs kubectl and jq (for lab-pod.sh). Chapter 06.
 set -euo pipefail
@@ -23,14 +24,15 @@ NAMESPACE=""
 CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
 LABEL_ARGS=()
 
-# usage - print the header comment (lines 2-18) as help, then exit 3.
-usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 3; }
+# usage - print the header comment (lines 2-19) as help, then exit 3.
+usage() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 3; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -n) NAMESPACE="$2"; shift 2 ;;
-    -c) CONTEXT="$2"; shift 2 ;;
-    -l) LABEL_ARGS+=(-l "$2"); shift 2 ;;
+    # An option without its value is a usage error (exit 3), never a probe with an empty argument.
+    -n) [ $# -ge 2 ] || usage; NAMESPACE="$2"; shift 2 ;;
+    -c) [ $# -ge 2 ] || usage; CONTEXT="$2"; shift 2 ;;
+    -l) [ $# -ge 2 ] || usage; LABEL_ARGS+=(-l "$2"); shift 2 ;;
     -h|--help) usage ;;
     -*) echo "unknown option: $1" >&2; usage ;;
     *) break ;;
@@ -53,6 +55,16 @@ echo "DNS ok ($ip), TCP blocked"; exit 1
 rc=0
 out="$("${SCRIPT_DIR}/lab-pod.sh" -c "${CONTEXT}" -n "${NAMESPACE}" ${LABEL_ARGS[@]+"${LABEL_ARGS[@]}"} \
   -- sh -c "${PROBE}" "${HOST}" "${PORT}" 2>&1)" || rc=$?
-# lab-pod.sh prints the pod's log; the probe's verdict is its last line.
-echo "${out}" | tail -1
-exit "${rc}"
+# lab-pod.sh prints the pod's log; the probe's verdict is its last line. Exit 0/1/2 only with a
+# verdict that matches it - anything else (the pod did not start, an image pull failed, a timeout)
+# is an error of its own (4), shown in full, never read as "TCP blocked".
+verdict="$(printf '%s\n' "${out}" | tail -1)"
+case "${rc}:${verdict}" in
+  "0:DNS ok ("*"), TCP open" | "1:DNS ok ("*"), TCP blocked" | "2:DNS FAILED")
+    echo "${verdict}"
+    exit "${rc}"
+    ;;
+esac
+echo "np-probe: no verdict from the probe pod (exit ${rc}):" >&2
+printf '%s\n' "${out}" >&2
+exit 4
