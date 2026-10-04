@@ -42,10 +42,12 @@ done
 HOST="$1"
 PORT="$2"
 # A port is a number from 1 to 65535 - anything else would fail inside the pod and read as "TCP blocked".
+# Digits only, at most 5 of them - checked before the numeric test, which would fail (and count as
+# false) on a number too large for the shell.
 case "${PORT}" in
   ''|*[!0-9]*) echo "np-probe: invalid port '${PORT}'" >&2; usage ;;
 esac
-if [ "${PORT}" -lt 1 ] || [ "${PORT}" -gt 65535 ]; then
+if [ "${#PORT}" -gt 5 ] || [ "${PORT}" -lt 1 ] || [ "${PORT}" -gt 65535 ]; then
   echo "np-probe: invalid port '${PORT}'" >&2; usage
 fi
 
