@@ -20,10 +20,11 @@ fresh_copy() {
   cp -R "${ROOT}/flux/apps" "${WORK}/repo/flux/"
 }
 
-# run_case NAME EXPECTED(pass|fail) SED_EXPRESSION [YQ_EXPRESSION] - apply the edit(s) to the production
-# backend overlay of a fresh copy, run the check, compare.
+# run_case NAME EXPECTED(pass|fail) SED_EXPRESSION [YQ_EXPRESSION] [POLICY_NAMESPACE] - apply the edit(s)
+# to the production backend overlay of a fresh copy (POLICY_NAMESPACE moves its ImagePolicy to another
+# namespace), run the check, compare.
 run_case() {
-  local name="$1" expected="$2" edit="$3" yq_edit="${4:-}" file got
+  local name="$1" expected="$2" edit="$3" yq_edit="${4:-}" policy_ns="${5:-}" file got
   fresh_copy
   file="${WORK}/repo/flux/apps/backend/production/kustomization.yaml"
   if [[ -n "${edit}" ]]; then
@@ -31,6 +32,9 @@ run_case() {
   fi
   if [[ -n "${yq_edit}" ]]; then
     yq -i "${yq_edit}" "${file}"
+  fi
+  if [[ -n "${policy_ns:-}" ]]; then
+    yq -i ".metadata.namespace = \"${policy_ns}\"" "${WORK}/repo/flux/apps/backend/production/image-policy.yaml"
   fi
   if "${WORK}/repo/scripts/check-image-tags.sh" >/dev/null 2>&1; then got=pass; else got=fail; fi
   if [[ "${got}" == "${expected}" ]]; then
@@ -48,5 +52,7 @@ run_case "the setter comment removed" fail 's/ # {"$imagepolicy": "production:ba
 run_case "the setter names another environment" fail 's/"production:backend:tag"/"staging:backend:tag"/'
 run_case "a second image with a tag and no ImagePolicy of its name" fail "" '.images += [{"name": "sidecar", "newTag": "v1"}]'
 run_case "a second image that only renames, without a tag" pass "" '.images += [{"name": "sidecar", "newName": "ghcr.io/example/sidecar"}]'
+run_case "the key written as 'newTag :' - still checked" fail 's/newTag: production-\(v[^ ]*\)/newTag : staging-\1/'
+run_case "a same-name ImagePolicy from another namespace" fail "" '.images[0].newTag = .images[0].newTag' 'staging'
 
 exit "${FAILED}"
