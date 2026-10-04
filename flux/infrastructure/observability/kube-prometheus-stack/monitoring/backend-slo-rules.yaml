@@ -76,7 +76,7 @@ spec:
             component: backend
             slo: availability
           annotations:
-            summary: "{{ $labels.namespace }}: backend users are failing - {{ $value | humanizePercentage }} of requests over 1h"
+            summary: "{{ $labels.namespace }}: backend users are failing - {{ $value | humanizePercentage }} of requests in the last 5m"
             description: "More than 7.2% of user requests to the backend in {{ $labels.namespace }} fail with a 5xx, over the last hour and still in the last 5 minutes. First check: the backend's error logs and the last change - a promotion or a config change (Chapter 10)."
             runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
 
