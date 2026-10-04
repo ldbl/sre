@@ -8,7 +8,8 @@
 #     production) also refuses a pod without the non-root, escalation, capabilities and seccomp
 #     settings - but only when it is created, in the cluster. This check stops the same regression
 #     in the pull request, and adds what Restricted does not require: readOnlyRootFilesystem.
-#   - every emptyDir volume has a sizeLimit (an unlimited one can fill the node's disk)
+#   - every emptyDir volume has a sizeLimit (an unlimited one can grow until the node's disk is full;
+#     the kubelet evicts a pod over its limit when it next measures - a budget, not a quota)
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
 #     "false" in production

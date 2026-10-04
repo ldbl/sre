@@ -1,8 +1,10 @@
 # Chapter 07 lab: the same pod with the fix - an emptyDir mounted at /tmp, with a size limit.
 # The write to /tmp succeeds; everything else stays as it was: the root filesystem is still
 # read-only (the write to /etc fails), the process is still not root, and there is no service
-# account token in the container (automountServiceAccountToken: false). The sizeLimit keeps a
-# runaway write from filling the node's disk: past 16Mi, only this pod is evicted.
+# account token in the container (automountServiceAccountToken: false). The sizeLimit is the
+# pod's budget for /tmp: the kubelet measures the volume on a schedule and evicts the pod once it is
+# over 16Mi. It does not stop a write at the boundary - a very fast writer can still fill the
+# node's disk first - but it ends a slow leak before it does.
 ---
 apiVersion: v1
 kind: Pod
