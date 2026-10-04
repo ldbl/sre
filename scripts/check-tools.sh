@@ -42,6 +42,8 @@ hint() {
   case "$tool:$OS" in
     docker:Darwin)     echo "https://orbstack.dev (recommended) or https://docs.docker.com/desktop/" ;;
     docker:*)          echo "https://docs.docker.com/engine/install/" ;;
+    buildx:Darwin)     echo "comes with Docker Desktop / OrbStack; otherwise brew install docker-buildx | https://docs.docker.com/build/install-buildx/" ;;
+    buildx:*)          echo "https://docs.docker.com/build/install-buildx/ (comes with Docker Engine from Docker's own packages)" ;;
     terraform:Darwin)  echo "brew tap hashicorp/tap && brew install hashicorp/tap/terraform  | https://developer.hashicorp.com/terraform/install" ;;
     terraform:*)       echo "https://developer.hashicorp.com/terraform/install" ;;
     kind:Darwin)       echo "brew install kind  | https://kind.sigs.k8s.io/docs/user/quick-start/#installation" ;;
@@ -117,6 +119,16 @@ check pre-commit ""               "pre-commit --version"
 check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
 check jq         ""               "jq --version"        # the AI agent's kube-context hook (Chapter 01) and scripts/lab-pod.sh
 check yq         "4"              "yq --version"        # the pre-commit guardrails that read the Flux manifests (Chapter 03 on)
+
+# docker buildx is a Docker CLI plugin, not a command on PATH, so `check` cannot find it.
+# Chapter 10 compares image digests in the registry with `docker buildx imagetools inspect`.
+if command -v docker >/dev/null 2>&1; then
+  if out="$(docker buildx version 2>/dev/null)"; then
+    ok "docker buildx" "$(printf '%s\n' "$out" | first_version || echo installed)"
+  else
+    missing "docker buildx" "$(hint buildx)"
+  fi
+fi
 
 # Docker must not only be installed but running - the kind nodes are containers.
 if command -v docker >/dev/null 2>&1; then
