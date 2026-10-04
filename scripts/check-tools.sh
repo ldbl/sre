@@ -43,7 +43,7 @@ hint() {
     docker:Darwin)     echo "https://orbstack.dev (recommended) or https://docs.docker.com/desktop/" ;;
     docker:*)          echo "https://docs.docker.com/engine/install/" ;;
     buildx:Darwin)     echo "comes with Docker Desktop / OrbStack; otherwise brew install docker-buildx | https://docs.docker.com/build/install-buildx/" ;;
-    buildx:*)          echo "apt install docker-buildx-plugin | https://docs.docker.com/build/install-buildx/" ;;
+    buildx:*)          echo "https://docs.docker.com/build/install-buildx/ (comes with Docker Engine from Docker's own packages)" ;;
     terraform:Darwin)  echo "brew tap hashicorp/tap && brew install hashicorp/tap/terraform  | https://developer.hashicorp.com/terraform/install" ;;
     terraform:*)       echo "https://developer.hashicorp.com/terraform/install" ;;
     kind:Darwin)       echo "brew install kind  | https://kind.sigs.k8s.io/docs/user/quick-start/#installation" ;;
