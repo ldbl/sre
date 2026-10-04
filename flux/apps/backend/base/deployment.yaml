@@ -150,8 +150,12 @@ spec:
         - name: cache
           mountPath: /home/app/.cache
       volumes:
+      # Every writable path is an emptyDir with a size limit: without one, a runaway write fills the
+      # node's disk for every pod on it; with one, only this pod is evicted. /tmp holds request bodies
+      # Go buffers to disk - measured at 0 KB at rest, so 64Mi leaves room for uploads.
       - name: tmp
-        emptyDir: {}
+        emptyDir:
+          sizeLimit: 64Mi
       - name: cache
         emptyDir:
           sizeLimit: 10Mi

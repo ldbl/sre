@@ -1,0 +1,27 @@
+# Chapter 07 lab: a hardened one-shot pod that writes a report to /tmp - and has no volume there.
+# The root filesystem is read-only, so the write fails with "Read-only file system". That is the
+# failure a real app shows when it needs a writable path nobody declared (step B2 fixes it in 20).
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: writer
+  namespace: lab
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c", "echo report > /tmp/report.txt && echo 'written: /tmp/report.txt'"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]

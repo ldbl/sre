@@ -1,0 +1,29 @@
+# Chapter 07 lab: a different failure - "Permission denied". Here the root filesystem is writable
+# (readOnlyRootFilesystem: false, for this comparison only), but the process runs as UID 65532 and
+# /etc belongs to root. The kernel refuses the write because of file ownership, not because the
+# filesystem is read-only. The answer is not root: it is a writable path the user owns - a volume,
+# or an image that gives the app's user its own directory (and fsGroup for volumes that need it).
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: writer-perm
+  namespace: lab
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c", "echo report > /etc/report.txt && echo 'written: /etc/report.txt'"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        capabilities:
+          drop: ["ALL"]
