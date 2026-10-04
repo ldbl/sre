@@ -1,0 +1,48 @@
+# Chapter 06 lab: a small HTTP service in the namespace "lab" - the target of every probe.
+# The namespace "lab" has no NetworkPolicy of its own, so the lab starts from a known state: open.
+# Nothing here is applied by Flux (it lives outside flux/): you apply it by hand, and C1 deletes it.
+# Pod Security "restricted" fields, so the same manifest works in a namespace that enforces it.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lab-api
+  namespace: lab
+  labels:
+    app: lab-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: busybox:1.36
+      # busybox httpd serves one page on 8080 - a port a non-root process may open.
+      command: ["sh", "-c", "mkdir -p /tmp/www && echo ok > /tmp/www/index.html && exec httpd -f -p 8080 -h /tmp/www"]
+      ports:
+        - containerPort: 8080
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: tmp
+      emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lab-api
+  namespace: lab
+spec:
+  selector:
+    app: lab-api
+  ports:
+    - port: 80
+      targetPort: 8080

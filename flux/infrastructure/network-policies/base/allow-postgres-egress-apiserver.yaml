@@ -1,3 +1,7 @@
+# Postgres (CNPG) pods talk to the Kubernetes API server on 6443: the CNPG instance manager inside each
+# pod reads and updates its Cluster object. The API server is not a pod - its address depends on the
+# cluster (kind, k3s) - so the rule uses an ipBlock for any address on TCP 6443. The residual risk is
+# small: only that port, and every request to the API server still needs the pod's own RBAC.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

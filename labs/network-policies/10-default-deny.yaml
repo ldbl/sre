@@ -1,0 +1,15 @@
+# Chapter 06 lab: default deny - selects every pod in "lab" (podSelector {}) for both directions and
+# allows nothing. From now on a connection exists only if another policy allows it - on both ends:
+# egress from the client's pod and ingress to the server's pod. Policies only ever add allowances;
+# none of them can take one away again.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: lab
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

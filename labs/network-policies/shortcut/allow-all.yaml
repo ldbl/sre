@@ -1,0 +1,22 @@
+# Chapter 06 lab: the shortcut from the incident - "allow everything until we find the problem".
+# Kept in its own folder: `kubectl apply -f labs/network-policies/` does not read subfolders, so
+# applying the lab never applies this by accident - only B6 applies it, by its own path.
+# Policies only add allowances, so this one policy reopens every connection in "lab" in both
+# directions, whatever the other policies say: empty "from"/"to" rules match every source and
+# destination, inside and outside the cluster. The lab applies it to see that, then deletes it.
+# Never apply anything like it to an environment.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shortcut-allow-all
+  namespace: lab
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {}
+  egress:
+    - {}
