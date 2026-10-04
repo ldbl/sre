@@ -1,0 +1,24 @@
+# Chapter 10 lab: the same policy pinned to one known-good tag - how a rollback holds while automation runs.
+# Reverting newTag in Git is not enough on Hetzner: the policy above still picks the newest production
+# tag, and ImageUpdateAutomation writes it back within five minutes. Narrowing the pattern to the one
+# good tag makes the policy - and so the automation - choose that tag; the rollback then stays until
+# the pattern is restored after the fix is promoted. Both changes go through a pull request.
+# The tag below is the platform's previous production release (still in GHCR; it reports itself as
+# staging-v0.0.0-a00f7ba-1773188261 - the staging build it was promoted from, never rebuilt).
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: backend-production
+  namespace: lab
+spec:
+  imageRepositoryRef:
+    name: backend
+  filterTags:
+    pattern: '^production-v0\.0\.0-a00f7ba-(?P<ts>1773188261)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 10m

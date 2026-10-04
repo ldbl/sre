@@ -68,6 +68,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: check-image-tags-test
+        name: image-tag check tests (throw-away copy of flux/apps)
+        entry: tests/check-image-tags.test.sh
+        language: script
+        files: ^(scripts/check-image-tags\.sh|tests/check-image-tags\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh
@@ -90,6 +98,14 @@ repos:
         entry: scripts/check-oidc-rbac.sh
         language: script
         files: ^flux/infrastructure/security/(rbac|dex)/.*\.ya?ml$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: image-tags
+        name: Each overlay's image tag matches its own ImagePolicy, with the setter comment
+        entry: scripts/check-image-tags.sh
+        language: script
+        files: ^flux/apps/.*\.ya?ml$
         pass_filenames: false
         stages: [pre-commit]
 
