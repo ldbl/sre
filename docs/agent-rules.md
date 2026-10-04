@@ -170,3 +170,18 @@ each namespace's quota.
 | Tell the three apart before acting: OOMKilled (container status, exit 137), eviction (pod status `Evicted`, node pressure), throttling (no event - only the CFS metrics). | Instruction only. |
 | Change staging and production resources together, and never let production get less than develop. | `scripts/check-app-resources.sh`. |
 | Never raise a namespace quota to fit a change: show the worst case it has to hold, and let the owner decide. | Quotas are in Git (review); `scripts/check-app-resources.sh` prints the worst case per namespace. |
+
+## Chapter 09 - Availability is counted, not hoped for
+
+The HPA owns the replica count of every app Deployment: `spec.replicas` is not in Git, so Flux never
+sets it back during a peak. A PodDisruptionBudget limits voluntary evictions - `kubectl drain`, a
+node upgrade, kured before a reboot - not rolling updates (the Deployment strategy) and not crashes.
+`develop` runs one replica with `maxUnavailable: 1`; staging and production at least two with
+`minAvailable: 1`.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never put `spec.replicas` in Git for a Deployment an HPA scales. | `scripts/check-app-security.sh` in pre-commit and Flux Diff. |
+| Never drain a node without a plan: first `kubectl drain --dry-run=server --ignore-daemonsets --delete-emptydir-data --timeout=...` and the PDBs of every namespace on that node; a real drain only with the owner's yes, and `uncordon` after. | Instruction only. |
+| Never lower or delete a PodDisruptionBudget to let a drain through. Report which PDB blocks and why (ALLOWED DISRUPTIONS 0, no room for the replacement). | The PDBs are in Git (review); Flux sets a hand edit back. |
+| Do not promise node redundancy: check where the replicas run (`-o wide`) and how many schedulable nodes there are. | Instruction only. |

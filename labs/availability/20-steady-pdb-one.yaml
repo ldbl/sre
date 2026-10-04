@@ -1,0 +1,17 @@
+# Chapter 09 lab: the same PDB with minAvailable: 1 - the rule staging and production use.
+# With two healthy pods, ALLOWED DISRUPTIONS is 1: one eviction succeeds. The evicted pod is gone at
+# once, its replacement is not Ready yet - and for those seconds ALLOWED DISRUPTIONS is 0, so a second
+# eviction would be refused. The budget comes back only when the replacement is Ready. With three
+# healthy pods the same rule would allow two: minAvailable counts the pods that must stay, not the
+# ones that may go (that is maxUnavailable).
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: steady
+  namespace: lab
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: steady
