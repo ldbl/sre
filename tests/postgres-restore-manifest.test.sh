@@ -34,11 +34,11 @@ check() {
   if eval "$2"; then echo "ok   - $1"; else echo "FAIL - $1"; FAILED=1; fi
 }
 
-# run ARGS... - run the script; stdout to WORK/out.yaml, exit code to RC.
+# run ARGS... - run the script; stdout to WORK/out.yaml, stderr to WORK/err.txt, exit code to RC.
 # shellcheck disable=SC2034  # RC is read by the conditions check() evaluates
 run() {
   : > "${STUB_LOG}"
-  set +e; "${SCRIPT}" "$@" > "${WORK}/out.yaml" 2>/dev/null; RC=$?; set -e
+  set +e; "${SCRIPT}" "$@" > "${WORK}/out.yaml" 2> "${WORK}/err.txt"; RC=$?; set -e
 }
 
 run -n develop
@@ -63,7 +63,10 @@ run
 check "missing -n is refused" '[ "${RC}" != 0 ]'
 
 run -n develop -t
-check "-t without a value is refused" '[ "${RC}" != 0 ]'
+check "-t without a value is refused: exit 1, says why" '[ "${RC}" = 1 ] && grep -q -- "-t needs a value" "${WORK}/err.txt"'
+
+run -n -c some-ctx
+check "an option where a value belongs is refused: exit 1, says why" '[ "${RC}" = 1 ] && grep -q -- "-n needs a value" "${WORK}/err.txt"'
 
 STUB_NO_BUCKET=1 run -n develop
 check "a Secret without BUCKET fails loudly" '[ "${RC}" != 0 ]'

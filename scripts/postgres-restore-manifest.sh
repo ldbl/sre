@@ -38,8 +38,12 @@ RESTORE="app-postgres-restore"
 # usage - print the header comment of this file (lines 2-17) as help, then exit 1.
 usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
-# need_value OPTION ARGS... - fail with a clear message when OPTION has no value after it.
-need_value() { [ $# -ge 2 ] && [ -n "$2" ] || { echo "$1 needs a value" >&2; usage; }; }
+# need_value OPTION ARGS... - fail with a clear message when OPTION has no value after it, or when
+# the "value" is the next option (-n -c ...). No namespace, image, label, Secret or context used here
+# starts with "-", so a leading "-" always means a missing value.
+need_value() {
+  if [ $# -lt 2 ] || [ -z "$2" ] || [ "${2#-}" != "$2" ]; then echo "$1 needs a value" >&2; usage; fi
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
