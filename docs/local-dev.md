@@ -47,9 +47,13 @@ Images are pulled from `ghcr.io/safeops-course/*`; no registry credentials are n
 
 ## Provision the Cluster with Terraform
 Use the Terraform module under `infra/terraform/kind_cluster/` to create (or destroy) the local kind cluster. The module codifies the multi-node topology directly in Terraform, automatically merges the generated kubeconfig into `~/.kube/config`, and bootstraps Flux via Flux Operator + `FluxInstance`.
-GitOps reconciliation is on by default (course repo, local profile, anonymous HTTPS - the repository is public). Override when you work from a fork or want the full platform profile:
+GitOps reconciliation is on by default (course repo, local profile, anonymous HTTPS - the repository is public). Working from a fork, put its URL into `infra/terraform/kind_cluster/terraform.tfvars` (git-ignored; start from `terraform.tfvars.example`) - not into an `export`: a plan from a terminal without it would point Flux back to the course repository and reinstall Flux:
 ```bash
-export TF_VAR_flux_git_repository_url="https://github.com/<you>/sre.git"      # your fork
+cp infra/terraform/kind_cluster/terraform.tfvars.example infra/terraform/kind_cluster/terraform.tfvars
+# edit flux_git_repository_url = "https://github.com/<you>/sre.git"
+```
+For the full platform profile, override for that run:
+```bash
 export TF_VAR_flux_kustomization_path="./flux/bootstrap/flux-system"           # full platform (needs cloud secrets)
 export TF_VAR_local_profile=false                                              # skip the generated local secrets
 ```

@@ -273,7 +273,7 @@ requests while sparing the probes - a release can look healthy to every health c
 | Rule for the agent | What enforces it |
 |---|---|
 | During an incident, change nothing the commander did not ask for, and say each action before and after it; never act in parallel with another responder. | Instruction only. |
-| Find the last change before proposing a fix: a release minutes before the first failure is reverted first, through a pull request - a restart does not undo a configuration change. | Instruction only; Flux reverts hand changes to what Git holds (Chapter 03). |
+| Find the last change before proposing a fix: a release minutes before the first failure is the first suspect. Revert it through a pull request only after checking the revert is safe - data and schema still compatible (Chapter 18), nothing pruned that holds data, image automation not putting the bad tag back (Chapter 10). A restart does not undo a configuration change. | Instruction only; Flux reverts hand changes to what Git holds (Chapter 03). |
 | Never call an incident recovered because an alert resolved: prove it with a user operation that succeeds (a request through the Service, a login), with traffic flowing. | Instruction only. |
 | Never write a postmortem cause that names a person; name the conditions, and give every action an owner, a date and a way to check it. | Review of the postmortem. |
 | Never leave `RANDOM_ERROR_RATE` (or any drill setting) in an overlay after a drill; the drill ends with its revert merged. | Review; `flux/apps/backend/*/kustomization.yaml` in Git shows it. |
