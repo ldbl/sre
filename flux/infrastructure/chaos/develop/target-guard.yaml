@@ -1,0 +1,35 @@
+---
+# RBAC cannot select by label: the Role lets the chaos-monkey ServiceAccount delete ANY pod in
+# develop - app-postgres-1 included. The script picks only frontend and backend, but a script is an
+# instruction, not a guardrail. This policy is the guardrail: a pod deletion by that ServiceAccount
+# is refused unless the pod is labelled app=frontend or app=backend. Native ValidatingAdmissionPolicy
+# (GA since Kubernetes 1.30), Deny from the start - like oidc-flux-operator-fields.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: chaos-monkey-targets
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["DELETE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: chaos-monkey
+      expression: "request.userInfo.username == 'system:serviceaccount:flux-system:chaos-monkey'"
+  validations:
+    # On DELETE the pod being deleted is oldObject (object is null).
+    - expression: >-
+        has(oldObject.metadata.labels) && 'app' in oldObject.metadata.labels
+        && oldObject.metadata.labels['app'] in ['frontend', 'backend']
+      message: "chaos-monkey may delete only frontend and backend pods"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: chaos-monkey-targets
+spec:
+  policyName: chaos-monkey-targets
+  validationActions: [Deny]

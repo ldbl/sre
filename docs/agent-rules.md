@@ -234,3 +234,17 @@ kind, Hetzner Object Storage on the platform). A restore is a new cluster next t
 | Never restore over an existing database; restore next to it, as `app-postgres-restore`. | `postgres-restore-manifest.sh` (the name is fixed); the NetworkPolicies allow only that name. |
 | Every restore after damage names its target time; "the latest" is a decision, not a default. | Instruction only. |
 | Report a restore as done only with data proof - the expected rows, read and written with the app's user - never because the cluster is `Ready`. | Instruction only. |
+||||||| 3a1c087
+
+## Chapter 13 - Break it on purpose, small, with a way to stop
+
+Chaos Monkey (`flux/infrastructure/chaos/develop/cronjob.yaml`) runs in `flux-system` and deletes one
+frontend or backend pod in `develop`, on weekdays inside its UTC window, and only while not suspended
+(it is suspended in Git). Its Role allows pod deletion in `develop` only; the ValidatingAdmissionPolicy
+`chaos-monkey-targets` refuses any pod that is not `app=frontend|backend`.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never run a chaos experiment outside `develop`, and never without a written hypothesis, a probe of the service and a stop condition. | RBAC (the Role exists in `develop` only); the rest is instruction only. |
+| Never widen the monkey's targets, window or schedule outside Git, and never unsuspend it for longer than one run. | Flux (reconcile) and review; `chaos-monkey-targets` (Deny) for the targets. |
+| To stop an experiment, suspend the CronJob **and** delete its active Job - `suspend` alone stops only future runs. | Instruction only. |

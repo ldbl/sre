@@ -1,4 +1,16 @@
 ---
+# Chaos Monkey for develop: deletes one random frontend or backend pod per run (Chapter 13).
+# - Where it lives vs what it touches: the CronJob and its ServiceAccount are in flux-system (the
+#   platform's own namespace, which learners' apps cannot reach); its Role and its targets are in
+#   develop only. RBAC lets it delete pods in develop; the ValidatingAdmissionPolicy
+#   chaos-monkey-targets (target-guard.yaml) narrows that to app=frontend|backend.
+# - Off by default (suspend: true). suspend stops FUTURE runs only - a Job already running goes on:
+#   the full stop is suspend + delete the active Job (Chapter 13 runbook).
+# - Runs only on weekdays inside ALLOWED_HOURS_UTC; outside, it logs chaos_monkey_skip and deletes
+#   nothing. A manual Job obeys the same window - there is no override.
+# - Image: alpine/k8s (needs a shell, awk and kubectl; registry.k8s.io/kubectl has no shell), pinned
+#   by digest. It is outside the trusted registries, so require-trusted-registries (Audit) reports
+#   it - accepted tech debt until a signed image of our own exists (Chapter 17).
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -33,7 +45,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: monkey
-              image: bitnami/kubectl:1.31
+              image: docker.io/alpine/k8s:1.36.4@sha256:358ddfc2d6ff3f00dd461dbd79aaa6d6738709f225b8da0945bb63bd4dbc304e
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
@@ -54,29 +66,29 @@ spec:
                 - /bin/sh
                 - -ec
                 - |
+                  # skip REASON - log why nothing was deleted, as one JSON line, and stop.
+                  skip() {
+                    echo "{\"event\":\"chaos_monkey_skip\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"reason\":\"$1\"}"
+                    exit 0
+                  }
                   hour="$(date -u +%H)"
+                  weekday="$(date -u +%u)"
                   start_hour="${ALLOWED_HOURS_UTC%-*}"
                   end_hour="${ALLOWED_HOURS_UTC#*-}"
+                  [ "$weekday" -le 5 ] || skip "weekend (UTC)"
                   if [ "$hour" -lt "$start_hour" ] || [ "$hour" -ge "$end_hour" ]; then
-                    echo "outside allowed UTC window ${ALLOWED_HOURS_UTC}; skipping"
-                    exit 0
+                    skip "outside ${ALLOWED_HOURS_UTC} UTC"
                   fi
 
                   set -- ${TARGET_APPS}
                   count="$#"
-                  if [ "$count" -eq 0 ]; then
-                    echo "no target apps configured; skipping"
-                    exit 0
-                  fi
+                  [ "$count" -gt 0 ] || skip "no target apps configured"
                   index="$(awk -v n="$count" 'BEGIN{srand(); print int(rand()*n)+1}')"
                   eval "app=\${$index}"
 
                   pods="$(kubectl -n "${TARGET_NAMESPACE}" get pods -l "app=${app}" --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')"
                   target="$(printf '%s\n' "$pods" | awk 'NF {a[++n]=$0} END {if (n>0) {srand(); print a[int(rand()*n)+1]}}')"
-                  if [ -z "${target}" ]; then
-                    echo "no running pods for app=${app}; skipping"
-                    exit 0
-                  fi
+                  [ -n "${target}" ] || skip "no running pod for app=${app}"
 
                   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
                   echo "{\"event\":\"chaos_monkey_delete_pod\",\"timestamp\":\"${ts}\",\"namespace\":\"${TARGET_NAMESPACE}\",\"app\":\"${app}\",\"pod\":\"${target}\"}"
@@ -95,4 +107,5 @@ spec:
                   mountPath: /tmp
           volumes:
             - name: tmp
-              emptyDir: {}
+              emptyDir:
+                sizeLimit: 16Mi
