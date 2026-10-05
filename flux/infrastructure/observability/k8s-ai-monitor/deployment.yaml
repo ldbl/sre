@@ -36,8 +36,9 @@ spec:
               value: kube-system,kube-public,kube-node-lease,flux-system
             - name: LOG_LEVEL
               value: INFO
+            # openai on the platform; on kind Terraform sets guardian_llm_provider (gemini by default).
             - name: LLM_PROVIDER
-              value: openai
+              value: ${guardian_llm_provider:=openai}
             - name: PROMETHEUS_URL
               value: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
             - name: SQLITE_PATH
@@ -54,6 +55,12 @@ spec:
                   name: k8s-ai-monitor-secrets
                   key: anthropic-api-key
                   optional: true
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: k8s-ai-monitor-secrets
+                  key: gemini-api-key
+                  optional: true
             - name: SLACK_WEBHOOK_URL
               valueFrom:
                 secretKeyRef:
@@ -66,30 +73,13 @@ spec:
                   name: k8s-ai-monitor-secrets
                   key: slack-webhook-url-nonprod
                   optional: true
+            # Required: every HTTP route but /healthz needs it - Alertmanager sends it as a
+            # Bearer token (alertmanager-guardian.yaml). Without it the pod does not start.
             - name: INTERNAL_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: k8s-ai-monitor-secrets
                   key: internal-token
-                  optional: true
-            - name: ELASTICSEARCH_URL
-              valueFrom:
-                secretKeyRef:
-                  name: k8s-ai-monitor-secrets
-                  key: elasticsearch-url
-                  optional: true
-            - name: ELASTICSEARCH_USER
-              valueFrom:
-                secretKeyRef:
-                  name: k8s-ai-monitor-secrets
-                  key: elasticsearch-user
-                  optional: true
-            - name: ELASTICSEARCH_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: k8s-ai-monitor-secrets
-                  key: elasticsearch-password
-                  optional: true
             - name: SCANNER_CRITICAL_ENDPOINT_ENABLED
               value: "true"
             - name: ENDPOINT_INGRESS_SERVICE

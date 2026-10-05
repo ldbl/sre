@@ -139,6 +139,24 @@ variable "uptrace_dsn" {
   sensitive   = true
 }
 
+variable "guardian_llm_provider" {
+  description = "LLM provider of the Guardian (k8s-ai-monitor, Chapter 14) on kind: gemini (cheapest), anthropic or openai."
+  type        = string
+  default     = "gemini"
+
+  validation {
+    condition     = contains(["gemini", "anthropic", "openai"], var.guardian_llm_provider)
+    error_message = "guardian_llm_provider must be gemini, anthropic or openai."
+  }
+}
+
+variable "guardian_llm_api_key" {
+  description = "API key for guardian_llm_provider - your own. Empty: the Guardian still detects and tracks incidents, without the LLM analysis."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "image_registry" {
   description = "Container image registry prefix (e.g., ghcr.io/safeops-course). Change this if you fork the repos."
   type        = string

@@ -408,10 +408,11 @@ resource "kubernetes_config_map_v1" "cluster_config" {
   }
 
   data = {
-    cloudflare_proxied = "disabled"
-    cluster_name       = "sre-control-plane"
-    image_registry     = var.image_registry
-    git_owner          = var.git_owner
+    cloudflare_proxied    = "disabled"
+    cluster_name          = "sre-control-plane"
+    image_registry        = var.image_registry
+    git_owner             = var.git_owner
+    guardian_llm_provider = var.guardian_llm_provider
   }
 
   depends_on = [null_resource.flux_operator_install]
@@ -546,6 +547,34 @@ resource "random_password" "postgres_app_production" {
   count   = var.local_profile ? 0 : 1
   length  = 32
   special = false
+}
+
+# The Guardian's Secret on kind (Chapter 14; on the platform it comes from SOPS, secrets-observability).
+# internal-token: generated, guards the Guardian's HTTP API; Alertmanager sends it as a Bearer token.
+# The LLM key goes under the key the Deployment reads for that provider; without one the Guardian
+# still detects and tracks incidents, without the analysis.
+resource "random_password" "guardian_internal_token" {
+  count   = var.local_profile ? 1 : 0
+  length  = 40
+  special = false
+}
+
+resource "kubernetes_secret_v1" "guardian" {
+  count = var.local_profile ? 1 : 0
+
+  metadata {
+    name      = "k8s-ai-monitor-secrets"
+    namespace = "observability"
+  }
+
+  type = "Opaque"
+
+  data = merge(
+    { "internal-token" = random_password.guardian_internal_token[0].result },
+    var.guardian_llm_api_key == "" ? {} : { "${var.guardian_llm_provider}-api-key" = var.guardian_llm_api_key },
+  )
+
+  depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
 resource "kubernetes_secret_v1" "postgres_app_production" {
