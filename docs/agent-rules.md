@@ -230,7 +230,7 @@ kind, Hetzner Object Storage on the platform). A restore is a new cluster next t
 
 | Rule for the agent | What enforces it |
 |---|---|
-| Never run a `DELETE`, `UPDATE` or `DROP` against a shared database without a `WHERE` reviewed by a person, and never in production. | RBAC on Hetzner (the everyday sign-in has no `exec` in production); on kind instruction only. |
+| Never run a `DELETE` or `UPDATE` against a shared database without a `WHERE` reviewed by a person, never a `DROP` without a person's separate approval - and none of them in production. | RBAC on Hetzner (the everyday sign-in has no `exec` in production); on kind instruction only. |
 | Never restore over an existing database; restore next to it, as `app-postgres-restore`. | `postgres-restore-manifest.sh` (the name is fixed); the NetworkPolicies allow only that name. |
 | Every restore after damage names its target time; "the latest" is a decision, not a default. | Instruction only. |
 | Report a restore as done only with data proof - the expected rows, read and written with the app's user - never because the cluster is `Ready`. | Instruction only. |
