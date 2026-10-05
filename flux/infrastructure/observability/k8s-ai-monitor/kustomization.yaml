@@ -8,6 +8,7 @@ resources:
   - pvc.yaml
   - deployment.yaml
   - service.yaml
+  - alertmanager-guardian.yaml
   - image-policy.yaml
   - image-automation.yaml
 # Same pattern as backend/frontend: the setter updates only the tag, the registry stays a Flux
@@ -15,4 +16,4 @@ resources:
 images:
   - name: k8s-ai-monitor
     newName: ${image_registry}/k8s-ai-monitor
-    newTag: main-v0.0.1-c0d7530-1790461567 # {"$imagepolicy": "observability:k8s-ai-monitor:tag"}
+    newTag: main-v0.0.1-05cacd6-1791201991 # {"$imagepolicy": "observability:k8s-ai-monitor:tag"}

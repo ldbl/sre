@@ -14,14 +14,16 @@ The `kube-prometheus-stack` Helm chart provides:
 - **Node Exporter** - Node-level metrics
 - **Kube-State-Metrics** - Kubernetes object metrics
 
-### AI Alert Router (`k8s-ai-monitor`)
+### The Guardian (`k8s-ai-monitor`, Chapter 14)
 
-The `k8s-ai-monitor` deployment provides:
-
-- scanner/event-driven incident detection across Kubernetes and Flux resources
-- context enrichment (logs/events/metrics) for triage
-- LLM-assisted incident analysis
-- webhook alert delivery (Slack-compatible endpoint, can be bridged to OpsGenie)
+- **Input:** Alertmanager hands it every alert except `Watchdog` and `InfoInhibitor`
+  (`k8s-ai-monitor/alertmanager-guardian.yaml`, webhook to `POST /alertmanager` with a Bearer token); its own scanners, Kubernetes Warning events
+  and Flux stalls feed the same pipeline.
+- **One incident per problem:** fingerprints, cooldowns, escalation; a resolved alert closes it.
+- **Analysis:** context (logs, events, metrics, traces) sanitized, then the LLM for production
+  incidents; non-prod is tracked without it. It only reads the cluster - no Secrets, no writes.
+- **Delivery:** one Slack message per incident (webhooks from its Secret); without them, its log.
+- **Runs on kind too**, with your own LLM key (`docs/local-dev.md`).
 
 ## Architecture
 
@@ -76,12 +78,13 @@ Then open: http://localhost:9090
 
 ### k8s-ai-monitor
 
-**Local Access:**
+**Local Access:** every route except `/healthz` needs the `internal-token` from the Guardian's Secret:
 ```bash
-kubectl port-forward -n observability svc/k8s-ai-monitor 8080:8080
+kubectl --context kind-sre-control-plane -n observability port-forward svc/k8s-ai-monitor 8080:8080
+TOKEN=$(kubectl --context kind-sre-control-plane -n observability get secret k8s-ai-monitor-secrets \
+  -o jsonpath='{.data.internal-token}' | base64 -d)
+curl -s -H "X-Internal-Token: $TOKEN" http://localhost:8080/incidents
 ```
-
-Then open: http://localhost:8080/healthz
 
 ## ServiceMonitor Configuration
 
@@ -177,7 +180,9 @@ signal: the last attempt is newer than the last success.
   the SOPS Secret `alertmanager-slack` exists). On kind they have no integration; the Alertmanager API
   shows where each alert group went.
 - `Watchdog` goes to Healthchecks.io as a heartbeat (`alerting/watchdog-heartbeat.yaml`, platform only).
-- Chapter 14 moves delivery to `k8s-ai-monitor`, which watches Alertmanager.
+- Chapter 14: a second AlertmanagerConfig (`k8s-ai-monitor/alertmanager-guardian.yaml`) hands every
+  alert except `Watchdog` and `InfoInhibitor` to the Guardian, which posts one message per incident. It lives with the Guardian, so where the
+  Guardian does not run, nothing points at it.
 
 ## Metrics Reference
 
@@ -336,7 +341,7 @@ kubectl port-forward -n observability svc/kube-prometheus-stack-prometheus 9090:
 ```bash
 kubectl -n observability logs deploy/k8s-ai-monitor --tail=200
 kubectl port-forward -n observability svc/k8s-ai-monitor 8080:8080
-# Visit: http://localhost:8080/state
+# curl -H "X-Internal-Token: $TOKEN" http://localhost:8080/state   (token: see "Local Access")
 ```
 
 ## Storage
@@ -383,7 +388,7 @@ For production deployments, consider:
    - Monitor Prometheus memory usage (can grow with cardinality)
 
 4. **Alerting:**
-   - Configure `k8s-ai-monitor` webhook destination (OpsGenie relay/integration)
+   - Fill the Guardian's Slack webhooks (`k8s-ai-monitor-secrets`); Alertmanager -> Guardian -> Slack
    - Set up escalation policies
    - Test end-to-end alert routing regularly
 

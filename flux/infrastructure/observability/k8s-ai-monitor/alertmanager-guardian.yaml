@@ -1,0 +1,41 @@
+# Chapter 14: Alertmanager hands every alert but Watchdog and InfoInhibitor to the Guardian (k8s-ai-monitor), which turns it into an
+# incident - deduplicated, enriched, analysed by the LLM in production - and posts one Slack message
+# per incident. This route lives with the Guardian: where the Guardian does not run, nothing points at it.
+#
+# - Same filter and grouping as safeops-routing (../../alerting/routing/routing.yaml); with the operator's
+#   matcher strategy None each AlertmanagerConfig is a sibling route with continue: true, so both see
+#   every alert. The Guardian deduplicates repeats itself; repeatInterval only bounds how long a
+#   firing alert can go unseen if a delivery was lost.
+# - sendResolved: a resolved alert closes the Guardian's incident.
+# - The Guardian's API needs INTERNAL_TOKEN on every route; Alertmanager sends it as a Bearer token
+#   from the Guardian's own Secret (same namespace). Rotating it needs a Guardian restart (env var):
+#   see README.md "Rotating internal-token".
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: guardian
+  labels:
+    alertmanagerconfig: safeops
+spec:
+  route:
+    receiver: guardian
+    matchers:
+      - name: alertname
+        value: Watchdog|InfoInhibitor
+        matchType: "!~"
+    groupBy: [namespace, alertname]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 1h
+  receivers:
+    - name: guardian
+      webhookConfigs:
+        - url: http://k8s-ai-monitor.observability.svc.cluster.local:8080/alertmanager
+          sendResolved: true
+          httpConfig:
+            authorization:
+              type: Bearer
+              credentials:
+                name: k8s-ai-monitor-secrets
+                key: internal-token
