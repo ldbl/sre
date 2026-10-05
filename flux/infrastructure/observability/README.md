@@ -16,8 +16,8 @@ The `kube-prometheus-stack` Helm chart provides:
 
 ### The Guardian (`k8s-ai-monitor`, Chapter 14)
 
-- **Input:** Alertmanager hands it every alert (`k8s-ai-monitor/alertmanager-guardian.yaml`,
-  webhook to `POST /alertmanager` with a Bearer token); its own scanners, Kubernetes Warning events
+- **Input:** Alertmanager hands it every alert except `Watchdog` and `InfoInhibitor`
+  (`k8s-ai-monitor/alertmanager-guardian.yaml`, webhook to `POST /alertmanager` with a Bearer token); its own scanners, Kubernetes Warning events
   and Flux stalls feed the same pipeline.
 - **One incident per problem:** fingerprints, cooldowns, escalation; a resolved alert closes it.
 - **Analysis:** context (logs, events, metrics, traces) sanitized, then the LLM for production
@@ -181,7 +181,7 @@ signal: the last attempt is newer than the last success.
   shows where each alert group went.
 - `Watchdog` goes to Healthchecks.io as a heartbeat (`alerting/watchdog-heartbeat.yaml`, platform only).
 - Chapter 14: a second AlertmanagerConfig (`k8s-ai-monitor/alertmanager-guardian.yaml`) hands every
-  alert to the Guardian, which posts one message per incident. It lives with the Guardian, so where the
+  alert except `Watchdog` and `InfoInhibitor` to the Guardian, which posts one message per incident. It lives with the Guardian, so where the
   Guardian does not run, nothing points at it.
 
 ## Metrics Reference
@@ -388,7 +388,7 @@ For production deployments, consider:
    - Monitor Prometheus memory usage (can grow with cardinality)
 
 4. **Alerting:**
-   - Configure `k8s-ai-monitor` webhook destination (OpsGenie relay/integration)
+   - Fill the Guardian's Slack webhooks (`k8s-ai-monitor-secrets`); Alertmanager -> Guardian -> Slack
    - Set up escalation policies
    - Test end-to-end alert routing regularly
 

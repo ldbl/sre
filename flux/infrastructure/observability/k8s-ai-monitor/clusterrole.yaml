@@ -19,12 +19,9 @@ rules:
     verbs: ["get", "list", "watch"]
   # No `secrets`: reading a Secret returns its contents, and a cluster-wide read would give the
   # monitor (which processes alerts, logs and LLM output) flux-system/sops-age, the backup keys and
-  # every password. The checks work without it (k8s-ai-monitor#4). The opt-in S3 storage check needs
-  # exactly one Secret - grant it with a namespaced Role + resourceNames, see README.md.
-  - apiGroups: [""]
-    resources:
-      - events
-    verbs: ["create", "patch", "update"]
+  # every password. The checks work without it (k8s-ai-monitor#4).
+  # No writes at all, Events included: the monitor reports to Slack, not to the cluster
+  # (kopf's Event posting is turned off in its startup).
   - apiGroups: ["apps"]
     resources:
       - deployments

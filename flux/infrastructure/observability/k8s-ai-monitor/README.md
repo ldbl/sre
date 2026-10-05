@@ -4,8 +4,9 @@ Deploys `k8s-ai-monitor` in namespace `observability`: every signal becomes one 
 
 ## What It Does
 
-- Receives every Prometheus alert from Alertmanager (`alertmanager-guardian.yaml`, `POST /alertmanager`;
-  a `resolved` alert closes its incident). The alert's own severity is final.
+- Receives the Prometheus alerts Alertmanager routes to it - all but `Watchdog` and `InfoInhibitor`
+  (`alertmanager-guardian.yaml`, `POST /alertmanager`; a `resolved` alert closes its incident). The
+  alert's own severity is final.
 - Watches Warning events, Flux stalls and runs its own scanners (pods, nodes, HPA, PVC, certificates,
   endpoints, CloudNativePG backups).
 - Deduplicates and escalates in SQLite, collects context, redacts secrets, asks the LLM (production
@@ -25,6 +26,17 @@ Deploys `k8s-ai-monitor` in namespace `observability`: every signal becomes one 
 - **Hetzner**: copy `flux/secrets/observability/k8s-ai-monitor-secrets.yaml.example` to
   `k8s-ai-monitor-secrets.yaml`, fill it, encrypt it with SOPS and uncomment it in
   `flux/secrets/observability/kustomization.yaml`.
+
+### Rotating `internal-token`
+
+The Deployment reads the token into an env var at start, so a new Secret value reaches the pod only on
+restart (Alertmanager picks it up by itself):
+
+1. Change the Secret - Hetzner: edit and re-encrypt the SOPS file, commit; kind: `terraform apply
+   -replace='random_password.guardian_internal_token[0]'`.
+2. Wait until it is applied (`flux get kustomizations secrets-observability` on Hetzner).
+3. `kubectl -n observability rollout restart deployment/k8s-ai-monitor` - until then Alertmanager's
+   calls get 403.
 
 ## Runtime Endpoints
 

@@ -21,7 +21,7 @@ Use Terraform to provision a local multi-node kind cluster. Terraform manages li
 | **MinIO** as the CNPG backup target (replaces Hetzner Object Storage) | Flux image automation (needs a git write token) |
 | Kyverno + both policy packs (Audit) | `flux/secrets/*` encrypted for the platform key |
 | Flagger (develop canaries are opt-in, Ch19), Chaos Monkey | |
-| **The Guardian** (k8s-ai-monitor, Ch14): Alertmanager hands it every alert; with your own LLM key (below) it analyses production incidents | |
+| **The Guardian** (k8s-ai-monitor, Ch14): Alertmanager hands it every alert but `Watchdog` and `InfoInhibitor`; with your own LLM key (below) it analyses production incidents | |
 | `secrets-local`: your own SOPS secrets under `flux/secrets/local/` | |
 | `lab` namespace: Pod Security *warn/audit* instead of enforce, for drills that must observe a violation (Kyverno reports) | |
 

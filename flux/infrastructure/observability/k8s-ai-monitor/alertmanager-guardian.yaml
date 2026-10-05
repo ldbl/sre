@@ -1,4 +1,4 @@
-# Chapter 14: Alertmanager hands every alert to the Guardian (k8s-ai-monitor), which turns it into an
+# Chapter 14: Alertmanager hands every alert but Watchdog and InfoInhibitor to the Guardian (k8s-ai-monitor), which turns it into an
 # incident - deduplicated, enriched, analysed by the LLM in production - and posts one Slack message
 # per incident. This route lives with the Guardian: where the Guardian does not run, nothing points at it.
 #
@@ -8,7 +8,8 @@
 #   firing alert can go unseen if a delivery was lost.
 # - sendResolved: a resolved alert closes the Guardian's incident.
 # - The Guardian's API needs INTERNAL_TOKEN on every route; Alertmanager sends it as a Bearer token
-#   from the Guardian's own Secret (same namespace).
+#   from the Guardian's own Secret (same namespace). Rotating it needs a Guardian restart (env var):
+#   see README.md "Rotating internal-token".
 ---
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
