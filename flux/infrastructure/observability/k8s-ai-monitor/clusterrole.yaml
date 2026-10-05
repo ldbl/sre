@@ -70,4 +70,16 @@ rules:
       - gitrepositories
       - helmrepositories
       - helmcharts
+      - ocirepositories
+    verbs: ["get", "list", "watch"]
+  # The critical-endpoint scanner discovers routes from Traefik IngressRoutes.
+  - apiGroups: ["traefik.io"]
+    resources:
+      - ingressroutes
+    verbs: ["get", "list", "watch"]
+  # kopf lists CRDs to resolve the Flux resources it watches; without it, a minute of
+  # 403 retries at every start and no notice of CRDs installed later.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources:
+      - customresourcedefinitions
     verbs: ["get", "list", "watch"]

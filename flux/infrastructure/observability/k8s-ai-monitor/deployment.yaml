@@ -32,6 +32,10 @@ spec:
               value: production
             - name: NON_PROD_NAMESPACES
               value: develop,staging
+            # Track develop/staging too (posted with context, never sent to the LLM);
+            # without it their events and alerts are dropped.
+            - name: NON_PROD_SCANNER_ENABLED
+              value: "true"
             - name: EXCLUDE_NAMESPACES
               value: kube-system,kube-public,kube-node-lease,flux-system
             - name: LOG_LEVEL
