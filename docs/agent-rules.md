@@ -219,3 +219,18 @@ traffic the backend alerts stay quiet; other alerts still fire on their own cond
 | Measure the backend on user requests per environment - never on all requests, never across environments. | The recording rules in `backend-slo-rules.yaml` (review). |
 | Never lower a threshold or remove the traffic floor to make an alert fire in a test - generate the condition, or post a test alert to Alertmanager. | Instruction only. |
 | Never route an alert to a receiver nobody reads, and never mute a channel instead of removing the noise. | The routes are in Git (review). |
+
+## Chapter 12 - A backup is only as good as the last restore you proved
+
+`app-postgres` archives every WAL segment and takes a daily base backup to the object store (MinIO on
+kind, Hetzner Object Storage on the platform). A restore is a new cluster next to the original,
+`app-postgres-restore`, printed by `scripts/postgres-restore-manifest.sh` (`serverName`, optional
+`targetTime`); the NetworkPolicies allow exactly that name. Three alerts watch the backups
+(`flux/infrastructure/observability/kube-prometheus-stack/monitoring/backup-alerts.yaml`).
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never run a `DELETE`, `UPDATE` or `DROP` against a shared database without a `WHERE` reviewed by a person, and never in production. | RBAC on Hetzner (the everyday sign-in has no `exec` in production); on kind instruction only. |
+| Never restore over an existing database; restore next to it, as `app-postgres-restore`. | `postgres-restore-manifest.sh` (the name is fixed); the NetworkPolicies allow only that name. |
+| Every restore after damage names its target time; "the latest" is a decision, not a default. | Instruction only. |
+| Report a restore as done only with data proof - the expected rows, read and written with the app's user - never because the cluster is `Ready`. | Instruction only. |
