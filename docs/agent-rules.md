@@ -219,3 +219,16 @@ traffic the backend alerts stay quiet; other alerts still fire on their own cond
 | Measure the backend on user requests per environment - never on all requests, never across environments. | The recording rules in `backend-slo-rules.yaml` (review). |
 | Never lower a threshold or remove the traffic floor to make an alert fire in a test - generate the condition, or post a test alert to Alertmanager. | Instruction only. |
 | Never route an alert to a receiver nobody reads, and never mute a channel instead of removing the noise. | The routes are in Git (review). |
+
+## Chapter 13 - Break it on purpose, small, with a way to stop
+
+Chaos Monkey (`flux/infrastructure/chaos/develop/cronjob.yaml`) runs in `flux-system` and deletes one
+frontend or backend pod in `develop`, on weekdays inside its UTC window, and only while not suspended
+(it is suspended in Git). Its Role allows pod deletion in `develop` only; the ValidatingAdmissionPolicy
+`chaos-monkey-targets` refuses any pod that is not `app=frontend|backend`.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never run a chaos experiment outside `develop`, and never without a written hypothesis, a probe of the service and a stop condition. | RBAC (the Role exists in `develop` only); the rest is instruction only. |
+| Never widen the monkey's targets, window or schedule outside Git, and never unsuspend it for longer than one run. | Flux (reconcile) and review; `chaos-monkey-targets` (Deny) for the targets. |
+| To stop an experiment, suspend the CronJob **and** delete its active Job - `suspend` alone stops only future runs. | Instruction only. |
