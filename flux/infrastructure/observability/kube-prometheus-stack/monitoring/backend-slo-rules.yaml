@@ -78,7 +78,7 @@ spec:
           annotations:
             summary: "{{ $labels.namespace }}: backend users are failing - {{ $value | humanizePercentage }} of requests in the last 5m"
             description: "More than 7.2% of user requests to the backend in {{ $labels.namespace }} fail with a 5xx, over the last hour and still in the last 5 minutes. First check: the backend's error logs and the last change - a promotion or a config change (Chapter 10)."
-            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
+            runbook_url: "https://safeops.work/members/chapter-11-observability/runbook-incident-debug/"
 
         # Slow burn: at 6x the budget is gone in five days. Not urgent tonight - plan a fix (warning).
         - alert: BackendErrorBudgetBurnSlow
@@ -94,4 +94,4 @@ spec:
           annotations:
             summary: "{{ $labels.namespace }}: backend error budget burning - {{ $value | humanizePercentage }} of requests over 30m"
             description: "More than 3% of user requests to the backend in {{ $labels.namespace }} have failed over the last 6 hours. Not an outage: find the failing route in the backend logs and plan the fix before the budget is gone."
-            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
+            runbook_url: "https://safeops.work/members/chapter-11-observability/runbook-incident-debug/"

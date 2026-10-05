@@ -31,7 +31,7 @@ spec:
           annotations:
             summary: "{{ $labels.namespace }}: no backend pod is ready - every request fails"
             description: "The backend Deployment in {{ $labels.namespace }} has no available replica for 2 minutes. First check: kubectl get pods -l app=backend in {{ $labels.namespace }} - the reason is in the pod status (CrashLoopBackOff, OOMKilled, ImagePullBackOff, Pending)."
-            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
+            runbook_url: "https://safeops.work/members/chapter-11-observability/runbook-incident-debug/"
 
         - alert: BackendLatencyHigh
           expr: |
@@ -44,7 +44,7 @@ spec:
           annotations:
             summary: "{{ $labels.namespace }}: backend p95 latency {{ $value | humanizeDuration }}"
             description: "One in twenty user requests to the backend in {{ $labels.namespace }} takes longer than 1s, for 10 minutes. First check: the slow route in the latency panel by path, then its trace (the database span or an outbound call)."
-            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
+            runbook_url: "https://safeops.work/members/chapter-11-observability/runbook-incident-debug/"
 
         - alert: BackendNearMemoryLimit
           expr: |
@@ -60,4 +60,4 @@ spec:
           annotations:
             summary: "{{ $labels.namespace }}/{{ $labels.pod }}: backend at {{ $value | humanizePercentage }} of its memory limit"
             description: "The working set has stayed above 90% of the memory limit for 15 minutes; the next allocation may be OOMKilled. First check: does it level off (a size) or climb (a leak)? Chapter 08."
-            runbook_url: "https://safeops.work/course/chapter-11-observability/runbook-incident-debug/"
+            runbook_url: "https://safeops.work/members/chapter-11-observability/runbook-incident-debug/"
