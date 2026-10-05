@@ -28,6 +28,9 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
+      # A run deletes one pod in seconds. A Job that cannot run - an image that does not pull, a
+      # stuck API call - is stopped after five minutes instead of waiting for ever (Chapter 13).
+      activeDeadlineSeconds: 300
       template:
         metadata:
           labels:

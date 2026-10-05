@@ -1,0 +1,18 @@
+# terraform.tfvars.example - your settings for the local kind cluster (Chapter 00).
+#
+# Copy it to terraform.tfvars (git-ignored) and edit. A value here holds in every terminal; an
+# `export TF_VAR_...` holds only in the shell that set it - and a `make kind-plan` from another
+# terminal would then plan Flux back to the course repository (FluxInstance replaced, Flux
+# reinstalled, your fork no longer followed).
+#
+# Tokens stay out of this file: read them into the shell when needed (docs/local-dev.md).
+
+# Your fork - what Flux applies to this cluster. Without it, the upstream course repository.
+flux_git_repository_url = "https://github.com/YOUR_GITHUB_USER/sre.git"
+
+# The Guardian's LLM (Chapter 14) - optional; without a key it tracks and posts, no analysis.
+# guardian_llm_provider = "gemini" # or "openai", "anthropic"
+# guardian_llm_api_key  = "<your key>"
+
+# Traces (Chapter 11) - optional; your own Uptrace project's DSN.
+# uptrace_dsn = "<your DSN>"
