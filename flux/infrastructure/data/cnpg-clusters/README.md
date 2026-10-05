@@ -24,7 +24,7 @@ same namespace, bootstrapped from the base backup and the archived WAL - to the 
 or to a point in time before a bad change.
 
 ```bash
-scripts/postgres-restore-manifest.sh -n develop -t 2026-10-05T09:30:00Z \
+scripts/postgres-restore-manifest.sh -c kind-sre-control-plane -n develop -t 2026-10-05T09:30:00Z \
   | kubectl --context kind-sre-control-plane apply -f -
 ```
 

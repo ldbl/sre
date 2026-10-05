@@ -158,8 +158,8 @@ controller manager and kube-proxy (neither kind nor k3s exposes them), and `Kube
 |------------|----------|------------|--------|
 | `PostgresWALArchivingFailing` | warning | the newest WAL segment failed to archive, for 15m | point-in-time restore stops at the last good segment: check the backup store's credentials, endpoint, network policy |
 | `PostgresBackupFailed` | warning | the newest base backup failed after the last good one, for 5m | read the failed Backup's `status.error`, fix, take a new backup |
-| `PostgresBackupTooOld` | warning | no completed base backup for 26h (daily schedule + 2h) | check the ScheduledBackup, take a backup by hand |
-| `PostgresNeverBackedUp` | warning | the instance has run 26h and has no completed base backup at all | the ScheduledBackup is missing or suspended: take a backup by hand |
+| `PostgresBackupTooOld` | warning | no completed base backup for 26h (daily schedule + 2h), still true 15m later | check the ScheduledBackup, take a backup by hand |
+| `PostgresNeverBackedUp` | warning | the instance has run 26h and has no completed base backup at all, still true 15m later | the ScheduledBackup is missing or suspended: take a backup by hand |
 
 Left out on purpose: the age of the last archived WAL segment. An idle database writes no WAL, so
 nothing is archived for hours - that alert would fire on every quiet cluster. The failure itself is the
