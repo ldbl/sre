@@ -41,6 +41,10 @@ permissions:
 
 jobs:
   sync-snippets:
+    # Only the course's own repository publishes snippets to sre-course. A learner's fork has no
+    # COURSE_REPO_PAT and nothing to publish to, so the job is skipped there instead of failing
+    # every push. In this repository a missing secret still fails loudly (next step).
+    if: github.repository == 'safeops-course/sre'
     runs-on: ubuntu-latest
     steps:
       - name: Require COURSE_REPO_PAT
