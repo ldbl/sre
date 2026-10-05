@@ -82,7 +82,7 @@ patches:
   # The Guardian (k8s-ai-monitor, Chapter 14) runs on kind too. Its Secret comes from Terraform
   # (guardian_llm_provider / guardian_llm_api_key), not from secrets-observability; and kind has no
   # image automation, so its ImagePolicy and ImageUpdateAutomation are left out - the tag changes
-  # only by a commit, as for every app on kind (Chapter 10).
+  # only by a commit, as for every app on kind (Chapter 10). LLM_DEBUG is on, for the lab.
   - target: { kind: Kustomization, name: k8s-ai-monitor }
     patch: |-
       - op: replace
@@ -102,6 +102,20 @@ patches:
               kind: ImageUpdateAutomation
               metadata: { name: k8s-ai-monitor, namespace: observability }
               $patch: delete
+          # Keep every LLM request and response (GET /llm-debug, 7 days): on kind you see
+          # exactly what left the cluster, already redacted (Chapter 14).
+          - patch: |-
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata: { name: k8s-ai-monitor }   # no namespace: deployment.yaml has none yet
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: k8s-ai-monitor
+                        env:
+                          - name: LLM_DEBUG
+                            value: "true"
   - patch: |-
       apiVersion: kustomize.toolkit.fluxcd.io/v1
       kind: Kustomization
