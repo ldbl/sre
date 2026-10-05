@@ -13,3 +13,4 @@ resources:
   - allow-postgres-egress-apiserver.yaml
   - allow-postgres-ingress-cnpg-operator.yaml
   - allow-backend-metrics-from-observability.yaml
+  - allow-postgres-metrics-from-observability.yaml

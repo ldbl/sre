@@ -12,9 +12,12 @@ spec:
     - Egress
   egress:
     - to:
+        # app-postgres-restore: lets a validation pod with the backend's label check a restore.
         - podSelector:
-            matchLabels:
-              cnpg.io/cluster: app-postgres
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: In
+                values: [app-postgres, app-postgres-restore]
       ports:
         - protocol: TCP
           port: 5432

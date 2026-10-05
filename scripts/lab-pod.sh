@@ -8,7 +8,7 @@
 # exit code - the labs use it instead of hand-written overrides.
 #
 # Usage:
-#   scripts/lab-pod.sh -n <namespace> [-c <context>] [-i <image>] [-l key=value]... [-u <uid>] -- <command...>
+#   scripts/lab-pod.sh -n <namespace> [-c <context>] [-i <image>] [-l key=value]... [-u <uid>] [-s <secret>] -- <command...>
 #   scripts/lab-pod.sh -n <namespace> [-c <context>] [-i <image>] [-l key=value]... --daemon [<name>]
 #
 # Examples:
@@ -16,6 +16,9 @@
 #   scripts/lab-pod.sh -n develop -i curlimages/curl -l app=frontend -- curl -sf -m 5 http://backend/healthz
 #   # long-lived debug pod, then: kubectl --context kind-sre-control-plane -n develop exec np-debug -- nc -w 2 backend 80
 #   scripts/lab-pod.sh -n develop --daemon np-debug
+#   # connect as the app, its password never on a command line (-s: every key as $SECRET_<key>)
+#   scripts/lab-pod.sh -n develop -l app=backend -i postgres:17 -u 999 -s app-postgres-app -- \
+#     sh -c 'PGPASSWORD="$SECRET_password" psql -h app-postgres-rw -U app -d app -c "SELECT 1"'
 #
 # Defaults: image busybox:1.36, uid 65532, read-only root filesystem with a
 # writable /tmp (16Mi); CPU and memory come from the namespace LimitRange
@@ -25,7 +28,7 @@
 # The cluster: -c, else $KUBE_CONTEXT, else kind-sre-control-plane. Every kubectl call names it
 # (--context) - the pod is created and deleted there, never on the shared current context (Chapter 01).
 #
-# (Lines 2-26 above are also the --help text: usage() prints them. Keep notes for readers below.)
+# (Lines 2-29 above are also the --help text: usage() prints them. Keep notes for readers below.)
 # Run by hand in the labs (Chapter 00 on). Needs: kubectl and jq.
 # Changes: creates one pod in the namespace; a one-off pod is deleted at the end, a --daemon pod stays.
 # Exit code: the command's own; 124 when the pod did not finish within LAB_POD_TIMEOUT (default 120s).
@@ -35,21 +38,30 @@ NAMESPACE=""
 IMAGE="busybox:1.36"
 UID_NUM="65532"
 LABELS=()
+SECRET=""
 DAEMON=0
 NAME=""
 TIMEOUT="${LAB_POD_TIMEOUT:-120}"
 CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
 
-# usage - print the header comment of this file (lines 2-26) as help, then exit 1.
-usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+# usage - print the header comment of this file (lines 2-29) as help, then exit 1.
+usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+
+# need_value OPTION ARGS... - fail with a clear message when OPTION has no value after it, or when
+# the "value" is the next option (-n -c ...). No namespace, image, label, Secret or context used here
+# starts with "-", so a leading "-" always means a missing value.
+need_value() {
+  if [ $# -lt 2 ] || [ -z "$2" ] || [ "${2#-}" != "$2" ]; then echo "$1 needs a value" >&2; usage; fi
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -n) NAMESPACE="$2"; shift 2 ;;
-    -c) CONTEXT="$2"; shift 2 ;;
-    -i) IMAGE="$2"; shift 2 ;;
-    -l) LABELS+=("$2"); shift 2 ;;
-    -u) UID_NUM="$2"; shift 2 ;;
+    -n) need_value "$@"; NAMESPACE="$2"; shift 2 ;;
+    -c) need_value "$@"; CONTEXT="$2"; shift 2 ;;
+    -i) need_value "$@"; IMAGE="$2"; shift 2 ;;
+    -l) need_value "$@"; LABELS+=("$2"); shift 2 ;;
+    -u) need_value "$@"; UID_NUM="$2"; shift 2 ;;
+    -s) need_value "$@"; SECRET="$2"; shift 2 ;;
     --daemon) DAEMON=1; shift; if [ $# -gt 0 ] && [ "$1" != "--" ]; then NAME="$1"; shift; fi ;;
     --) shift; break ;;
     -h|--help) usage ;;
@@ -83,6 +95,13 @@ if [ ${#LABELS[@]} -gt 0 ]; then
   LABEL_JSON="$(printf '%s\0' "${LABELS[@]}" | jq -cRs 'split("\u0000") | .[:-1] | map(capture("^(?<k>[^=]+)=(?<v>.*)$") | {(.k): .v}) | add // {}')"
 fi
 
+# -s: the Secret's keys as environment variables with the prefix SECRET_ (envFrom), so a password
+# reaches the command without appearing in it, in the pod spec or in the shell history.
+ENV_FROM_JSON="[]"
+if [ -n "$SECRET" ]; then
+  ENV_FROM_JSON="$(jq -cn --arg s "$SECRET" '[{"prefix": "SECRET_", "secretRef": {"name": $s}}]')"
+fi
+
 # The pod spec kubectl run cannot express with flags: everything Pod Security "restricted" requires
 # (non-root user, no privilege escalation, no capabilities, RuntimeDefault seccomp) plus a read-only
 # root filesystem with a writable /tmp, capped at 16Mi like every emptyDir on the platform.
@@ -101,6 +120,7 @@ OVERRIDES="$(cat <<JSON
       "name": "${NAME}",
       "image": "${IMAGE}",
       "command": ${CMD_JSON},
+      "envFrom": ${ENV_FROM_JSON},
       "securityContext": {
         "runAsNonRoot": true,
         "allowPrivilegeEscalation": false,

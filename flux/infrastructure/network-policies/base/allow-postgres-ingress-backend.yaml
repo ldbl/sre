@@ -3,9 +3,13 @@ kind: NetworkPolicy
 metadata:
   name: allow-postgres-ingress-backend
 spec:
+  # app-postgres-restore: the side-by-side restore cluster (runbook, Chapter 12) needs the same
+  # paths as the cluster it restores - or its recovery job hangs on a silently dropped connection.
   podSelector:
-    matchLabels:
-      cnpg.io/cluster: app-postgres
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: In
+        values: [app-postgres, app-postgres-restore]
   policyTypes:
     - Ingress
   ingress:

@@ -1,0 +1,23 @@
+# Prometheus scrapes the CNPG instance's own exporter (port 9187, named "metrics"): WAL archiving
+# and backup timestamps, which the backup alerts read (backup-alerts.yaml). Only the observability
+# namespace, only that port. The restore cluster is left out on purpose: it is short-lived and
+# nobody is alerted about it.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-metrics-from-observability
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: app-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - protocol: TCP
+          port: 9187

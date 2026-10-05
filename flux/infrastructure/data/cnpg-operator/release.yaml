@@ -8,6 +8,8 @@ spec:
   chart:
     spec:
       chart: cloudnative-pg
+      # CNPG 1.28 (chart 0.27). Do not move to a chart with CNPG 1.29 before the backups move to the
+      # Barman Cloud plugin: 1.29 removes the in-tree barmanObjectStore every cluster here uses.
       version: "0.27.1"
       sourceRef:
         kind: HelmRepository
