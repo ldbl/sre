@@ -62,6 +62,9 @@ check "a time that is not RFC 3339 is refused (exit 2)" '[ "${RC}" = 2 ]'
 run
 check "missing -n is refused" '[ "${RC}" != 0 ]'
 
+run -n develop -t
+check "-t without a value is refused" '[ "${RC}" != 0 ]'
+
 STUB_NO_BUCKET=1 run -n develop
 check "a Secret without BUCKET fails loudly" '[ "${RC}" != 0 ]'
 

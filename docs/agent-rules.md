@@ -225,7 +225,7 @@ traffic the backend alerts stay quiet; other alerts still fire on their own cond
 `app-postgres` archives every WAL segment and takes a daily base backup to the object store (MinIO on
 kind, Hetzner Object Storage on the platform). A restore is a new cluster next to the original,
 `app-postgres-restore`, printed by `scripts/postgres-restore-manifest.sh` (`serverName`, optional
-`targetTime`); the NetworkPolicies allow exactly that name. Three alerts watch the backups
+`targetTime`); the NetworkPolicies allow exactly that name. Four alerts watch the backups
 (`flux/infrastructure/observability/kube-prometheus-stack/monitoring/backup-alerts.yaml`).
 
 | Rule for the agent | What enforces it |

@@ -1,6 +1,7 @@
 # Scrape the app-postgres instances in every environment. CNPG exposes no Service for its exporter,
 # so a PodMonitor selects the instance pods directly. The NetworkPolicy that lets Prometheus in is
 # allow-postgres-metrics-from-observability (network-policies/base).
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:

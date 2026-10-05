@@ -4,6 +4,7 @@
 #                                 restore stops at the last good segment, and WAL piles up on disk
 #   PostgresBackupFailed        - the newest base backup failed: the last good one is getting older
 #   PostgresBackupTooOld        - no completed base backup for 26 hours (daily schedule + 2h)
+#   PostgresNeverBackedUp       - running for 26 hours and not one completed base backup
 # Left out on purpose: the age of the last archived segment. An idle database writes no WAL, so
 # nothing is archived for hours - on a quiet cluster that alert would fire all the time (noise).
 # The failure itself is the signal: the last attempt is newer than the last success.
@@ -56,4 +57,20 @@ spec:
           annotations:
             summary: "{{ $labels.namespace }}: the newest Postgres base backup is {{ $value | humanizeDuration }} old"
             description: "No base backup of app-postgres in {{ $labels.namespace }} completed in the last 26 hours; a restore would replay more WAL, and depends on every segment since. First check: the ScheduledBackup (suspended? its last schedule time), then take a backup by hand."
+            runbook_url: "https://safeops.work/members/chapter-12-backup-restore/runbook/"
+
+        - alert: PostgresNeverBackedUp
+          # A cluster that never completed a backup reports 0 - PostgresBackupTooOld leaves it out.
+          # The clock is the instance's start time, so a new cluster gets the same 26 hours as the
+          # daily schedule; a restart starts the clock again (the alert then comes later, not never).
+          expr: |
+            time() - cnpg_pg_postmaster_start_time > 26 * 3600
+            and cnpg_collector_last_available_backup_timestamp == 0
+          for: 15m
+          labels:
+            severity: warning
+            component: postgres
+          annotations:
+            summary: "{{ $labels.namespace }}: Postgres has run for {{ $value | humanizeDuration }} without a single base backup"
+            description: "app-postgres in {{ $labels.namespace }} has no completed base backup at all; a restore is impossible. First check: the ScheduledBackup (missing? suspended?) and kubectl get backups in {{ $labels.namespace }}, then take a backup by hand."
             runbook_url: "https://safeops.work/members/chapter-12-backup-restore/runbook/"

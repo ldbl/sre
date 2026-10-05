@@ -38,11 +38,14 @@ RESTORE="app-postgres-restore"
 # usage - print the header comment of this file (lines 2-17) as help, then exit 1.
 usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
+# need_value OPTION ARGS... - fail with a clear message when OPTION has no value after it.
+need_value() { [ $# -ge 2 ] && [ -n "$2" ] || { echo "$1 needs a value" >&2; usage; }; }
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    -n) NAMESPACE="$2"; shift 2 ;;
-    -c) CONTEXT="$2"; shift 2 ;;
-    -t) TARGET_TIME="$2"; shift 2 ;;
+    -n) need_value "$@"; NAMESPACE="$2"; shift 2 ;;
+    -c) need_value "$@"; CONTEXT="$2"; shift 2 ;;
+    -t) need_value "$@"; TARGET_TIME="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "unknown option: $1" >&2; usage ;;
   esac

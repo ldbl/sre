@@ -13,7 +13,8 @@ database and owner `app`, credentials in the Secret `app-postgres-app`.
   (ConfigMap substitution); the keys from the Secret `cnpg-backup-s3`.
 - **Known tech debt:** CNPG 1.29 removes the in-tree `barmanObjectStore`. The operator chart is pinned
   (`cnpg-operator/release.yaml`) until the backups move to the Barman Cloud plugin.
-- **Watched by** `PostgresWALArchivingFailing`, `PostgresBackupFailed` and `PostgresBackupTooOld`
+- **Watched by** `PostgresWALArchivingFailing`, `PostgresBackupFailed`, `PostgresBackupTooOld` and
+  `PostgresNeverBackedUp`
   (`observability/kube-prometheus-stack/monitoring/backup-alerts.yaml`).
 
 ## Restore
