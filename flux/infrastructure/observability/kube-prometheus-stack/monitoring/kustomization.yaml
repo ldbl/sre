@@ -8,3 +8,5 @@ resources:
   - backend-alerts.yaml
   - cert-manager-servicemonitor.yaml
   - cert-manager-alerts.yaml
+  - cnpg-podmonitor.yaml
+  - backup-alerts.yaml

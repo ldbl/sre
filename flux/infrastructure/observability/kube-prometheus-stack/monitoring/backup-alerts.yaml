@@ -1,0 +1,59 @@
+# Backup alerts for app-postgres (CNPG), from the instance's exporter (cnpg-podmonitor.yaml).
+# Each one names an action:
+#   PostgresWALArchivingFailing - the newest WAL segment could not be archived: point-in-time
+#                                 restore stops at the last good segment, and WAL piles up on disk
+#   PostgresBackupFailed        - the newest base backup failed: the last good one is getting older
+#   PostgresBackupTooOld        - no completed base backup for 26 hours (daily schedule + 2h)
+# Left out on purpose: the age of the last archived segment. An idle database writes no WAL, so
+# nothing is archived for hours - on a quiet cluster that alert would fire all the time (noise).
+# The failure itself is the signal: the last attempt is newer than the last success.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: backup-alerts
+  namespace: observability
+  labels:
+    prometheus: kube-prometheus-stack
+    role: alert-rules
+spec:
+  groups:
+    - name: backup.rules
+      rules:
+        - alert: PostgresWALArchivingFailing
+          expr: cnpg_pg_stat_archiver_last_failed_time > cnpg_pg_stat_archiver_last_archived_time
+          for: 15m
+          labels:
+            severity: warning
+            component: postgres
+          annotations:
+            summary: "{{ $labels.namespace }}: Postgres WAL archiving is failing - point-in-time restore stops at the last good segment"
+            description: "The newest WAL segment of {{ $labels.pod }} in {{ $labels.namespace }} failed to archive for 15 minutes. First check: the Cluster's ContinuousArchiving condition and the instance log (barman-cloud-wal-archive) - the backup store's credentials, endpoint or network policy."
+            runbook_url: "https://safeops.work/course/chapter-12-backup-restore/runbook/"
+
+        - alert: PostgresBackupFailed
+          expr: cnpg_collector_last_failed_backup_timestamp > cnpg_collector_last_available_backup_timestamp
+          for: 5m
+          labels:
+            severity: warning
+            component: postgres
+          annotations:
+            summary: "{{ $labels.namespace }}: the newest Postgres base backup failed"
+            description: "The last base backup of app-postgres in {{ $labels.namespace }} failed after the last good one. First check: kubectl get backups in {{ $labels.namespace }} - the failed Backup's status.error - then take a new backup once the cause is fixed."
+            runbook_url: "https://safeops.work/course/chapter-12-backup-restore/runbook/"
+
+        - alert: PostgresBackupTooOld
+          # > 0: a cluster that has never completed a backup reports 0; PostgresBackupFailed covers
+          # a first backup that fails.
+          # The age comes first, so that $value in the summary is the age, not the timestamp.
+          expr: |
+            time() - cnpg_collector_last_available_backup_timestamp > 26 * 3600
+            and cnpg_collector_last_available_backup_timestamp > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: postgres
+          annotations:
+            summary: "{{ $labels.namespace }}: the newest Postgres base backup is {{ $value | humanizeDuration }} old"
+            description: "No base backup of app-postgres in {{ $labels.namespace }} completed in the last 26 hours; a restore would replay more WAL, and depends on every segment since. First check: the ScheduledBackup (suspended? its last schedule time), then take a backup by hand."
+            runbook_url: "https://safeops.work/course/chapter-12-backup-restore/runbook/"
