@@ -33,8 +33,6 @@ patches:
                 env:
                   - name: CHAOS_ENABLED
                     value: "true"
-                  - name: RANDOM_ERROR_RATE
-                    value: "0.3"
   # Develop runs smaller than production (the base); scripts/check-app-resources.sh keeps production
   # >= develop and staging == production, and checks the worst case against each namespace quota.
   - patch: |-
