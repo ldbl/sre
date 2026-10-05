@@ -16,4 +16,4 @@ resources:
 images:
   - name: backend
     newName: ${image_registry}/backend
-    newTag: production-v0.0.0-165ecab-1790509191 # {"$imagepolicy": "production:backend:tag"}
+    newTag: production-v0.0.0-7890945-1791154832 # {"$imagepolicy": "production:backend:tag"}
