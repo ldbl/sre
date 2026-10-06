@@ -9,8 +9,8 @@
 #   - the annotations safeops.io/owner, safeops.io/reason and safeops.io/expires (YYYY-MM-DD);
 #   - an expiry date not in the past and at most MAX_DAYS ahead - temporary means a date;
 #   - exactly one policy and one rule (plus its autogen-<rule> variants), no "*";
-#   - in every match entry exactly one namespace and at least one resource name, none of them "*"
-#     - no exception for a whole namespace or the whole cluster.
+#   - in every match entry exactly one literal namespace and at least one resource name that is not
+#     only wildcards (*, ?) - no exception for a whole namespace or the whole cluster.
 # The expiry is checked on every run, not only when the file changes: CI runs every hook on every
 # pull request, so an expired exception fails all of them until it is removed or renewed on purpose.
 #
@@ -35,6 +35,14 @@ latest_expiry() {
     || date -u -d "${TODAY} + ${MAX_DAYS} days" +%F
 }
 LATEST="$(latest_expiry)"
+
+# is_calendar_date DATE - true when DATE (YYYY-MM-DD) is a real day. GNU date refuses 2026-02-30;
+# BSD date rolls it over to 2026-03-02 - so the date must come back unchanged.
+is_calendar_date() {
+  local normalized
+  normalized="$(date -u -d "$1" +%F 2>/dev/null || date -u -j -f %F "$1" +%F 2>/dev/null || true)"
+  [[ "${normalized}" == "$1" ]]
+}
 
 failures=()
 checked=0
@@ -61,8 +69,8 @@ while IFS= read -r file; do
     done
 
     expires="$(yq '.metadata.annotations["safeops.io/expires"] // ""' <<<"${doc}")"
-    if [[ ! "${expires}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-      failures+=("${where}: annotation safeops.io/expires must be a date, YYYY-MM-DD (got '${expires}')")
+    if [[ ! "${expires}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || ! is_calendar_date "${expires}"; then
+      failures+=("${where}: annotation safeops.io/expires must be a real date, YYYY-MM-DD (got '${expires}')")
     elif [[ "${expires}" < "${TODAY}" ]]; then
       failures+=("${where}: expired on ${expires} - remove it, or renew it in a pull request that says why")
     elif [[ "${expires}" > "${LATEST}" ]]; then
@@ -106,8 +114,13 @@ while IFS= read -r file; do
         || failures+=("${where}: match entry ${m} must name exactly one namespace")
       [[ "$(yq "${entry}.names | length" <<<"${doc}")" -ge 1 ]] \
         || failures+=("${where}: match entry ${m} must name the resources (resources.names)")
-      if [[ "$(yq "[${entry}.namespaces[], ${entry}.names[]] | any_c(test(\"^\\\\*\$\"))" <<<"${doc}")" == "true" ]]; then
-        failures+=("${where}: match entry ${m} uses \"*\" for a namespace or a name")
+      # Kyverno matches namespaces and names as wildcards (* and ?). A namespace must be literal; a
+      # name may be a prefix such as vendor-agent-*, but not only wildcards (*, ?*, ...).
+      if [[ "$(yq "[${entry}.namespaces[]] | any_c(test(\"[*?]\"))" <<<"${doc}")" == "true" ]]; then
+        failures+=("${where}: match entry ${m} uses a wildcard (* or ?) in a namespace")
+      fi
+      if [[ "$(yq "[${entry}.names[]] | any_c(test(\"^[*?]+\$\"))" <<<"${doc}")" == "true" ]]; then
+        failures+=("${where}: match entry ${m} has a name made only of wildcards (* or ?)")
       fi
     done
   done

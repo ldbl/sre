@@ -44,6 +44,8 @@ run_case "expires today - still valid" pass '.metadata.annotations["safeops.io/e
 run_case "expired yesterday" fail '.metadata.annotations["safeops.io/expires"] = "2026-10-05"'
 run_case "expires more than 90 days ahead" fail '.metadata.annotations["safeops.io/expires"] = "2027-01-05"'
 run_case "expiry not a date" fail '.metadata.annotations["safeops.io/expires"] = "next sprint"'
+run_case "an impossible date (30 February)" fail '.metadata.annotations["safeops.io/expires"] = "2026-02-30"'
+run_case "an impossible month (13)" fail '.metadata.annotations["safeops.io/expires"] = "2026-13-01"'
 run_case "no owner" fail 'del(.metadata.annotations["safeops.io/owner"])'
 run_case "empty reason" fail '.metadata.annotations["safeops.io/reason"] = ""'
 run_case "another namespace - Kyverno would ignore it" fail '.metadata.namespace = "develop"'
@@ -54,6 +56,9 @@ run_case "no resource names - the whole namespace" fail "del(${M}.names)"
 run_case "a \"*\" name" fail "${M}.names = [\"*\"]"
 run_case "a second entry (match.all) without names" fail \
   '.spec.match.all = [{"resources": {"kinds": ["Pod"], "namespaces": ["develop"]}}]'
+run_case "\"?*\" as a name" fail "${M}.names = [\"?*\"]"
+run_case "\"?*\" as the namespace" fail "${M}.namespaces = [\"?*\"]"
+run_case "a namespace prefix (dev*)" fail "${M}.namespaces = [\"dev*\"]"
 run_case "a named prefix (vendor-agent-*) is still narrow" pass "${M}.names = [\"vendor-agent-*\"]"
 E='.spec.exceptions'
 run_case "the rule and its autogen variants (a Deployment)" pass \

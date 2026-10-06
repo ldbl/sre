@@ -13,7 +13,8 @@ stays under the guardrail. This directory is the only way one reaches the cluste
     `safeops.io/expires` (`YYYY-MM-DD`, at most 90 days ahead);
   - one policy and one rule (`ruleNames` may add its `autogen-<rule>` variants, which a Deployment
     needs), no `*`;
-  - one namespace and at least one resource name in every `match` entry - no exception for a whole
+  - one literal namespace (no `*` or `?`) and at least one resource name that is not only wildcards
+    in every `match` entry - no exception for a whole
     namespace or the whole cluster.
   It also fails every pull request once an exception has expired, until it is removed or renewed
   on purpose.
