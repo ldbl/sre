@@ -1,0 +1,11 @@
+# Chapter 16: the namespace Kyverno reads PolicyExceptions from, the guard that lets only Flux write
+# them, and the exceptions themselves - one file each, added and removed through pull requests.
+# scripts/check-policy-exceptions.sh (pre-commit and CI) refuses an exception without an owner, a
+# reason and an expiry date - and every pull request once that date has passed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - only-from-git.yaml
+  # exceptions - one line per file, e.g.:
+  # - develop-vendor-agent.yaml

@@ -13,7 +13,7 @@
 #
 # Examples:
 #   # probe the backend the way the frontend does (app=frontend passes the NetworkPolicies)
-#   scripts/lab-pod.sh -n develop -i curlimages/curl -l app=frontend -- curl -sf -m 5 http://backend/healthz
+#   scripts/lab-pod.sh -n develop -i curlimages/curl:8.22.0 -l app=frontend -- curl -sf -m 5 http://backend/healthz
 #   # long-lived debug pod, then: kubectl --context kind-sre-control-plane -n develop exec np-debug -- nc -w 2 backend 80
 #   scripts/lab-pod.sh -n develop --daemon np-debug
 #   # connect as the app, its password never on a command line (-s: every key as $SECRET_<key>)
@@ -30,6 +30,9 @@
 #
 # (Lines 2-29 above are also the --help text: usage() prints them. Keep notes for readers below.)
 # Run by hand in the labs (Chapter 00 on). Needs: kubectl and jq.
+# Images (-i): in develop/staging/production the Kyverno guardrails (Chapter 16) admit only a pinned
+# tag (not latest, not none) from a trusted source - the platform registry, CloudNativePG, or the lab
+# images busybox, postgres and curlimages/curl. Anything else is refused at `kubectl run`.
 # Changes: creates one pod in the namespace; a one-off pod is deleted at the end, a --daemon pod stays.
 # Exit code: the command's own; 124 when the pod did not finish within LAB_POD_TIMEOUT (default 120s).
 set -euo pipefail

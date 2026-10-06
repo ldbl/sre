@@ -1,3 +1,9 @@
+# A privileged container has the host's devices and kernel capabilities - one escape from it is an
+# escape from the node. Init containers are checked too: they run with the same privileges, only
+# earlier. In the application namespaces Pod Security "restricted" (Chapter 07) refuses this as well;
+# Kyverno adds the PolicyReport in the namespaces Pod Security does not restrict.
+#
+# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -10,7 +16,6 @@ metadata:
       Privileged containers have full access to the host. This policy
       blocks privileged mode to enforce workload isolation boundaries.
 spec:
-  validationFailureAction: Audit
   background: true
   rules:
     - name: no-privileged
@@ -20,9 +25,16 @@ spec:
               kinds:
                 - Pod
       validate:
-        message: "Privileged containers are not allowed."
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaces: [develop, staging, production]
+        message: "Privileged containers (and init containers) are not allowed."
         pattern:
           spec:
+            =(initContainers):
+              - =(securityContext):
+                  =(privileged): "false"
             containers:
               - =(securityContext):
                   =(privileged): "false"

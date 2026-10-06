@@ -97,7 +97,7 @@ terraform destroy
 
 ```bash
 # one-off probe, labelled like the frontend so the NetworkPolicies let it through
-scripts/lab-pod.sh -n develop -i curlimages/curl -l app=frontend -- curl -sf http://backend/healthz
+scripts/lab-pod.sh -n develop -i curlimages/curl:8.22.0 -l app=frontend -- curl -sf http://backend/healthz
 # long-lived debug pod (prints its name), then kubectl --context kind-sre-control-plane exec into it
 scripts/lab-pod.sh -n develop --daemon np-debug
 ```

@@ -97,8 +97,8 @@ done
 smoke_curl() {
   local ns="develop" pod
   pod="smoke-curl-$(date +%s)-$RANDOM"
-  k run "$pod" --image=curlimages/curl --labels=app=frontend --restart=Never -n "$ns" \
-    --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl","command":["curl","-sf","-m","10","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
+  k run "$pod" --image=curlimages/curl:8.22.0 --labels=app=frontend --restart=Never -n "$ns" \
+    --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl:8.22.0","command":["curl","-sf","-m","10","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
   local phase=""
   for _ in $(seq 1 30); do
     phase="$(k -n "$ns" get pod "$pod" -o jsonpath='{.status.phase}' 2>/dev/null)"

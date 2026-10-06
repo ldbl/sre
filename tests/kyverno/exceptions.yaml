@@ -1,0 +1,26 @@
+# A PolicyException the way flux/infrastructure/policy/exceptions/ holds them: one policy, one rule,
+# one namespace, one named pod. The test proves it turns that pod's failure into "skip" - and only
+# that pod's: registry-untrusted, with the same image, still fails.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: vendor-agent-registry
+  namespace: policy-exceptions
+  annotations:
+    safeops.io/owner: platform-team
+    safeops.io/reason: "test fixture"
+    safeops.io/expires: "2099-01-01"
+spec:
+  exceptions:
+    - policyName: require-trusted-registries
+      ruleNames:
+        - trusted-registries-only
+  match:
+    any:
+      - resources:
+          kinds:
+            - Pod
+          namespaces:
+            - develop
+          names:
+            - vendor-agent

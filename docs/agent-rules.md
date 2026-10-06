@@ -277,3 +277,17 @@ requests while sparing the probes - a release can look healthy to every health c
 | Never call an incident recovered because an alert resolved: prove it with a user operation that succeeds (a request through the Service, a login), with traffic flowing. | Instruction only. |
 | Never write a postmortem cause that names a person; name the conditions, and give every action an owner, a date and a way to check it. | Review of the postmortem. |
 | Never leave `RANDOM_ERROR_RATE` (or any drill setting) in an overlay after a drill; the drill ends with its revert merged. | Review; `flux/apps/backend/*/kustomization.yaml` in Git shows it. |
+
+## Chapter 16 - A guardrail refuses; an exception is narrow, owned and from Git
+
+Five Kyverno ClusterPolicies (`flux/infrastructure/policy/packs/admission-guardrails/`) enforce in
+`develop`, `staging` and `production` - the API server refuses a pod or Deployment that breaks them -
+and audit everywhere else (PolicyReports). An exception for one workload is a `PolicyException` in
+`flux/infrastructure/policy/exceptions/`; Kyverno reads no other namespace, and only Flux may write one.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| When admission refuses a change, fix the manifest - never weaken the policy, switch it to Audit or narrow its namespaces to get one workload through. | Review of the policy diff; `tests/kyverno-policies.test.sh` (pre-commit and CI) fails when a rule's verdicts change. |
+| An exception names one policy rule, one namespace and the resources by name, with `safeops.io/owner`, `safeops.io/reason` and `safeops.io/expires` (at most 90 days) - and goes in through a pull request. | `scripts/check-policy-exceptions.sh` (pre-commit and CI); the ValidatingAdmissionPolicy `policy-exceptions-only-from-git` refuses any writer but Flux. |
+| Never `kubectl apply` a policy, a mode change or an exception by hand, and never delete the `policy-exceptions-only-from-git` binding - that is break-glass for the owner, when Flux itself is broken. | The ValidatingAdmissionPolicy for exceptions; Flux reverts hand changes to policies (Chapter 03). |
+| Before proposing Enforce for a new rule or namespace, show the evidence: the PolicyReports of that namespace with no failures, and the occasional workloads (lab pods, Jobs) checked too. | Review of the pull request. |
