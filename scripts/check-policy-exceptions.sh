@@ -8,6 +8,7 @@
 #     (Kyverno reads no other namespace - an exception elsewhere would silently do nothing);
 #   - the annotations safeops.io/owner, safeops.io/reason and safeops.io/expires (YYYY-MM-DD);
 #   - an expiry date not in the past and at most MAX_DAYS ahead - temporary means a date;
+#   - exactly one policy and one rule (plus its autogen-<rule> variants), no "*";
 #   - in every match entry exactly one namespace and at least one resource name, none of them "*"
 #     - no exception for a whole namespace or the whole cluster.
 # The expiry is checked on every run, not only when the file changes: CI runs every hook on every
@@ -66,6 +67,34 @@ while IFS= read -r file; do
       failures+=("${where}: expired on ${expires} - remove it, or renew it in a pull request that says why")
     elif [[ "${expires}" > "${LATEST}" ]]; then
       failures+=("${where}: expires ${expires}, more than ${MAX_DAYS} days ahead (latest ${LATEST})")
+    fi
+
+    # What it switches off: one policy, one rule. ruleNames may add the rule's generated variants for
+    # pod controllers (autogen-<rule>, autogen-cronjob-<rule>) - an exception for a Deployment needs
+    # them - but no other rule and no "*".
+    if [[ "$(yq '.spec.exceptions | length' <<<"${doc}")" != "1" ]]; then
+      failures+=("${where}: spec.exceptions must have exactly one entry (one policy)")
+    else
+      policy="$(yq '.spec.exceptions[0].policyName // ""' <<<"${doc}")"
+      [[ -n "${policy}" && "${policy}" != *"*"* ]] \
+        || failures+=("${where}: spec.exceptions[0].policyName must name one policy, without \"*\"")
+      rules="$(yq '.spec.exceptions[0].ruleNames[]' <<<"${doc}" 2>/dev/null || true)"
+      base=""
+      [[ -n "${rules}" ]] || failures+=("${where}: spec.exceptions[0].ruleNames must name the rule")
+      while IFS= read -r rule; do
+        [[ -n "${rule}" ]] || continue
+        if [[ "${rule}" == *"*"* ]]; then
+          failures+=("${where}: rule name '${rule}' uses \"*\"")
+          continue
+        fi
+        stripped="${rule#autogen-cronjob-}"
+        stripped="${stripped#autogen-}"
+        if [[ -z "${base}" ]]; then
+          base="${stripped}"
+        elif [[ "${stripped}" != "${base}" ]]; then
+          failures+=("${where}: ruleNames name more than one rule ('${base}' and '${stripped}') - one exception per rule")
+        fi
+      done <<<"${rules}"
     fi
 
     # Every match entry (any and all): one namespace, named resources, no "*".

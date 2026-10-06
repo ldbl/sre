@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/check-policy-exceptions.sh on a throw-away copy of the exceptions directory - no
+# Tests scripts/check-policy-exceptions.sh in a throw-away repository, one case at a time - no
 # cluster. Each case writes one PolicyException (tests/kyverno/exceptions.yaml, changed by one yq
 # edit) into a fresh copy, runs the check with a fixed TODAY and compares the verdict.
 # Run: tests/check-policy-exceptions.test.sh   (pre-commit runs it when the check or this test changes)
@@ -19,8 +19,10 @@ run_case() {
   local name="$1" expected="$2" edit="$3" dir="${4:-flux/infrastructure/policy/exceptions}" got
   rm -rf "${WORK}/repo"
   mkdir -p "${WORK}/repo/scripts" "${WORK}/repo/flux/infrastructure/policy" "${WORK}/repo/${dir}"
+  # Only the check and the case - not the repository's own exceptions: their real expiry dates would
+  # fail against the fixed TODAY. The live ones are checked by the policy-exceptions hook.
+  mkdir -p "${WORK}/repo/flux/infrastructure/policy/exceptions"
   cp "${ROOT}/scripts/check-policy-exceptions.sh" "${WORK}/repo/scripts/"
-  cp -R "${ROOT}/flux/infrastructure/policy/exceptions" "${WORK}/repo/flux/infrastructure/policy/"
   if [[ "${edit}" != "none" ]]; then
     yq '.metadata.annotations["safeops.io/expires"] = "2026-12-31"' \
       "${ROOT}/tests/kyverno/exceptions.yaml" > "${WORK}/repo/${dir}/case.yaml"
@@ -53,5 +55,16 @@ run_case "a \"*\" name" fail "${M}.names = [\"*\"]"
 run_case "a second entry (match.all) without names" fail \
   '.spec.match.all = [{"resources": {"kinds": ["Pod"], "namespaces": ["develop"]}}]'
 run_case "a named prefix (vendor-agent-*) is still narrow" pass "${M}.names = [\"vendor-agent-*\"]"
+E='.spec.exceptions'
+run_case "the rule and its autogen variants (a Deployment)" pass \
+  "${E}[0].ruleNames = [\"trusted-registries-only\", \"autogen-trusted-registries-only\", \"autogen-cronjob-trusted-registries-only\"]"
+run_case "two policies in one exception" fail \
+  "${E} += [{\"policyName\": \"disallow-latest-tag\", \"ruleNames\": [\"no-latest\"]}]"
+run_case "no exceptions entry" fail "${E} = []"
+run_case "a \"*\" policy" fail "${E}[0].policyName = \"*\""
+run_case "a \"*\" rule" fail "${E}[0].ruleNames = [\"*\"]"
+run_case "a rule prefix with \"*\"" fail "${E}[0].ruleNames = [\"trusted-*\"]"
+run_case "two different rules" fail "${E}[0].ruleNames = [\"trusted-registries-only\", \"no-latest\"]"
+run_case "no rule names" fail "del(${E}[0].ruleNames)"
 
 exit "${FAILED}"
