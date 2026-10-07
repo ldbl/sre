@@ -1,0 +1,10 @@
+# The only namespace Kyverno reads PolicyExceptions from (features.policyExceptions.namespace in
+# ../kyverno/release.yaml). It holds no workloads, so Pod Security "restricted" costs nothing here.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: policy-exceptions
+  labels:
+    managed-by: flux
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

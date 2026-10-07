@@ -84,6 +84,30 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: check-policy-exceptions-test
+        name: policy-exception check tests (throw-away copy, no cluster)
+        entry: tests/check-policy-exceptions.test.sh
+        language: script
+        files: ^(scripts/check-policy-exceptions\.sh|tests/check-policy-exceptions\.test\.sh|tests/kyverno/exceptions\.yaml)$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: kyverno-policies-test
+        name: Admission guardrails give the expected verdicts (kyverno test, no cluster)
+        entry: tests/kyverno-policies.test.sh
+        language: script
+        files: ^(flux/infrastructure/policy/packs/admission-guardrails/.*|tests/kyverno/.*|tests/kyverno-policies\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: kyverno-supply-chain-test
+        name: Supply-chain policies give the expected verdicts on real images (kyverno test, network)
+        entry: tests/kyverno-supply-chain.test.sh
+        language: script
+        files: ^(flux/infrastructure/policy/packs/supply-chain/.*|tests/kyverno-supply-chain/.*|tests/kyverno-supply-chain\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh
@@ -106,6 +130,14 @@ repos:
         entry: scripts/check-oidc-rbac.sh
         language: script
         files: ^flux/infrastructure/security/(rbac|dex)/.*\.ya?ml$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: policy-exceptions
+        name: PolicyExceptions are narrow, owned and not expired
+        entry: scripts/check-policy-exceptions.sh
+        language: script
+        files: ^flux/.*\.ya?ml$
         pass_filenames: false
         stages: [pre-commit]
 

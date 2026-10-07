@@ -23,6 +23,27 @@ spec:
     remediation:
       retries: 3
   values:
+    config:
+      # Namespaces the admission webhooks never see. The webhooks fail closed (failurePolicy: Fail):
+      # while no Kyverno replica answers, the API server refuses every Pod they cover. flux-system
+      # is out so that the path that repairs Kyverno - Flux applying Git - never waits on Kyverno.
+      # Its pods are still scanned in the background and reported in PolicyReports.
+      # kube-system is the chart's default; the kyverno namespace is excluded by the chart itself.
+      webhooks:
+        namespaceSelector:
+          matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values:
+                - kube-system
+                - flux-system
+    features:
+      # PolicyExceptions (Chapter 16) - read only from this one namespace. The namespace and its
+      # exceptions come from Git (flux/infrastructure/policy/exceptions); the ValidatingAdmissionPolicy
+      # there lets only Flux write them.
+      policyExceptions:
+        enabled: true
+        namespace: policy-exceptions
     admissionController:
       replicas: 2
     backgroundController:

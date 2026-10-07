@@ -1,12 +1,13 @@
-# Policy Packs (Inactive by Default)
+# Policy Packs
 
-These policy packs are chapter scaffolds and are not reconciled by Flux unless
-you add explicit `Kustomization` entries in `flux/bootstrap/flux-system/infrastructure.yaml`.
+Each pack is one Flux Kustomization (`flux/bootstrap/flux-system/infrastructure.yaml`), applied after
+the `kyverno` engine. `${image_registry}` and `${git_owner}` come from the `cluster-config` ConfigMap
+(Flux postBuild substitution).
 
-- `admission-guardrails/` contains baseline admission policy examples.
-- `supply-chain/` contains signature/attestation policy examples.
+- `admission-guardrails/` - Chapter 16. Enforce in the application namespaces, Audit elsewhere.
+- `supply-chain/` - Chapter 17. Deny in the application namespaces, Audit elsewhere.
 
-Use staged rollout:
-1. deploy policy engine (Kyverno)
-2. run in audit mode in non-production
-3. switch selected policies to enforce
+Rollout, for any new rule: Audit everywhere first; read the PolicyReports until the namespaces it will
+enforce in have no failures (and the workloads created only now and then - lab pods, Jobs - are
+checked too); then add the Enforce override for those namespaces, in a pull request with that
+evidence.

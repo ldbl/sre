@@ -1,3 +1,10 @@
+# Requests make scheduling honest, limits keep one container from starving its neighbours (Chapter 08).
+# A Pod is checked after admission defaults are applied, so in a namespace with a LimitRange (all
+# application namespaces have one) a pod without resources gets the defaults and passes; a Deployment
+# - checked through Kyverno's generated rule for pod controllers - has no LimitRange applied and
+# must set them itself.
+#
+# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -10,7 +17,6 @@ metadata:
       CPU and memory requests/limits are required for all containers
       to prevent noisy-neighbor impact and enable fair scheduling.
 spec:
-  validationFailureAction: Audit
   background: true
   rules:
     - name: require-cpu-memory-requests-limits
@@ -20,6 +26,10 @@ spec:
               kinds:
                 - Pod
       validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaces: [develop, staging, production]
         message: "CPU and memory requests/limits are required for all containers."
         pattern:
           spec:

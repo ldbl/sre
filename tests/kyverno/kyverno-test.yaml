@@ -1,0 +1,50 @@
+# Expected verdicts of the admission guardrails (flux/infrastructure/policy/packs/admission-guardrails).
+# Run with tests/kyverno-policies.test.sh: it fills in ${image_registry} the way Flux does, then
+# runs `kyverno test`. A rule not listed for a resource is not checked for it.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: admission-guardrails
+policies:
+  - policies/disallow-latest-tag.yaml
+  - policies/disallow-privileged-containers.yaml
+  - policies/require-requests-limits.yaml
+  - policies/require-security-context.yaml
+  - policies/require-trusted-registries.yaml
+resources:
+  - resources.yaml
+exceptions:
+  - exceptions.yaml
+results:
+  # The compliant pod passes all five.
+  - {policy: disallow-latest-tag, rule: no-latest, kind: Pod, resources: [good], result: pass}
+  - {policy: disallow-privileged-containers, rule: no-privileged, kind: Pod, resources: [good], result: pass}
+  - {policy: require-requests-limits, rule: require-cpu-memory-requests-limits, kind: Pod, resources: [good], result: pass}
+  - {policy: require-security-context, rule: require-container-security-context, kind: Pod, resources: [good], result: pass}
+  - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [good], result: pass}
+
+  # Tags: "latest" and no tag fail; a digest and pinned lab images pass; a Deployment is checked too.
+  - {policy: disallow-latest-tag, rule: no-latest, kind: Pod, resources: [tag-latest, tag-missing], result: fail}
+  - {policy: disallow-latest-tag, rule: no-latest, kind: Pod, resources: [tag-digest, lab-images], result: pass}
+  - {policy: disallow-latest-tag, rule: autogen-no-latest, kind: Deployment, resources: [deploy-latest], result: fail}
+
+  # Ephemeral containers (kubectl debug) are checked like the others.
+  - {policy: disallow-latest-tag, rule: no-latest, kind: Pod, resources: [ephemeral-latest], result: fail}
+  - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [ephemeral-untrusted], result: fail}
+
+  # Registries: short and long Docker Hub names are the same image; other sources fail, init containers too.
+  - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [lab-images, tag-digest], result: pass}
+  - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [registry-untrusted, registry-dockerhub-other, registry-untrusted-init], result: fail}
+
+  # Privileged: in a container or an init container.
+  - {policy: disallow-privileged-containers, rule: no-privileged, kind: Pod, resources: [privileged, privileged-init], result: fail}
+
+  # Security context: runAsNonRoot per pod or per container; missing, turned off, or escalation allowed fails.
+  - {policy: require-security-context, rule: require-container-security-context, kind: Pod, resources: [nonroot-per-container], result: pass}
+  - {policy: require-security-context, rule: require-container-security-context, kind: Pod, resources: [nonroot-missing, nonroot-turned-off, escalation-allowed], result: fail}
+
+  # Requests and limits.
+  - {policy: require-requests-limits, rule: require-cpu-memory-requests-limits, kind: Pod, resources: [resources-missing], result: fail}
+
+  # The exception: skips exactly the pod it names.
+  - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [vendor-agent], result: skip}
