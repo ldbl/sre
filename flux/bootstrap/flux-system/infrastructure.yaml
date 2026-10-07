@@ -461,6 +461,25 @@ spec:
   dependsOn:
     - name: kyverno
 ---
+# Chapter 16: the policy-exceptions namespace, the guard that lets only Flux write PolicyExceptions,
+# and the exceptions themselves. After kyverno: the PolicyException CRD comes with its chart.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: policy-exceptions
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/policy/exceptions
+  prune: true
+  wait: true
+  timeout: 5m0s
+  dependsOn:
+    - name: kyverno
+---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:

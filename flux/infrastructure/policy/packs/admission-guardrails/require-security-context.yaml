@@ -1,3 +1,9 @@
+# Least privilege for the process: not root, and no way to gain more privileges than it started with.
+# runAsNonRoot may be set for the whole pod (spec.securityContext) or per container - both are what
+# Pod Security "restricted" accepts (Chapter 07), so both pass here. allowPrivilegeEscalation exists
+# only per container and must be false in every one, init containers included.
+#
+# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -10,7 +16,6 @@ metadata:
       Containers must run as non-root and disallow privilege escalation.
       This enforces least-privilege at the container runtime level.
 spec:
-  validationFailureAction: Audit
   background: true
   rules:
     - name: require-container-security-context
@@ -20,10 +25,33 @@ spec:
               kinds:
                 - Pod
       validate:
-        message: "Containers must run as non-root and disallow privilege escalation."
-        pattern:
-          spec:
-            containers:
-              - securityContext:
-                  runAsNonRoot: true
-                  allowPrivilegeEscalation: false
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce
+            namespaces: [develop, staging, production]
+        message: >-
+          Containers must run as non-root (pod or container securityContext.runAsNonRoot: true)
+          and set allowPrivilegeEscalation: false - init containers included.
+        anyPattern:
+          # runAsNonRoot for the whole pod; a container may repeat it, but not turn it off.
+          - spec:
+              securityContext:
+                runAsNonRoot: true
+              =(initContainers):
+                - securityContext:
+                    =(runAsNonRoot): true
+                    allowPrivilegeEscalation: false
+              containers:
+                - securityContext:
+                    =(runAsNonRoot): true
+                    allowPrivilegeEscalation: false
+          # runAsNonRoot in every container.
+          - spec:
+              =(initContainers):
+                - securityContext:
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+              containers:
+                - securityContext:
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false

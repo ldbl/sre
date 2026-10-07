@@ -1,0 +1,35 @@
+# A PolicyException switches a guardrail off for what it names - so who may write one matters as
+# much as the guardrail. This policy lets only Flux (kustomize-controller, applying Git) create or
+# change PolicyExceptions; a kubectl apply by a person or an AI agent - even with cluster-admin - is
+# refused. Deleting one is not guarded: it can only make the platform stricter, and Flux re-applies
+# it while it is still in Git.
+# Break-glass (Flux itself broken): the admin kubeconfig deletes this binding, writes the exception,
+# and the same change goes into Git right after - Flux then restores the binding.
+# Native ValidatingAdmissionPolicy, Deny from the start - it guards the exception path itself, and it
+# must not depend on Kyverno, the engine it is guarding.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: policy-exceptions-only-from-git
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      # kyverno.io: exceptions to ClusterPolicies; policies.kyverno.io: to the newer CEL policies.
+      - apiGroups: ["kyverno.io", "policies.kyverno.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["policyexceptions"]
+  validations:
+    - expression: "request.userInfo.username == 'system:serviceaccount:flux-system:kustomize-controller'"
+      messageExpression: >-
+        'PolicyExceptions come only from Git (flux/infrastructure/policy/exceptions, through a pull request); '
+        + request.userInfo.username + ' may not write them'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: policy-exceptions-only-from-git
+spec:
+  policyName: policy-exceptions-only-from-git
+  validationActions: [Deny]

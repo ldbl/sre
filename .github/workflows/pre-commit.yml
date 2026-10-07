@@ -43,6 +43,19 @@ jobs:
           curl -sLO "https://dl.k8s.io/release/v1.36.5/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
+      # The Kyverno CLI for the kyverno-policies-test hook (tests/kyverno-policies.test.sh says why
+      # >= 1.19). Pinned and checked against the release's checksums.txt.
+      - name: Setup Kyverno CLI
+        env:
+          KYVERNO_VERSION: "1.19.1"
+          KYVERNO_SHA256: "b38228f367fc0fdc2b08f4c83ea50ac5f16c60ff8d62d76a66157c33c47b70ae"
+        run: |
+          archive="kyverno-cli_v${KYVERNO_VERSION}_linux_x86_64.tar.gz"
+          curl -sSLfO "https://github.com/kyverno/kyverno/releases/download/v${KYVERNO_VERSION}/${archive}"
+          echo "${KYVERNO_SHA256}  ${archive}" | sha256sum -c -
+          tar xzf "${archive}" kyverno && sudo mv kyverno /usr/local/bin/ && rm "${archive}"
+          kyverno version
+
       # checkov: the terraform-security hook fails without it (it is a required tool, not optional).
       - name: Install pre-commit and checkov
         run: pip install pre-commit==4.6.2 checkov==3.3.20

@@ -19,6 +19,7 @@ MIN_TERRAFORM="1.11"   # the kind and Hetzner modules need write-only attributes
 MIN_KIND="0.30"
 MIN_KUBECTL="1.35"
 MIN_FLUX="2.4"
+MIN_KYVERNO="1.19"   # tests/kyverno-policies.test.sh: 1.17 lets a wrong expectation pass
 
 # Resources Docker gives the kind nodes. Measured on the full local profile:
 # ~5.1 GiB used and ~0.4 cores busy at rest, ~2.7 cores requested. Labs add
@@ -68,6 +69,8 @@ hint() {
     jq:*)              echo "apt install jq  | https://jqlang.org/download/" ;;
     yq:Darwin)         echo "brew install yq  | https://github.com/mikefarah/yq#install" ;;
     yq:*)              echo "https://github.com/mikefarah/yq#install (the Go yq v4 - not the Python 'yq' from apt)" ;;
+    kyverno:Darwin)    echo "brew install kyverno  | https://kyverno.io/docs/kyverno-cli/install/" ;;
+    kyverno:*)         echo "https://github.com/kyverno/kyverno/releases (kyverno-cli_v<version>_linux_x86_64.tar.gz) | https://kyverno.io/docs/kyverno-cli/install/" ;;
     *)                 echo "" ;;
   esac
 }
@@ -119,6 +122,7 @@ check pre-commit ""               "pre-commit --version"
 check checkov    ""               "checkov --version"   # the terraform-security pre-commit hook fails without it
 check jq         ""               "jq --version"        # the AI agent's kube-context hook (Chapter 01) and scripts/lab-pod.sh
 check yq         "4"              "yq --version"        # the pre-commit guardrails that read the Flux manifests (Chapter 03 on)
+check kyverno    "$MIN_KYVERNO"   "kyverno version"     # the admission policy tests in pre-commit (Chapter 16)
 
 # docker buildx is a Docker CLI plugin, not a command on PATH, so `check` cannot find it.
 # Chapter 10 compares image digests in the registry with `docker buildx imagetools inspect`.
