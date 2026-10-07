@@ -40,6 +40,48 @@ spec:
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+      # Schema migrations before the app (Chapter 18): the same image - so the same signed digest, set
+      # by the overlay's images: transformer - runs `backend migrate`, applies the embedded migrations
+      # the database lacks (golang-migrate, under a Postgres advisory lock) and exits. The app then only
+      # checks the schema version and refuses to start on one it cannot use. Migrations only expand:
+      # the previous release keeps working on the new schema, so rolling back the image never needs
+      # rolling back the data.
+      initContainers:
+      - name: migrate
+        image: backend:latest  # name/tag set by the environment overlay (images: transformer)
+        imagePullPolicy: IfNotPresent
+        args: ["migrate"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          capabilities:
+            drop:
+              - ALL
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-postgres-app
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-postgres-app
+              key: password
+        - name: POSTGRES_HOST
+          value: app-postgres-rw
+        - name: POSTGRES_DB
+          value: app
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
       containers:
       - name: backend
         image: backend:latest  # name/tag set by the environment overlay (images: transformer)
