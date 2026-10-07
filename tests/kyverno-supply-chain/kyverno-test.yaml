@@ -1,0 +1,22 @@
+# Expected verdicts of the supply-chain policies (flux/infrastructure/policy/packs/supply-chain).
+# Run with tests/kyverno-supply-chain.test.sh - it needs the network: Kyverno reads the signatures from
+# ghcr.io and checks them against Sigstore's public trust root.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: supply-chain
+policies:
+  - policies/verify-images-enforce.yaml
+  - policies/verify-images-audit.yaml
+resources:
+  - resources.yaml
+variables: values.yaml
+results:
+  # Signed by our CI - both signature formats - pass where the policy enforces.
+  - {policy: verify-images-enforce, kind: Pod, resources: [backend-signed, frontend-signed-legacy-format, signed-with-foreign-image], result: pass}
+  # No signature: fail - the enforce copy's verdict (Deny at admission; shown on kind, not here), init containers included.
+  - {policy: verify-images-enforce, kind: Pod, resources: [unsigned, unsigned-init-container], result: fail}
+  # Signed, but its SBOM sits in the old format next to a referrer: not found - fail.
+  - {policy: verify-images-enforce, kind: Pod, resources: [frontend-mixed-formats], result: fail}
+  # The same unsigned image outside them: the audit copy reports it.
+  - {policy: verify-images-audit, kind: Pod, resources: [unsigned-in-observability], result: fail}

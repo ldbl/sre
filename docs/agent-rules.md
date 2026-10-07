@@ -291,3 +291,16 @@ and audit everywhere else (PolicyReports). An exception for one workload is a `P
 | An exception names one policy rule, one namespace and the resources by name, with `safeops.io/owner`, `safeops.io/reason` and `safeops.io/expires` (at most 90 days) - and goes in through a pull request. | `scripts/check-policy-exceptions.sh` (pre-commit and CI); the ValidatingAdmissionPolicy `policy-exceptions-only-from-git` refuses any writer but Flux. |
 | Never `kubectl apply` a policy, a mode change or an exception by hand, and never delete the `policy-exceptions-only-from-git` binding - that is break-glass for the owner, when Flux itself is broken. | The ValidatingAdmissionPolicy for exceptions; Flux reverts hand changes to policies (Chapter 03). |
 | Before proposing Enforce for a new rule or namespace, show the evidence: the PolicyReports of that namespace with no failures, and the occasional workloads (lab pods, Jobs) checked too. | Review of the pull request. |
+
+## Chapter 17 - Only what our CI built and signed runs in the application namespaces
+
+An `ImageValidatingPolicy` (`flux/infrastructure/policy/packs/supply-chain/`) refuses any
+`ghcr.io/safeops-course` image in `develop`, `staging` and `production` that is not signed - keyless,
+by `build.yml` of its own repository on `main` or `develop` - or has no SPDX SBOM attestation signed
+the same way. Elsewhere it reports.
+
+| Rule for the agent | What enforces it |
+|---|---|
+| Never build or push an image from a workstation, and never sign one by hand: an image reaches the registry only through its repository's `build.yml`. | The policy refuses an image without that signer identity; registry write access only for CI. |
+| When a signed image is refused, find out why before anything else (`cosign verify`, `cosign verify-attestation --type spdxjson`) - never widen the signer identity, switch the policy to Audit or add an exception to get it through. | `tests/kyverno-supply-chain.test.sh` (pre-commit and CI) fails when a verdict changes; review of the policy diff. |
+| A CI change that touches signing (a cosign or attest action version, the signing step) is verified against the policy with a real signed image before it merges. | Instruction; the test's real images. |

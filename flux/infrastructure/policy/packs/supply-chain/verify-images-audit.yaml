@@ -1,0 +1,73 @@
+# Chapter 17: every image from the platform's own registry (${image_registry}) must be signed - keyless,
+# by the build.yml of its own repository (backend, frontend, k8s-ai-monitor) on main or develop - and
+# carry an SPDX SBOM attestation signed the same way. Images from other registries are not this
+# policy's business (Chapter 16's require-trusted-registries decides whether they may run at all).
+#
+# ImageValidatingPolicy (CEL), not a ClusterPolicy verifyImages rule: the CI signs with cosign v3,
+# whose signatures are Sigstore bundles stored as OCI referrers; Kyverno's ClusterPolicy verifyImages
+# finds none of them ("no signatures found"), the ImageValidatingPolicy verifies both the bundles and
+# the older .sig format (checked with the Kyverno CLI 1.17 against the real images).
+#
+# Two copies, identical but for the name, the namespaces, the action and the failure policy -
+# tests/kyverno-supply-chain.test.sh fails when they drift apart:
+#   verify-images-enforce  develop, staging, production - Deny, failurePolicy Fail
+#   verify-images-audit    every other namespace         - Audit (PolicyReports), failurePolicy Ignore
+#
+# The pod runs the digest that was verified: Kyverno resolves the tag, verifies that digest and writes
+# it into the image (mutateDigest: true -> "<tag>@sha256:..."); verifyDigest then refuses an image left
+# without one. Without that, a tag moved in the registry between admission and the pull would run an
+# image nobody verified. Git keeps the tags (Flux image automation writes them); the cluster shows
+# tag@digest.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-images-audit
+  annotations:
+    policies.kyverno.io/title: Verify Image Signatures and SBOM (audit)
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  validationConfigurations:
+    mutateDigest: true
+    verifyDigest: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [develop, staging, production]
+  matchImageReferences:
+    - glob: "${image_registry}/*"
+  attestors:
+    - name: ci
+      cosign:
+        keyless:
+          identities:
+            - issuer: "https://token.actions.githubusercontent.com"
+              subjectRegExp: '^https://github\.com/${git_owner}/(backend|frontend|k8s-ai-monitor)/\.github/workflows/build\.yml@refs/heads/(main|develop)$'
+  attestations:
+    - name: sbom
+      intoto:
+        type: "https://spdx.dev/Document"
+  validations:
+    # Every container, init container and ephemeral container (kubectl debug) whose image is ours.
+    - expression: >-
+        (images.?containers.orValue([]) + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
+        .filter(image, image.startsWith('${image_registry}/'))
+        .all(image, verifyImageSignatures(image, [attestors.ci]) > 0)
+      message: "every ${image_registry} image must be signed by its repository's build.yml (cosign, keyless)"
+    - expression: >-
+        (images.?containers.orValue([]) + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
+        .filter(image, image.startsWith('${image_registry}/'))
+        .all(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.ci]) > 0)
+      message: "every ${image_registry} image must carry an SPDX SBOM attestation signed by its repository's build.yml"
