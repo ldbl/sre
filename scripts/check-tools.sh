@@ -19,7 +19,7 @@ MIN_TERRAFORM="1.11"   # the kind and Hetzner modules need write-only attributes
 MIN_KIND="0.30"
 MIN_KUBECTL="1.35"
 MIN_FLUX="2.4"
-MIN_COSIGN="3.0"     # Chapter 17 reads Sigstore bundles (OCI referrers) - cosign 2 does not find them
+MIN_COSIGN="3.0"     # Chapter 17 verifies Sigstore bundles stored as OCI referrers - checked with cosign 3
 MIN_KYVERNO="1.19"   # tests/kyverno-policies.test.sh: 1.17 lets a wrong expectation pass
 
 # Resources Docker gives the kind nodes. Measured on the full local profile:
