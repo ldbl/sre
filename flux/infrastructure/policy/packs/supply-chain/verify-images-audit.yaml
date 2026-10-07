@@ -13,9 +13,11 @@
 #   verify-images-enforce  develop, staging, production - Deny, failurePolicy Fail
 #   verify-images-audit    every other namespace         - Audit (PolicyReports), failurePolicy Ignore
 #
-# Tags are verified as they resolve at admission (mutateDigest: false, verifyDigest: false): Flux keeps
-# writing the tags it reads from Git, and the pods keep them. The digest Kyverno verified is the one the
-# kubelet pulls - unless the tag is moved in between; only a digest in Git would close that gap.
+# The pod runs the digest that was verified: Kyverno resolves the tag, verifies that digest and writes
+# it into the image (mutateDigest: true -> "<tag>@sha256:..."); verifyDigest then refuses an image left
+# without one. Without that, a tag moved in the registry between admission and the pull would run an
+# image nobody verified. Git keeps the tags (Flux image automation writes them); the cluster shows
+# tag@digest.
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:
@@ -28,8 +30,8 @@ spec:
   validationActions: [Audit]
   failurePolicy: Ignore
   validationConfigurations:
-    mutateDigest: false
-    verifyDigest: false
+    mutateDigest: true
+    verifyDigest: true
   autogen:
     podControllers:
       controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]

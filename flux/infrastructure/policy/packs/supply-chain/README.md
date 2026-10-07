@@ -20,6 +20,9 @@ ClusterPolicy `verifyImages` finds none of them; the ImageValidatingPolicy verif
 older `.sig` format. An image whose signature and SBOM are in the old format while GitHub's provenance
 is a referrer fails the SBOM check: with a referrer present, only the referrers are read.
 
+The pod runs what was verified: Kyverno resolves the tag, verifies that digest and writes it into the
+image (`mutateDigest`), so the cluster shows `<tag>@sha256:...` while Git keeps the tag.
+
 Admission needs Kyverno to reach ghcr.io and Sigstore. In the application namespaces a failed lookup
 refuses the pod (fail closed); elsewhere it is ignored.
 

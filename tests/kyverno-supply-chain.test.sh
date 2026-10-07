@@ -4,8 +4,9 @@
 # (cosign v3 bundle), a frontend image (cosign v2 .sig), an unsigned image. Needs the network: Kyverno
 # reads the signatures from ghcr.io and checks them against Sigstore's public trust root.
 #
-# Also checks that the two copies of the policy (enforce, audit) are identical but for their name,
-# title, action, failure policy and namespace operator - a fix made in one copy only fails here.
+# Also checks that verify-images-enforce is Deny/Fail/In and verify-images-audit Audit/Ignore/NotIn, and
+# that otherwise the two copies are identical - a fix made in one copy only fails here.
+# The verdicts are the engine's (pass/fail); that Deny actually refuses at admission is the kind lab's job.
 #
 # ${image_registry} and ${git_owner} are filled in the way Flux does (postBuild, cluster-config).
 # Kyverno CLI >= 1.19, as tests/kyverno-policies.test.sh (1.17 marks these results "Excluded").
@@ -32,6 +33,18 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 mkdir -p "${WORK}/policies"
 cp "${ROOT}"/tests/kyverno-supply-chain/{kyverno-test.yaml,resources.yaml,values.yaml} "${WORK}/"
+
+# Each copy has exactly its own action and failure policy - checked before they are stripped below.
+check_mode() {
+  local file="$1" action="$2" failure="$3" operator="$4" got
+  got="$(yq '[.spec.validationActions | join(","), .spec.failurePolicy, .spec.matchConstraints.namespaceSelector.matchExpressions[0].operator] | join(" ")' "${PACK}/${file}")"
+  if [[ "${got}" != "${action} ${failure} ${operator}" ]]; then
+    echo "kyverno-supply-chain: ${file}: expected '${action} ${failure} ${operator}' (actions, failurePolicy, namespace operator), got '${got}'" >&2
+    exit 1
+  fi
+}
+check_mode verify-images-enforce.yaml Deny Fail In
+check_mode verify-images-audit.yaml Audit Ignore NotIn
 
 # The two copies must not drift: drop what may differ, compare the rest.
 strip='del(.metadata.name) | del(.metadata.annotations["policies.kyverno.io/title"])
