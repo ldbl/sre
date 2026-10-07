@@ -13,11 +13,11 @@
 #   verify-images-enforce  develop, staging, production - Deny, failurePolicy Fail
 #   verify-images-audit    every other namespace         - Audit (PolicyReports), failurePolicy Ignore
 #
-# The pod runs the digest that was verified: Kyverno resolves the tag, verifies that digest and writes
-# it into the image (mutateDigest: true -> "<tag>@sha256:..."); verifyDigest then refuses an image left
-# without one. Without that, a tag moved in the registry between admission and the pull would run an
-# image nobody verified. Git keeps the tags (Flux image automation writes them); the cluster shows
-# tag@digest.
+# Tags are verified as they resolve at admission. Pinning the verified digest into the pod
+# (mutateDigest) is what closes the gap of a tag moved between admission and the pull - but Kyverno
+# 1.17 does not implement it for ImageValidatingPolicy (pkg/cel/policies/ivpol/engine: added in
+# 1.19.0); set to true, it silently does nothing and verifyDigest refuses nothing (checked on kind).
+# So both are false here, explicitly: the gap is accepted tech debt until the Kyverno 1.19 upgrade.
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:
@@ -30,8 +30,8 @@ spec:
   validationActions: [Deny]
   failurePolicy: Fail
   validationConfigurations:
-    mutateDigest: true
-    verifyDigest: true
+    mutateDigest: false   # true from Kyverno 1.19 on - see the header
+    verifyDigest: false
   # Verifying a signature and an SBOM costs about ten seconds when the result is not cached (ghcr.io,
   # Sigstore): on kind the default 10 s timeout cut every first verification off, and the pod was
   # refused although its image was signed. 30 s is the maximum; a verified digest is then cached
