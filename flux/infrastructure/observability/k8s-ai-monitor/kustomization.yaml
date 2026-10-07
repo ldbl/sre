@@ -16,4 +16,4 @@ resources:
 images:
   - name: k8s-ai-monitor
     newName: ${image_registry}/k8s-ai-monitor
-    newTag: main-v0.0.1-ef38505-1791216916 # {"$imagepolicy": "observability:k8s-ai-monitor:tag"}
+    newTag: main-v0.0.1-79bb985-1791362527 # {"$imagepolicy": "observability:k8s-ai-monitor:tag"}
