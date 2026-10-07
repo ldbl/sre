@@ -17,6 +17,12 @@ on:
 permissions:
   contents: read
 
+# One run at a time: two runs could both pass the "does it exist" check below and both push.
+# Queued, never cancelled - a cancelled run could stop between the check and the push.
+concurrency:
+  group: unsigned-demo
+  cancel-in-progress: false
+
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/unsigned-demo
   VERSION: "1.0"
@@ -28,7 +34,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      packages: write   # push to ghcr.io - and nothing else: no id-token, so this job cannot sign
+      packages: write   # push to ghcr.io (and list its versions) - no id-token, so this job cannot sign
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,10 +52,26 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # The tag is immutable by convention here: a second push of the same version would change what
-      # the lab and the test point at.
+      # the lab and the test point at. Asked through the GitHub Packages API, which answers 404 when the
+      # package does not exist yet - any other error (auth, rate limit, an outage) fails the job instead
+      # of being read as "missing" and pushing over an existing tag.
       - name: Refuse to overwrite an existing version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
         run: |
-          if docker buildx imagetools inspect "${IMAGE}:${VERSION}" >/dev/null 2>&1; then
+          set -euo pipefail
+          if ! tags="$(gh api --paginate "/orgs/${OWNER}/packages/container/unsigned-demo/versions" \
+                --jq '.[].metadata.container.tags[]' 2>err.txt)"; then
+            if grep -q "HTTP 404" err.txt; then
+              echo "unsigned-demo does not exist yet - first push"
+              exit 0
+            fi
+            cat err.txt >&2
+            echo "::error::could not list the versions of unsigned-demo - refusing to push blind"
+            exit 1
+          fi
+          if grep -qx "${VERSION}" <<<"${tags}"; then
             echo "::error::${IMAGE}:${VERSION} already exists - raise VERSION for a new image"
             exit 1
           fi
