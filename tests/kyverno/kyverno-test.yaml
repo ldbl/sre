@@ -28,6 +28,10 @@ results:
   - {policy: disallow-latest-tag, rule: no-latest, kind: Pod, resources: [tag-digest, lab-images], result: pass}
   - {policy: disallow-latest-tag, rule: autogen-no-latest, kind: Deployment, resources: [deploy-latest], result: fail}
 
+  # Ephemeral containers (kubectl debug) are checked like the others.
+  - {policy: disallow-latest-tag, rule: no-latest, kind: Pod, resources: [ephemeral-latest], result: fail}
+  - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [ephemeral-untrusted], result: fail}
+
   # Registries: short and long Docker Hub names are the same image; other sources fail, init containers too.
   - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [lab-images, tag-digest], result: pass}
   - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [registry-untrusted, registry-dockerhub-other, registry-untrusted-init], result: fail}

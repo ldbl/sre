@@ -483,3 +483,61 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ephemeral-latest
+  namespace: develop
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: ghcr.io/safeops-course/backend:develop-v0.0.0-abc1234-1791000000
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  ephemeralContainers:
+    - name: debug
+      image: busybox
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ephemeral-untrusted
+  namespace: develop
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: ghcr.io/safeops-course/backend:develop-v0.0.0-abc1234-1791000000
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+  ephemeralContainers:
+    - name: debug
+      image: quay.io/example/agent:1.0

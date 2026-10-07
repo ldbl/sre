@@ -2,6 +2,8 @@
 # can run a different image tomorrow: no artifact identity, no reliable rollback (Chapter 10).
 # The rule reads Kyverno's parsed image references (`images`), not the image string, so
 # `curlimages/curl` without a tag is caught as "latest". An image pinned by digest has no tag to check.
+# Init and ephemeral containers (kubectl debug - Kyverno also sees pods/ephemeralcontainers) count too.
+# Any other tag passes, though most registries let a tag be moved: only a digest names one image.
 #
 # Mode (Chapter 16): Enforce in the application namespaces, Audit - a PolicyReport only - everywhere
 # else. Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
@@ -32,10 +34,10 @@ spec:
             namespaces: [develop, staging, production]
         message: >-
           Image tag 'latest' (or no tag) is not allowed - use an immutable tag or a digest.
-          Tags without a digest here: {{ images.[containers, initContainers][].*[] | [?digest == null].tag }}
+          Tags without a digest here: {{ images.[containers, initContainers, ephemeralContainers][].*[] | [?digest == null].tag }}
         deny:
           conditions:
             any:
-              - key: "{{ images.[containers, initContainers][].*[] | [?digest == null].tag }}"
+              - key: "{{ images.[containers, initContainers, ephemeralContainers][].*[] | [?digest == null].tag }}"
                 operator: AnyIn
                 value: ["latest"]
