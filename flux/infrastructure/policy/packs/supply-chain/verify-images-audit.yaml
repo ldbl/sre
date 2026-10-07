@@ -32,6 +32,12 @@ spec:
   validationConfigurations:
     mutateDigest: true
     verifyDigest: true
+  # Verifying a signature and an SBOM costs about ten seconds when the result is not cached (ghcr.io,
+  # Sigstore): on kind the default 10 s timeout cut every first verification off, and the pod was
+  # refused although its image was signed. 30 s is the maximum; a verified digest is then cached
+  # for an hour (Kyverno's image verify cache) and admission is fast.
+  webhookConfiguration:
+    timeoutSeconds: 30
   autogen:
     podControllers:
       controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
