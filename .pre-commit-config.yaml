@@ -100,6 +100,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: kyverno-supply-chain-test
+        name: Supply-chain policies give the expected verdicts on real images (kyverno test, network)
+        entry: tests/kyverno-supply-chain.test.sh
+        language: script
+        files: ^(flux/infrastructure/policy/packs/supply-chain/.*|tests/kyverno-supply-chain/.*|tests/kyverno-supply-chain\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh

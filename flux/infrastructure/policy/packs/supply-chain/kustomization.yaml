@@ -1,5 +1,7 @@
+# Chapter 17: one ImageValidatingPolicy in two copies - Deny in the application namespaces, Audit
+# everywhere else. See the header of either file.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - verify-images.yaml
-  - verify-attestations.yaml
+  - verify-images-enforce.yaml
+  - verify-images-audit.yaml

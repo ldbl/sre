@@ -5,7 +5,7 @@ the `kyverno` engine. `${image_registry}` and `${git_owner}` come from the `clus
 (Flux postBuild substitution).
 
 - `admission-guardrails/` - Chapter 16. Enforce in the application namespaces, Audit elsewhere.
-- `supply-chain/` - Chapter 17. Audit.
+- `supply-chain/` - Chapter 17. Deny in the application namespaces, Audit elsewhere.
 
 Rollout, for any new rule: Audit everywhere first; read the PolicyReports until the namespaces it will
 enforce in have no failures (and the workloads created only now and then - lab pods, Jobs - are
