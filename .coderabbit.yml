@@ -73,10 +73,6 @@ reviews:
       instructions: |
         Kyverno ClusterPolicies. *.example.yaml are teaching examples, not in kustomization.yaml - do not ask to include them.
         Flag a policy switched from Audit to Enforce (or back) without a note in the PR description.
-    - path: "flux/infrastructure/data/migrations/*.sql"
-      instructions: |
-        Expand/contract examples run by hand with psql. Expand must stay backward-compatible and idempotent (IF [NOT] EXISTS);
-        contract is destructive and must keep its preconditions header.
     - path: ".github/workflows/**"
       instructions: |
         - terraform apply/destroy (and the Hetzner e2e) runs only in a job with `environment: production` (required reviewer, deployment branches = main); no issue-based manual-approval actions. Concurrency cancel-in-progress: false.
