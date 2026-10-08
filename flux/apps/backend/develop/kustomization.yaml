@@ -13,7 +13,14 @@ resources:
   - image-automation.yaml
   - hpa.yaml
   - pdb.yaml
-  - patches/feature-flags.yaml
+# Feature flags of the develop backend (Chapter 18), read through envFrom (the last patch below). A
+# generator, not a plain ConfigMap: its name gets a hash of the values, so changing a flag changes the
+# name the Deployment refers to - and Flux rolls the pods. A plain ConfigMap would change while the
+# running pods kept the old value until something else restarted them.
+configMapGenerator:
+  - name: feature-flags
+    literals:
+      - FEATURE_DISPLAY_NAME=false # return display_name in register/login (schema version 2)
 images:
   - name: backend
     newName: ${image_registry}/backend

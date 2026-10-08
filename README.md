@@ -31,7 +31,7 @@ Topics are listed in course order. Chapter numbers live only in the course, so t
 | 24/7 Production SRE | Cross-cutting - observability + alerting + runbooks |
 | Admission Policy Guardrails (advanced) | `flux/infrastructure/policy/kyverno/`, `flux/infrastructure/policy/packs/admission-guardrails/` |
 | Supply Chain Security (advanced) | `flux/infrastructure/policy/packs/supply-chain/` |
-| Rollback & Data Migrations (advanced) | `flux/infrastructure/data/cnpg-clusters/` |
+| Rollback & Data Migrations (advanced) | `flux/apps/backend/base/deployment.yaml` (migrate initContainer), `flux/apps/backend/develop/kustomization.yaml` (feature flags), `scripts/postgres-restore-manifest.sh`, `../backend/pkg/migrations/` |
 | Progressive Delivery (advanced) | `flux/infrastructure/progressive-delivery/` |
 
 ## Repository Layout
