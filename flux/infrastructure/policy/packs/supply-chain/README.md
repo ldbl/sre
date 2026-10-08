@@ -27,6 +27,13 @@ admission and the pull is accepted tech debt until that upgrade.
 Verification costs about ten seconds uncached per webhook call (ghcr.io, Sigstore); the webhooks get
 the maximum timeout, 30 s.
 
+Verification runs at admission only (`evaluation.background.enabled: false`). A background scan
+re-verified every running pod's images on every resync; on kind it kept the reports controller at
+1.3 cores on average (6.6 at peak), it lost its leader lease under that load and restarted 49 times in
+29 hours, starting the scan over each time. A running pod's image does not change, so the re-check
+bought nothing. The cost: a pod admitted while Kyverno could not answer (the audit copy fails open)
+has no report until it is recreated.
+
 Admission needs Kyverno to reach ghcr.io and Sigstore. In the application namespaces a failed lookup
 refuses the pod (fail closed); elsewhere it is ignored.
 

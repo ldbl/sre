@@ -38,6 +38,16 @@ spec:
   # for an hour (Kyverno's image verify cache) and admission is fast.
   webhookConfiguration:
     timeoutSeconds: 30
+  # Verified at admission only - the moment a pod's image is decided. A background scan re-verified
+  # every image of every running pod (cosign signature + SBOM, against ghcr.io and Sigstore) on every
+  # resync: on kind the reports controller averaged 1.3 cores, peaked at 6.6, lost its leader lease
+  # under its own load and restarted - 49 times in 29 hours - each time scanning everything again.
+  # A running pod's image does not change, so the re-check bought nothing. What it costs: a pod
+  # admitted while Kyverno could not answer (the audit copy fails open) gets no report until it is
+  # recreated; the enforce copy fails closed, so in develop/staging/production no such pod exists.
+  evaluation:
+    background:
+      enabled: false
   autogen:
     podControllers:
       controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
