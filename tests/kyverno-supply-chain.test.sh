@@ -47,12 +47,14 @@ check_mode verify-images-enforce.yaml Deny Fail In
 check_mode verify-images-audit.yaml Audit Ignore NotIn
 
 # Settings both copies must have - checked per file, not only through the parity check below:
-# a 30 s webhook timeout (uncached verification takes about ten seconds) and no digest
-# pinning (Kyverno 1.17 does not implement it for ImageValidatingPolicy; see the policy header).
+# a 30 s webhook timeout (uncached verification takes about ten seconds), no digest pinning
+# (Kyverno 1.17 does not implement it for ImageValidatingPolicy) and no background scan (it
+# re-verified every running image on every resync and kept the reports controller at several
+# cores); see the policy header.
 for file in verify-images-enforce.yaml verify-images-audit.yaml; do
-  got="$(yq '[.spec.validationConfigurations.mutateDigest, .spec.validationConfigurations.verifyDigest, .spec.webhookConfiguration.timeoutSeconds] | join(" ")' "${PACK}/${file}")"
-  if [[ "${got}" != "false false 30" ]]; then
-    echo "kyverno-supply-chain: ${file}: expected 'false false 30' (mutateDigest, verifyDigest, timeoutSeconds), got '${got}'" >&2
+  got="$(yq '[.spec.validationConfigurations.mutateDigest, .spec.validationConfigurations.verifyDigest, .spec.webhookConfiguration.timeoutSeconds, .spec.evaluation.background.enabled] | join(" ")' "${PACK}/${file}")"
+  if [[ "${got}" != "false false 30 false" ]]; then
+    echo "kyverno-supply-chain: ${file}: expected 'false false 30 false' (mutateDigest, verifyDigest, timeoutSeconds, background), got '${got}'" >&2
     exit 1
   fi
 done
