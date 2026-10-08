@@ -127,6 +127,24 @@ spec:
     kubeProxy:
       enabled: false
 
+    # The API server is the biggest source of series: its histograms are split by verb x resource x
+    # scope, 20-40 buckets each - about 23,000 series on kind, more than every other job together.
+    # Only two of them are read by a rule or a dashboard (checked against /api/v1/rules and the
+    # grafana_dashboard ConfigMaps): apiserver_request_sli_duration_seconds_bucket (the availability
+    # and histogram recording rules behind the API server dashboard) and
+    # apiserver_client_certificate_expiration_seconds_bucket (KubeClientCertificateExpiration).
+    # The rest are dropped at ingestion. The list replaces the chart's default, so its first entry -
+    # the chart's own drop of the noisiest buckets - is copied here unchanged.
+    kubeApiServer:
+      serviceMonitor:
+        metricRelabelings:
+          - action: drop
+            regex: (etcd_request|apiserver_request_slo|apiserver_request_sli|apiserver_request)_duration_seconds_bucket;(0\.15|0\.2|0\.3|0\.35|0\.4|0\.45|0\.6|0\.7|0\.8|0\.9|1\.25|1\.5|1\.75|2|3|3\.5|4|4\.5|6|7|8|9|15|20|40|45|50)(\.0)?
+            sourceLabels: [__name__, le]
+          - action: drop
+            regex: (etcd_.+|apiserver_(admission|cel|delegated|flowcontrol|impersonation|storage|validating_admission_policy|watch)_.+|apiserver_(request_body_size_bytes|request_duration_seconds|request_filter_duration_seconds|request_timestamp_comparison_time|response_sizes))_bucket
+            sourceLabels: [__name__]
+
     # Default rules: every alert must call for an action. The rules for the components above go with
     # them; KubeHpaMaxedOut fires for every HPA whose min equals its max - develop and staging run
     # that way on purpose (Chapter 09), so it would fire forever and mean nothing.
@@ -137,6 +155,14 @@ spec:
         kubeProxy: false
         kubeSchedulerAlerting: false
         kubeSchedulerRecording: false
+        # The API server's own error-budget SLO (KubeAPIErrorBudgetBurn): burn rates over windows up
+        # to 3 days across thousands of histogram series. One evaluation took 95 s against a 30 s
+        # interval - it missed 50 of every 60 runs and kept Prometheus busy without a pause - for an
+        # alert about the control plane, which kind runs for us and k3s manages on Hetzner. The
+        # course's SLOs are the applications' (Chapter 11). Availability and histogram rules stay:
+        # the API server dashboard reads them.
+        kubeApiserverBurnrate: false
+        kubeApiserverSlos: false
       disabled:
         KubeHpaMaxedOut: true
 
