@@ -17,4 +17,7 @@ spec:
   podMetricsEndpoints:
     - port: metrics
       path: /metrics
-      interval: 30s
+      # 15 s, not 30: a canary's first 500 creates a new series, and rate() sees a series only from
+      # its second sample - at 30 s the errors reached the analysis a minute late and a bad release
+      # got to 30% of the traffic before it was rolled back (kind).
+      interval: 15s
