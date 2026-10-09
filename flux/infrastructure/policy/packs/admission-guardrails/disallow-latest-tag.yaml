@@ -31,7 +31,7 @@ spec:
         failureAction: Audit
         failureActionOverrides:
           - action: Enforce
-            namespaces: [develop, staging, production, lab]
+            namespaces: [develop, staging, production]
         message: >-
           Image tag 'latest' (or no tag) is not allowed - use an immutable tag or a digest.
           Tags without a digest here: {{ images.[containers, initContainers, ephemeralContainers][].*[] | [?digest == null].tag }}
