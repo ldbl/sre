@@ -1,0 +1,20 @@
+# Traefik's request metrics (traefik_service_requests_total, ..._duration_seconds): the canary
+# analysis of Chapter 19 reads them, and without a monitor Prometheus never had them - every check
+# found no values and every canary was rolled back. Traefik serves them on its "metrics" port
+# (9100) in both clusters (the Traefik chart's default: kind via Terraform, Hetzner via kube-hetzner).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: traefik
+  namespace: observability
+spec:
+  namespaceSelector:
+    matchNames:
+      - traefik
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
