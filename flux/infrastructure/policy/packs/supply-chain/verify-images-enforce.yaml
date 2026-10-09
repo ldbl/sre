@@ -96,8 +96,9 @@ spec:
       expression: >-
         (images.?containers.orValue([]) + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
         .filter(image, image.startsWith('${image_registry}/'))
-    # Which signer each repository of the registry has. A repository not listed has none: its images
-    # are refused (unsigned-demo, or anything pushed there by hand).
+    # Which signer each repository of the registry has. A repository not listed has none, so its images
+    # fail both checks (unsigned-demo, or anything pushed there by hand): the enforce copy refuses them,
+    # the audit copy reports them.
     - name: signers
       expression: >-
         {'backend': attestors.backend, 'frontend': attestors.frontend, 'k8s-ai-monitor': attestors.guardian}
