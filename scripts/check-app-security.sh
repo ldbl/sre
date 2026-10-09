@@ -133,7 +133,8 @@ for overlay in "${overlays[@]}"; do
       [[ -z "${dep}" ]] && continue
       failures+=("${overlay}: Deployment ${dep} container ${container} must not set RANDOM_ERROR_RATE in production")
     done < <(yq -N 'select(.kind == "Deployment") | .metadata.name as $d
-        | .spec.template.spec.containers[] | select((.env // [])[] | .name == "RANDOM_ERROR_RATE")
+        | ((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))[]
+        | select((.env // [])[] | .name == "RANDOM_ERROR_RATE")
         | [$d, .name] | @tsv' <<<"${rendered}")
   fi
 
