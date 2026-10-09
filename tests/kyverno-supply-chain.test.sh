@@ -75,3 +75,36 @@ while IFS= read -r policy; do
 done < <(yq '.resources[]' "${PACK}/kustomization.yaml")
 
 kyverno test "${WORK}" --remove-color
+
+# Each image is verified against the signer of its own repository, not against "any of ours". No
+# real image is signed by another repository's workflow (GHCR lets a repository push only to its own
+# package), so the proof swaps the mapping instead: with backend images mapped to the frontend's
+# signer, the real backend image must fail and the others must still pass. The swap edits the
+# policy's `signers` map; if the policy no longer has it - back to one identity for all images, or
+# a list of all three signers per image - the swap changes nothing and the check fails loudly.
+SWAP="$(mktemp -d)"
+trap 'rm -rf "${WORK}" "${SWAP}"' EXIT
+mkdir -p "${SWAP}/policies"
+cp "${WORK}/resources.yaml" "${WORK}/values.yaml" "${SWAP}/"
+sed "s|'backend': attestors.backend|'backend': attestors.frontend|" "${WORK}/policies/verify-images-enforce.yaml" \
+  > "${SWAP}/policies/verify-images-enforce.yaml"
+if cmp -s "${WORK}/policies/verify-images-enforce.yaml" "${SWAP}/policies/verify-images-enforce.yaml"; then
+  echo "kyverno-supply-chain: the policy has no per-repository signer map ('backend': attestors.backend) - each image must be verified against its own repository's signer" >&2
+  exit 1
+fi
+cat > "${SWAP}/kyverno-test.yaml" <<'TEST'
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: supply-chain-swapped-signers
+policies:
+  - policies/verify-images-enforce.yaml
+resources:
+  - resources.yaml
+variables: values.yaml
+results:
+  - {policy: verify-images-enforce, kind: Pod, resources: [backend-signed], result: fail}
+  - {policy: verify-images-enforce, kind: Pod, resources: [frontend-signed-legacy-format, guardian-signed], result: pass}
+TEST
+echo "kyverno-supply-chain: backend images mapped to the frontend's signer: the backend image must fail"
+kyverno test "${SWAP}" --remove-color
