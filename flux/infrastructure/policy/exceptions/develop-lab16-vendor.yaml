@@ -1,0 +1,24 @@
+# Chapter 16 lab: one named pod in develop may run an image from outside the allowlist.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: develop-lab16-vendor
+  namespace: policy-exceptions
+  annotations:
+    safeops.io/owner: "ldbl"
+    safeops.io/reason: "https://safeops.work/course/chapter-16-admission-policy-guardrails/ - lab B7, removed in part C"
+    safeops.io/expires: "2026-10-16"
+spec:
+  exceptions:
+    - policyName: require-trusted-registries
+      ruleNames:
+        - trusted-registries-only
+  match:
+    any:
+      - resources:
+          kinds:
+            - Pod
+          namespaces:
+            - develop
+          names:
+            - lab16-vendor
