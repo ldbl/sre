@@ -9,4 +9,3 @@ resources:
   - only-from-git.yaml
   # exceptions - one line per file, e.g.:
   # - develop-vendor-agent.yaml
-  - develop-lab16-vendor.yaml
