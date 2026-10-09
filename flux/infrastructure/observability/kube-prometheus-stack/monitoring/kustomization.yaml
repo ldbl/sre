@@ -11,3 +11,4 @@ resources:
   - cnpg-podmonitor.yaml
   - traefik-podmonitor.yaml
   - backup-alerts.yaml
+  - platform-alerts.yaml

@@ -21,6 +21,7 @@ MIN_KUBECTL="1.35"
 MIN_FLUX="2.4"
 MIN_COSIGN="3.0"     # Chapter 17 verifies Sigstore bundles stored as OCI referrers - checked with cosign 3
 MIN_KYVERNO="1.19"   # tests/kyverno-policies.test.sh: 1.17 lets a wrong expectation pass
+MIN_PROMTOOL="3.0"   # tests/platform-alerts.test.sh - the clusters run Prometheus 3
 
 # Resources Docker gives the kind nodes. Measured on the full local profile:
 # ~5.1 GiB used and ~0.4 cores busy at rest, ~2.7 cores requested. Labs add
@@ -73,6 +74,8 @@ hint() {
     cosign:Darwin)     echo "brew install cosign  | https://docs.sigstore.dev/cosign/system_config/installation/" ;;
     cosign:*)          echo "https://github.com/sigstore/cosign/releases (cosign-linux-amd64) | https://docs.sigstore.dev/cosign/system_config/installation/" ;;
     kyverno:Darwin)    echo "brew install kyverno  | https://kyverno.io/docs/kyverno-cli/install/" ;;
+    promtool:Darwin)   echo "brew install prometheus  | https://prometheus.io/download/ (promtool is in the archive)" ;;
+    promtool:*)        echo "https://github.com/prometheus/prometheus/releases (prometheus-<version>.linux-amd64.tar.gz: promtool) | https://prometheus.io/download/" ;;
     kyverno:*)         echo "https://github.com/kyverno/kyverno/releases (kyverno-cli_v<version>_linux_x86_64.tar.gz) | https://kyverno.io/docs/kyverno-cli/install/" ;;
     *)                 echo "" ;;
   esac
@@ -127,6 +130,7 @@ check jq         ""               "jq --version"        # the AI agent's kube-co
 check yq         "4"              "yq --version"        # the pre-commit guardrails that read the Flux manifests (Chapter 03 on)
 check kyverno    "$MIN_KYVERNO"   "kyverno version"     # the admission policy tests in pre-commit (Chapter 16)
 check cosign     "$MIN_COSIGN"    "cosign version"      # verify image signatures and SBOMs (Chapter 17)
+check promtool   "$MIN_PROMTOOL"  "promtool --version"  # the platform alert tests in pre-commit
 
 # docker buildx is a Docker CLI plugin, not a command on PATH, so `check` cannot find it.
 # Chapter 10 compares image digests in the registry with `docker buildx imagetools inspect`.
