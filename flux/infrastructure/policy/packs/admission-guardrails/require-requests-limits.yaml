@@ -2,7 +2,8 @@
 # A Pod is checked after admission defaults are applied, so in a namespace with a LimitRange (all
 # application namespaces have one) a pod without resources gets the defaults and passes; a Deployment
 # - checked through Kyverno's generated rule for pod controllers - has no LimitRange applied and
-# must set them itself.
+# must set them itself. Init containers are checked too (`=(initContainers)`: when the pod has
+# them); ephemeral containers cannot have resources and are not.
 #
 # Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
 apiVersion: kyverno.io/v1
@@ -14,7 +15,7 @@ metadata:
     policies.kyverno.io/category: Best Practices
     policies.kyverno.io/severity: medium
     policies.kyverno.io/description: >-
-      CPU and memory requests/limits are required for all containers
+      CPU and memory requests/limits are required for all containers and init containers
       to prevent noisy-neighbor impact and enable fair scheduling.
 spec:
   background: true
@@ -30,10 +31,18 @@ spec:
         failureActionOverrides:
           - action: Enforce
             namespaces: [develop, staging, production]
-        message: "CPU and memory requests/limits are required for all containers."
+        message: "CPU and memory requests/limits are required for all containers and init containers."
         pattern:
           spec:
             containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"
+            =(initContainers):
               - resources:
                   requests:
                     cpu: "?*"
