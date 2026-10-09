@@ -38,13 +38,36 @@ while IFS= read -r policy; do
   sed "s|\${image_registry}|${IMAGE_REGISTRY}|g" "${PACK}/${policy}" > "${WORK}/policies/${policy}"
 done < <(yq '.resources[]' "${PACK}/kustomization.yaml")
 
-# Every policy in the pack must be in the test: a new policy without expected verdicts fails here.
+# Every policy in the pack must be in the test.
 for policy in "${WORK}"/policies/*.yaml; do
   rel="policies/$(basename "${policy}")"
   if [[ "$(yq ".policies | contains([\"${rel}\"])" "${WORK}/kyverno-test.yaml")" != "true" ]]; then
     echo "kyverno-policies: ${rel} is in the pack but not in tests/kyverno/kyverno-test.yaml" >&2
     exit 1
   fi
+done
+
+# Every rule of every policy must have at least one expected pass and one expected fail: a rule
+# tested only one way could be broken the other way - refusing everything, or nothing - and pass.
+# A rule's autogen-<rule> variant (pod controllers) counts as the same rule.
+for policy in "${WORK}"/policies/*.yaml; do
+  name="$(yq '.metadata.name' "${policy}")"
+  # Captured first, not read from a process substitution: a failing yq stops the script here (set -e),
+  # and a policy with no rules is an error, not a loop that checks nothing.
+  rules="$(yq '.spec.rules[].name' "${policy}")"
+  if [[ -z "${rules}" ]]; then
+    echo "kyverno-policies: ${name} has no rules (.spec.rules[].name is empty)" >&2
+    exit 1
+  fi
+  while IFS= read -r rule; do
+    for verdict in pass fail; do
+      found="$(yq "[.results[] | select(.policy == \"${name}\" and (.rule == \"${rule}\" or .rule == \"autogen-${rule}\") and .result == \"${verdict}\")] | length" "${WORK}/kyverno-test.yaml")"
+      if [[ "${found}" == "0" ]]; then
+        echo "kyverno-policies: ${name}/${rule} has no expected '${verdict}' in tests/kyverno/kyverno-test.yaml" >&2
+        exit 1
+      fi
+    done
+  done <<<"${rules}"
 done
 
 kyverno test "${WORK}" --remove-color
