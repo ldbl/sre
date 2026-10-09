@@ -3,9 +3,13 @@
 One Kyverno `ImageValidatingPolicy` in two copies (`verify-images-enforce.yaml`, `verify-images-audit.yaml`):
 every image from `${image_registry}` must be
 
-- **signed** - keyless cosign, by `build.yml` of its own repository (`backend`, `frontend`,
-  `k8s-ai-monitor`) on `main` or `develop`, and
-- **with an SPDX SBOM attestation** signed the same way.
+- **signed** - keyless cosign, by `build.yml` of the repository it is named after, on `main` or
+  `develop`: a `backend` image by backend's workflow, `frontend` by frontend's, `k8s-ai-monitor` by
+  the Guardian's. One attestor per repository and a `signers` map in the policy; an image of any other
+  repository in the registry has no signer and fails both checks (`unsigned-demo`) - refused by
+  `verify-images-enforce`, reported by `verify-images-audit`. The test proves the
+  mapping by remapping backend images to the frontend's signer: the real backend image must fail.
+- **with an SPDX SBOM attestation** signed by the same repository's workflow.
 
 | Copy | Namespaces | Action | failurePolicy |
 |---|---|---|---|
