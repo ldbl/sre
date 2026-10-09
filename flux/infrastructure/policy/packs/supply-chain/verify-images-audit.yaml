@@ -64,26 +64,52 @@ spec:
           values: [develop, staging, production]
   matchImageReferences:
     - glob: "${image_registry}/*"
+  # One signer per repository: an image is verified against the workflow of the repository it is
+  # named after - a backend image against backend's build.yml, not "any of the three". The single
+  # regex this replaced admitted a backend image signed by the frontend's workflow.
   attestors:
-    - name: ci
+    - name: backend
       cosign:
         keyless:
           identities:
             - issuer: "https://token.actions.githubusercontent.com"
-              subjectRegExp: '^https://github\.com/${git_owner}/(backend|frontend|k8s-ai-monitor)/\.github/workflows/build\.yml@refs/heads/(main|develop)$'
+              subjectRegExp: '^https://github\.com/${git_owner}/backend/\.github/workflows/build\.yml@refs/heads/(main|develop)$'
+    - name: frontend
+      cosign:
+        keyless:
+          identities:
+            - issuer: "https://token.actions.githubusercontent.com"
+              subjectRegExp: '^https://github\.com/${git_owner}/frontend/\.github/workflows/build\.yml@refs/heads/(main|develop)$'
+    - name: guardian
+      cosign:
+        keyless:
+          identities:
+            - issuer: "https://token.actions.githubusercontent.com"
+              subjectRegExp: '^https://github\.com/${git_owner}/k8s-ai-monitor/\.github/workflows/build\.yml@refs/heads/(main|develop)$'
   attestations:
     - name: sbom
       intoto:
         type: "https://spdx.dev/Document"
-  validations:
+  variables:
     # Every container, init container and ephemeral container (kubectl debug) whose image is ours.
-    - expression: >-
+    - name: ours
+      expression: >-
         (images.?containers.orValue([]) + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
         .filter(image, image.startsWith('${image_registry}/'))
-        .all(image, verifyImageSignatures(image, [attestors.ci]) > 0)
-      message: "every ${image_registry} image must be signed by its repository's build.yml (cosign, keyless)"
+    # Which signer each repository of the registry has. A repository not listed has none: its images
+    # are refused (unsigned-demo, or anything pushed there by hand).
+    - name: signers
+      expression: >-
+        {'backend': attestors.backend, 'frontend': attestors.frontend, 'k8s-ai-monitor': attestors.guardian}
+  validations:
+    # The repository of an image: what follows the registry, up to the tag or digest.
     - expression: >-
-        (images.?containers.orValue([]) + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
-        .filter(image, image.startsWith('${image_registry}/'))
-        .all(image, verifyAttestationSignatures(image, attestations.sbom, [attestors.ci]) > 0)
-      message: "every ${image_registry} image must carry an SPDX SBOM attestation signed by its repository's build.yml"
+        variables.ours.all(image,
+          image.replace('${image_registry}/', '').split('@')[0].split(':')[0] in variables.signers
+          && verifyImageSignatures(image, [variables.signers[image.replace('${image_registry}/', '').split('@')[0].split(':')[0]]]) > 0)
+      message: "every ${image_registry} image must be signed by the build.yml of the repository it is named after (cosign, keyless)"
+    - expression: >-
+        variables.ours.all(image,
+          image.replace('${image_registry}/', '').split('@')[0].split(':')[0] in variables.signers
+          && verifyAttestationSignatures(image, attestations.sbom, [variables.signers[image.replace('${image_registry}/', '').split('@')[0].split(':')[0]]]) > 0)
+      message: "every ${image_registry} image must carry an SPDX SBOM attestation signed by the build.yml of the repository it is named after"
