@@ -142,7 +142,7 @@ spec:
             regex: (etcd_request|apiserver_request_slo|apiserver_request_sli|apiserver_request)_duration_seconds_bucket;(0\.15|0\.2|0\.3|0\.35|0\.4|0\.45|0\.6|0\.7|0\.8|0\.9|1\.25|1\.5|1\.75|2|3|3\.5|4|4\.5|6|7|8|9|15|20|40|45|50)(\.0)?
             sourceLabels: [__name__, le]
           - action: drop
-            regex: (etcd_.+|apiserver_(admission|cel|delegated|flowcontrol|impersonation|storage|validating_admission_policy|watch)_.+|apiserver_(request_body_size_bytes|request_duration_seconds|request_filter_duration_seconds|request_timestamp_comparison_time|response_sizes))_bucket
+            regex: (etcd_.+|apiserver_(admission|cel|delegated|flowcontrol|impersonation|storage|validating_admission_policy|watch)_.+|apiserver_(request_body_size_bytes|request_duration_seconds|request_filter_duration_seconds|request_slo_duration_seconds|request_timestamp_comparison_time|response_sizes))_bucket
             sourceLabels: [__name__]
 
     # Default rules: every alert must call for an action. The rules for the components above go with
