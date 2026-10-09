@@ -43,8 +43,8 @@ results:
   - {policy: require-security-context, rule: require-container-security-context, kind: Pod, resources: [nonroot-per-container], result: pass}
   - {policy: require-security-context, rule: require-container-security-context, kind: Pod, resources: [nonroot-missing, nonroot-turned-off, escalation-allowed], result: fail}
 
-  # Requests and limits.
-  - {policy: require-requests-limits, rule: require-cpu-memory-requests-limits, kind: Pod, resources: [resources-missing], result: fail}
+  # Requests and limits: in a container, or in an init container.
+  - {policy: require-requests-limits, rule: require-cpu-memory-requests-limits, kind: Pod, resources: [resources-missing, resources-init-missing], result: fail}
 
   # The exception: skips exactly the pod it names.
   - {policy: require-trusted-registries, rule: trusted-registries-only, kind: Pod, resources: [vendor-agent], result: skip}

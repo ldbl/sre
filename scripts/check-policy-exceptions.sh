@@ -13,6 +13,8 @@
 #     only wildcards (*, ?) - no exception for a whole namespace or the whole cluster.
 # The expiry is checked on every run, not only when the file changes: CI runs every hook on every
 # pull request, so an expired exception fails all of them until it is removed or renewed on purpose.
+# The date does not switch an applied exception off - nothing in the cluster reads it - so
+# .github/workflows/policy-exceptions-expiry.yml also runs this check on main every day.
 #
 # Runs in pre-commit (and with it in the CI `hooks` job). Needs yq (v4).
 # Usage: scripts/check-policy-exceptions.sh   (no arguments; reads flux/)
