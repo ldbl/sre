@@ -52,6 +52,13 @@ done
 # A rule's autogen-<rule> variant (pod controllers) counts as the same rule.
 for policy in "${WORK}"/policies/*.yaml; do
   name="$(yq '.metadata.name' "${policy}")"
+  # Captured first, not read from a process substitution: a failing yq stops the script here (set -e),
+  # and a policy with no rules is an error, not a loop that checks nothing.
+  rules="$(yq '.spec.rules[].name' "${policy}")"
+  if [[ -z "${rules}" ]]; then
+    echo "kyverno-policies: ${name} has no rules (.spec.rules[].name is empty)" >&2
+    exit 1
+  fi
   while IFS= read -r rule; do
     for verdict in pass fail; do
       found="$(yq "[.results[] | select(.policy == \"${name}\" and (.rule == \"${rule}\" or .rule == \"autogen-${rule}\") and .result == \"${verdict}\")] | length" "${WORK}/kyverno-test.yaml")"
@@ -60,7 +67,7 @@ for policy in "${WORK}"/policies/*.yaml; do
         exit 1
       fi
     done
-  done < <(yq '.spec.rules[].name' "${policy}")
+  done <<<"${rules}"
 done
 
 kyverno test "${WORK}" --remove-color

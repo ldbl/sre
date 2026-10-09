@@ -13,9 +13,10 @@ spec:
     - name: platform
       rules:
         # Restarts by count, whatever the exit code: a container that restarts four times an hour is
-        # not healthy, even when every exit looks clean.
+        # not healthy, even when every exit looks clean. floor(): increase() extrapolates to the edges
+        # of the window, so exactly three restarts can come out as 3.1 - restarts are whole numbers.
         - alert: ContainerRestartingOften
-          expr: increase(kube_pod_container_status_restarts_total[1h]) > 3
+          expr: floor(increase(kube_pod_container_status_restarts_total[1h])) > 3
           for: 5m
           labels:
             severity: warning
