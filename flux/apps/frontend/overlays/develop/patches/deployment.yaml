@@ -11,5 +11,7 @@ spec:
         env:
         - name: ENVIRONMENT
           value: "development"
+        - name: RANDOM_ERROR_RATE
+          value: "0.3"
         - name: RELEASE_NOTE
           value: "lab19-healthy"
