@@ -13,7 +13,7 @@ resources:
 variables: values.yaml
 results:
   # Signed by our CI - both signature formats - pass where the policy enforces.
-  - {policy: verify-images-enforce, kind: Pod, resources: [backend-signed, frontend-signed-legacy-format, signed-with-foreign-image, guardian-signed], result: pass}
+  - {policy: verify-images-enforce, kind: Pod, resources: [backend-signed, frontend-signed-legacy-format, signed-with-foreign-image, guardian-signed, backend-with-migrate], result: pass}
   # No signature: fail - the enforce copy's verdict (Deny at admission; shown on kind, not here), init containers included.
   - {policy: verify-images-enforce, kind: Pod, resources: [unsigned, unsigned-init-container], result: fail}
   # Signed, but its SBOM sits in the old format next to a referrer: not found - fail.
