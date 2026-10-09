@@ -1,0 +1,25 @@
+# A rejected release must be seen. Before this chapter, the develop canaries rolled back every new
+# image for weeks - the analysis had no data - and nothing said so: develop simply kept an old build.
+# flagger_canary_status is Flagger's verdict on the last analysis: 0 running, 1 promoted, 2 failed.
+# Prometheus scrapes it from Flagger's pod, so `namespace` is flagger-system; the Canary's own
+# namespace arrives as `exported_namespace` (checked on kind - with `namespace` it never fired).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: progressive-delivery-develop
+  namespace: develop
+spec:
+  groups:
+    - name: progressive-delivery
+      rules:
+        - alert: CanaryRolledBack
+          expr: max by (exported_namespace, name) (flagger_canary_status{exported_namespace="develop"}) == 2
+          labels:
+            severity: warning
+          annotations:
+            summary: "Canary {{ $labels.exported_namespace }}/{{ $labels.name }} was rolled back"
+            description: >-
+              The last release of {{ $labels.name }} failed its analysis and the previous version
+              still serves. Find out why before the next release: kubectl -n {{ $labels.exported_namespace }}
+              describe canary {{ $labels.name }} (Events) - a failed check with no values means the
+              analysis had no traffic to measure.

@@ -1,47 +1,56 @@
-# Progressive Delivery (Traefik + Flagger)
+# Progressive Delivery (Traefik + Flagger) - Chapter 19
 
-This directory contains the GitOps manifests for progressive delivery (course Ch19):
-- Flagger controller configured for the Traefik provider (`flagger/`) - always installed, idle
-  without Canary objects
-- `develop` canaries for backend and frontend with MetricTemplates and IngressRoutes (`develop/`) -
-  **opt-in**: the Flux Kustomization is `flux/bootstrap/flux-system/progressive-delivery-develop.yaml`,
-  which is not listed in that directory's `kustomization.yaml`
+A frontend release in `develop` reaches a share of the traffic first: Flagger runs the new version
+as a canary, Traefik sends it 10%, 20% ... 50% of the requests, and the canary's own success rate
+and latency decide - promoted, or rolled back after three failed checks.
 
-Until the canaries are enabled, develop gets a plain rolling update from the app Kustomizations.
+- `flagger/` - the Flagger controller (Traefik provider, its metrics scraped). Always installed;
+  idle without a Canary.
+- `develop/` - **opt-in**: the frontend Canary, the IngressRoute users take while it is on,
+  synthetic traffic for the analysis, and the alert `CanaryRolledBack`. Applied by
+  `flux/bootstrap/flux-system/progressive-delivery-develop.yaml`, which is not listed in that
+  directory's `kustomization.yaml`.
+- Traefik's request metrics come from `observability/kube-prometheus-stack/monitoring/traefik-podmonitor.yaml`.
 
-## Enable (Ch19)
+Only the frontend: static files and a proxy, no data - its rollback is the previous image and nothing
+else. The backend owns a database; a canary of it needs a schema both versions run on (Chapter 18)
+and a traffic split between services (a mesh or a gateway): not in this chapter.
 
-1. Make sure the analysis gets traffic (see "Known gap" below) - otherwise every release is rolled back.
-2. Add `- progressive-delivery-develop.yaml` to the resources in
-   `flux/bootstrap/flux-system/kustomization.yaml` and push.
-3. Check: `kubectl -n develop get canary` (phase `Initialized`), `kubectl -n develop get hpa`
-   (`backend-primary`, `frontend-primary`), `kubectl -n develop get traefikservice`.
+## Enable / disable
 
-## Disable
+Add `- progressive-delivery-develop.yaml` to the resources in
+`flux/bootstrap/flux-system/kustomization.yaml` (pull request, merge). Then
+`kubectl -n develop get canary frontend` turns `Initialized`, `frontend-primary` serves, and the
+Deployment `frontend` stays at 0 between releases.
 
-Remove the line again and push. The Canaries set `revertOnDeletion: true`: when Flux deletes them,
-Flagger scales the app Deployment back up, points the Service at it again and removes its primary
-objects. Without it the Service keeps selecting the deleted primary and the Deployment can stay at
-0 replicas (an HPA does not scale up from 0). Tested on kind 2026-09-27: before deletion
-`backend` had 0 replicas and the Service selected `backend-primary`; after it, 1 replica,
-selector `app=backend`, `/api/healthz` 200.
+Remove the line again to disable. The Canary sets `revertOnDeletion: true`: Flagger scales
+`frontend` back up and points the Service at it before it removes its primary objects; the
+IngressRoute goes and the Ingress serves again. Without it the Service would keep selecting the
+deleted primary and the Deployment could stay at 0 (an HPA does not scale up from 0).
 
-## Replicas and autoscaling
+## How traffic reaches the canary
 
-- The canaries use `autoscalerRef`: Flagger copies each app's HPA to `<app>-primary` (the Deployment
-  that serves traffic) and keeps the canary Deployment at 0 between releases.
-- Git sets no `spec.replicas` on the app Deployments: the HPA owns the count. See CLAUDE.md,
-  "Resource Management", and `scripts/hpa-replicas-handover.sh` for existing clusters.
+- Users: Traefik -> IngressRoute `frontend-canary` (priority 1000) -> TraefikService `frontend`
+  (Flagger: primary and canary, weighted). A Kubernetes Ingress cannot point at a TraefikService
+  ("Resource backends are not supported"), so the route is an IngressRoute.
+- The overlay's Ingress stays: external-dns (DNS record, `policy: sync`) and cert-manager
+  (`frontend-tls`) read it on Hetzner - removing it would delete the record. Both match the host;
+  the IngressRoute wins by its explicit priority (the default is the rule's length, and the
+  Ingress's rule is longer).
+- Analysis traffic: `frontend-synthetic-traffic` - two requests a second through Traefik over
+  HTTPS. develop has no users, and a check with no requests fails.
 
-## Known gap: the analysis gets no traffic (2026-09-27)
+## What went wrong before (2026-09-27)
 
-The IngressRoutes match `Host(backend.develop.svc.cluster.local)` / `frontend...`, which nothing
-sends, and the frontend nginx calls the backend Service directly (not through Traefik). With no
-load tester the `request-success-rate` query returns no values, the analysis halts 5 times and
-Flagger rolls back: every new develop image was rejected and `<app>-primary` kept the old one
-(on kind develop served a March build). This is why the canaries are opt-in; Ch19 adds the traffic.
+Both apps had Canaries whose IngressRoutes matched `Host(backend.develop.svc.cluster.local)` - a
+name nothing sends - and the frontend reaches the backend directly, not through Traefik. Prometheus
+did not scrape Traefik at all. Every check found no values, every new develop release was rolled
+back, and develop kept serving a March build; nothing alerted. On Hetzner those IngressRoutes would
+also have let anyone reach every backend route through the load balancer with that Host header,
+past the frontend's API allowlist. Removed; the analysis now has metrics, traffic and an alert.
 
-## Prerequisites
+## Not yet verified on Hetzner
 
-1. Cluster observability stack is running (Prometheus endpoint available).
-2. Traefik ingress controller is running (deployed via kube-hetzner).
+On kind there is no external-dns and no cert-manager (Traefik's default certificate). On Hetzner:
+that the IngressRoute serves `frontend-tls`, that external-dns keeps the record, and that
+kube-hetzner's Traefik exposes the `metrics` port. Check before enabling the module there.

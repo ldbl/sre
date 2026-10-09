@@ -9,4 +9,5 @@ resources:
   - cert-manager-servicemonitor.yaml
   - cert-manager-alerts.yaml
   - cnpg-podmonitor.yaml
+  - traefik-podmonitor.yaml
   - backup-alerts.yaml

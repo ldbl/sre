@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: flagger
-      version: "1.42.0"
+      version: "1.45.0"
       sourceRef:
         kind: HelmRepository
         name: flagger
@@ -27,3 +27,7 @@ spec:
       create: true
     meshProvider: traefik
     metricsServer: http://kube-prometheus-stack-prometheus.observability:9090
+    # Flagger's own metrics (flagger_canary_status, flagger_canary_weight): the alert that a canary
+    # was rolled back reads them - a release rejected without anyone noticing is this chapter's story.
+    podMonitor:
+      enabled: true

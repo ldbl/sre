@@ -13,6 +13,7 @@
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
 #     "false" in production
+#   - production: no container sets RANDOM_ERROR_RATE (fault injection - backend Ch15, frontend Ch19)
 #   - every overlay renders at least one Deployment (an empty render must not pass as OK)
 #   - a Deployment targeted by an HPA sets no spec.replicas (the HPA owns the count; a value in Git
 #     makes Flux reset what the HPA scaled on every reconcile)
@@ -124,6 +125,18 @@ for overlay in "${overlays[@]}"; do
       failures+=("${overlay}: Deployment ${target} has an HPA and must not set spec.replicas (got: ${replicas})")
     fi
   done < <(yq 'select(.kind == "HorizontalPodAutoscaler" and .spec.scaleTargetRef.kind == "Deployment") | .spec.scaleTargetRef.name' <<<"${rendered}")
+
+  # Rule: no injected errors in production, in any container of either app.
+  if [[ "${overlay}" == */production ]]; then
+    # shellcheck disable=SC2016 # $d below is a yq variable, not a shell one
+    while IFS=$'\t' read -r dep container; do
+      [[ -z "${dep}" ]] && continue
+      failures+=("${overlay}: Deployment ${dep} container ${container} must not set RANDOM_ERROR_RATE in production")
+    done < <(yq -N 'select(.kind == "Deployment") | .metadata.name as $d
+        | ((.spec.template.spec.containers // []) + (.spec.template.spec.initContainers // []))[]
+        | select((.env // [])[] | .name == "RANDOM_ERROR_RATE")
+        | [$d, .name] | @tsv' <<<"${rendered}")
+  fi
 
   # Rules for the backend only: PPROF_ENABLED off, CHAOS_ENABLED as expected for the environment.
   if [[ "${overlay}" == flux/apps/backend/* ]]; then

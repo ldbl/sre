@@ -1,47 +1,51 @@
+# Chapter 19: every new frontend release in develop goes to a share of the traffic first. Flagger
+# watches the frontend Deployment; a change to its pod template (a new image, a new env) starts an
+# analysis: the new version runs as the canary, Traefik sends it 10%, then 20% ... 50% of the
+# requests while the success rate and the latency of the canary's own requests are checked every
+# 30 s. Three failed checks and the canary gets 0% again and the release is rolled back; all checks
+# passed and the new version becomes the primary - the Deployment that serves everyone.
+#
+# Only the frontend: static files and a proxy, no data - going back is the previous image and
+# nothing else. A service that owns data needs its schema to fit both versions first (Chapter 18).
 apiVersion: flagger.app/v1beta1
 kind: Canary
 metadata:
   name: frontend
   namespace: develop
-  annotations:
-    flagger.app/max-weight-on-timeout: rollback
 spec:
   provider: traefik
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: frontend
-  # Flagger copies this HPA to frontend-primary (the serving Deployment) and leaves the canary Deployment
-  # at 0 between releases (an HPA does not scale a Deployment that is at 0 replicas).
+  # Flagger copies this HPA to frontend-primary (the serving Deployment) and leaves the canary
+  # Deployment at 0 between releases (an HPA does not scale a Deployment that is at 0 replicas).
   autoscalerRef:
     apiVersion: autoscaling/v2
     kind: HorizontalPodAutoscaler
     name: frontend
   progressDeadlineSeconds: 600
-  # Deleting the Canary (disabling this module) restores the app: Flagger scales the Deployment back up
-  # and points the Service at it again. Without this the Service keeps selecting the deleted primary
-  # and the Deployment may stay at 0 replicas (an HPA does not scale up from 0). Tested on kind.
+  # Deleting the Canary (disabling the module) restores the app: Flagger scales the Deployment back
+  # up and points the Service at it again. Without it the Service keeps selecting the deleted
+  # primary and the Deployment may stay at 0 replicas (an HPA does not scale up from 0).
   revertOnDeletion: true
   service:
     port: 8080
     targetPort: http
   analysis:
     interval: 30s
-    threshold: 5
-    maxWeight: 50
-    stepWeight: 10
+    threshold: 3       # failed checks before the rollback
+    stepWeight: 10     # 10% more traffic per passed check ...
+    maxWeight: 50      # ... up to half; then the canary is promoted
     metrics:
+      # Flagger's built-in Traefik queries over the canary's own requests (traefik_service_*):
+      # the share of non-5xx answers, and the 99th percentile latency in milliseconds. A check with
+      # no requests to measure fails - synthetic-traffic.yaml keeps requests coming.
       - name: request-success-rate
-        templateRef:
-          name: request-success-rate
-          namespace: develop
         thresholdRange:
           min: 99
-        interval: 30s
+        interval: 1m
       - name: request-duration
-        templateRef:
-          name: request-duration
-          namespace: develop
         thresholdRange:
           max: 500
-        interval: 30s
+        interval: 1m
