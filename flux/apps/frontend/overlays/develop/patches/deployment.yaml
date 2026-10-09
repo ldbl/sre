@@ -11,3 +11,5 @@ spec:
         env:
         - name: ENVIRONMENT
           value: "development"
+        - name: RELEASE_NOTE
+          value: "chapter 19"
