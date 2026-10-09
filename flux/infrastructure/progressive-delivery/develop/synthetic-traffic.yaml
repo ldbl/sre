@@ -1,0 +1,83 @@
+# Requests for the analysis. develop has no users, and a canary check with nothing to measure fails:
+# before this, every new develop release was rolled back - and develop kept serving an old build -
+# because nobody sent traffic through Traefik (the incident of Chapter 19). This sends two requests
+# a second, the way users come: through Traefik, over HTTPS, to develop.safeops.work - a page and an
+# API call the frontend proxies. Only develop, only while the canary module is enabled.
+#
+# --connect-to keeps the right name in the request (Host and TLS server name) while connecting to
+# Traefik's Service; -k because the certificate is for the public name (on kind: Traefik's default).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-synthetic-traffic
+  namespace: develop
+  labels:
+    app: frontend-synthetic-traffic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-synthetic-traffic
+  template:
+    metadata:
+      labels:
+        app: frontend-synthetic-traffic
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: curl
+          image: curlimages/curl:8.22.0
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                for path in / /api/version; do
+                  curl -sk -o /dev/null -m 5 \
+                    --connect-to develop.safeops.work:443:traefik.traefik.svc.cluster.local:443 \
+                    "https://develop.safeops.work${path}" || true
+                done
+                sleep 1
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+---
+# develop denies all traffic by default (Chapter 06): this pod may reach Traefik's HTTPS port and
+# nothing else (DNS comes from allow-dns-egress). 8443 is the port inside Traefik's pod - a policy
+# sees the pod, not the Service's 443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-synthetic-traffic-egress-traefik
+  namespace: develop
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend-synthetic-traffic
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
