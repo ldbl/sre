@@ -3,6 +3,7 @@
 #   backend  sha256:c531df33871e88a2fc8c51ad59ee0ec14e9cee4b65be628a98ef342dc017b7da - cosign v3 (Sigstore bundle), signed by backend's build.yml on main, SPDX SBOM
 #   frontend sha256:2d452580dffb2a3649d335d6a9f82c36800814023ee8d7be9e0ebc23fcb8a0c0 - cosign v2 (.sig), signed by frontend's build.yml on develop, SPDX SBOM
 #   k8s-ai-monitor sha256:91b7bb5d14deb880558ee5a78478525f4575a8fc549bcfe7e72c8f85486df3c5 - built before k8s-ai-monitor#11: no signature at all
+#   k8s-ai-monitor sha256:9ca189570118f4aad680f8b4c4bde4fabdc08ec3a9015498af87cf8492b0259b - signed by k8s-ai-monitor's build.yml on main (k8s-ai-monitor#11), SPDX SBOM
 #   frontend sha256:3ac8955f8bb18eebce622bfda77fa415aba2ed009470dc154e087bef5d1390f4 - mixed formats: signature and
 #     SBOM as cosign v2 (.sig/.att), GitHub's SLSA provenance as an OCI referrer. With a referrer present,
 #     the verifier reads only the referrers: the SBOM is never found. Signed, and still refused.
@@ -46,3 +47,8 @@ apiVersion: v1
 kind: Pod
 metadata: {name: frontend-mixed-formats, namespace: staging}
 spec: {containers: [{name: app, image: "ghcr.io/safeops-course/frontend@sha256:3ac8955f8bb18eebce622bfda77fa415aba2ed009470dc154e087bef5d1390f4"}]}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: guardian-signed, namespace: production}
+spec: {containers: [{name: app, image: "ghcr.io/safeops-course/k8s-ai-monitor@sha256:9ca189570118f4aad680f8b4c4bde4fabdc08ec3a9015498af87cf8492b0259b"}]}
