@@ -18,7 +18,7 @@ spec:
             matchExpressions:
               - key: app
                 operator: In
-                values: [backend, backend-primary]
+                values: [backend]
       ports:
         - protocol: TCP
           port: 5432

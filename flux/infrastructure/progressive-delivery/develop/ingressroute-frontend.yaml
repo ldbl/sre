@@ -1,0 +1,30 @@
+# The path users take while the canary is enabled: Traefik -> the TraefikService "frontend" that
+# Flagger writes (primary and canary, weighted) -> the pods. A Kubernetes Ingress cannot point at a
+# TraefikService (Traefik: "Resource backends are not supported" - checked on kind), so this is an
+# IngressRoute.
+#
+# The frontend's Ingress in the develop overlay stays: external-dns (DNS record) and cert-manager
+# (the frontend-tls certificate) read it on Hetzner - removing it would delete the record. Both
+# routes match the same host; this one wins by its explicit priority (Traefik's default priority is
+# the length of the rule, and the Ingress's rule is longer). Disabling the module removes this
+# route, and the Ingress serves again.
+#
+# websecure only: on Hetzner plain HTTP is redirected to HTTPS before any route. On kind, send
+# requests to https://localhost:8443 (Traefik's default certificate: curl -k).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: frontend-canary
+  namespace: develop
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`develop.safeops.work`)
+      kind: Rule
+      priority: 1000
+      services:
+        - name: frontend
+          kind: TraefikService
+  tls:
+    secretName: frontend-tls

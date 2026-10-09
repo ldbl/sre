@@ -102,9 +102,12 @@ scripts/             # Pre-commit hooks, automation scripts
 - external-dns (namespace `external-dns`) reads the Cloudflare DNS token from its SOPS Secret
   `cloudflare-api-token`; origin-ca-issuer (namespace `cert-manager`) reads a separate token with only
   "SSL and Certificates: Edit" from `cloudflare-origin-ca-token` (both in flux/secrets/cloudflare)
-- Flagger (progressive delivery) is installed but the develop canaries are OPT-IN (Ch19):
+- Flagger (progressive delivery) is installed but the develop frontend canary is OPT-IN (Ch19):
   `flux/bootstrap/flux-system/progressive-delivery-develop.yaml` is not in that kustomization.yaml.
-  Canaries set `revertOnDeletion: true` so disabling restores the app Deployment and Service.
+  Only the frontend (no data; the backend is out of scope). The Canary sets `revertOnDeletion: true`
+  so disabling restores the Deployment and Service; synthetic traffic feeds the analysis, and
+  `CanaryRolledBack` alerts on a rejected release. `RANDOM_ERROR_RATE` (backend and frontend) is never
+  set in production (`scripts/check-app-security.sh`).
 - OIDC access (Dex GitHub connector, `flux/infrastructure/security/{dex,rbac}`): only members of the
   GitHub teams `safeops-course/members` and `admins` can log in; groups are `safeops-course:members` /
   `safeops-course:admins` (Dex never sends the bare org). Both: admin in develop, read-only in staging,
