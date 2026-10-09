@@ -11,7 +11,3 @@ spec:
         env:
         - name: ENVIRONMENT
           value: "development"
-        - name: RELEASE_NOTE
-          value: "chapter 19"
-        - name: RANDOM_ERROR_RATE
-          value: "0.3"
