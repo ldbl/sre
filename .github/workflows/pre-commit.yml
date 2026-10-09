@@ -56,6 +56,20 @@ jobs:
           tar xzf "${archive}" kyverno && sudo mv kyverno /usr/local/bin/ && rm "${archive}"
           kyverno version
 
+      # promtool for the platform-alerts-test hook - the version the clusters' Prometheus runs.
+      # Pinned and checked against the release's sha256sums.txt.
+      - name: Setup promtool
+        env:
+          PROMETHEUS_VERSION: "3.9.1"
+          PROMETHEUS_SHA256: "86a6999dd6aacbd994acde93c77cfa314d4be1c8e7b7c58f444355c77b32c584"
+        run: |
+          archive="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
+          curl -sSLfO "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${archive}"
+          echo "${PROMETHEUS_SHA256}  ${archive}" | sha256sum -c -
+          tar xzf "${archive}" --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          sudo mv promtool /usr/local/bin/ && rm "${archive}"
+          promtool --version
+
       # checkov: the terraform-security hook fails without it (it is a required tool, not optional).
       - name: Install pre-commit and checkov
         run: pip install pre-commit==4.6.2 checkov==3.3.20

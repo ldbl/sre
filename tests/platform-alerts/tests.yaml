@@ -1,0 +1,59 @@
+# promtool unit tests for flux/infrastructure/observability/kube-prometheus-stack/monitoring/
+# platform-alerts.yaml (run by tests/platform-alerts.test.sh, which extracts the rules first).
+rule_files:
+  - rules.yaml
+evaluation_interval: 1m
+tests:
+  # The Kyverno case of 2026-10-08: a restart every ten minutes, each one clean (no CrashLoopBackOff).
+  # Next to it, a container that restarted twice in the hour: not a loop.
+  - interval: 1m
+    input_series:
+      - series: 'kube_pod_container_status_restarts_total{namespace="kyverno", pod="kyverno-reports-controller-0", container="controller"}'
+        values: '0+0.1x120'
+      - series: 'kube_pod_container_status_restarts_total{namespace="develop", pod="backend-0", container="backend"}'
+        values: '0x59 1 2x60'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ContainerRestartingOften
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: ContainerRestartingOften
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: kyverno
+              pod: kyverno-reports-controller-0
+              container: controller
+            exp_annotations:
+              summary: "kyverno/kyverno-reports-controller-0 (controller) restarted 6 times in the last hour"
+              description: >-
+                A restart loop can look clean: each exit 0, the pod Running between restarts.
+                kubectl -n kyverno logs kyverno-reports-controller-0 -c controller --previous
+                shows why the last run ended; kubectl describe pod shows the last state's reason.
+
+  # A platform component at one core for an hour fires after 15 minutes of rate window plus 30 of
+  # `for`; the same in an application namespace, or a platform component at a fifth of a core, never.
+  - interval: 1m
+    input_series:
+      - series: 'container_cpu_usage_seconds_total{namespace="kyverno", pod="kyverno-reports-controller-0", container="controller"}'
+        values: '0+60x90'
+      - series: 'container_cpu_usage_seconds_total{namespace="develop", pod="backend-0", container="backend"}'
+        values: '0+120x90'
+      - series: 'container_cpu_usage_seconds_total{namespace="observability", pod="prometheus-0", container="prometheus"}'
+        values: '0+12x90'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PlatformComponentHighCPU
+        exp_alerts: []
+      - eval_time: 60m
+        alertname: PlatformComponentHighCPU
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: kyverno
+              pod: kyverno-reports-controller-0
+            exp_annotations:
+              summary: "kyverno/kyverno-reports-controller-0 has used 1.00 CPU cores for 30 minutes"
+              description: >-
+                Find what it is doing before giving it more: its logs, its own metrics, what changed
+                in its configuration. Scaling a component that loops only makes the loop bigger.
