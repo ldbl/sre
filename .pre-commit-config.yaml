@@ -108,6 +108,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: platform-alerts-test
+        name: Platform alerts fire where they should, and only there (promtool test rules, no cluster)
+        entry: tests/platform-alerts.test.sh
+        language: script
+        files: ^(flux/infrastructure/observability/kube-prometheus-stack/monitoring/platform-alerts\.yaml|tests/platform-alerts/.*|tests/platform-alerts\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: flux-kustomize-validate
         name: Flux kustomize validate
         entry: scripts/flux-kustomize-validate.sh
