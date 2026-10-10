@@ -15,8 +15,9 @@
 #
 # Tags are verified as they resolve at admission, and the verified digest is pinned into the pod
 # (mutateDigest): the kubelet pulls exactly what was verified, even if the tag is moved a moment
-# later. verifyDigest then refuses an image the mutation did not pin. Both need Kyverno 1.19 (chart
-# 3.9.x): 1.17 does not implement mutateDigest for ImageValidatingPolicy and silently did nothing.
+# later. verifyDigest then fails an image the mutation did not pin - denied by the enforce copy,
+# reported (PolicyReport) by the audit copy. Both need Kyverno 1.19 (chart 3.9.x): 1.17 does not
+# implement mutateDigest for ImageValidatingPolicy and silently did nothing.
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:
