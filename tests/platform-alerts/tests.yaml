@@ -1,7 +1,9 @@
 # promtool unit tests for flux/infrastructure/observability/kube-prometheus-stack/monitoring/
-# platform-alerts.yaml (run by tests/platform-alerts.test.sh, which extracts the rules first).
+# platform-alerts.yaml and flux/infrastructure/progressive-delivery/develop/alerts.yaml (run by
+# tests/platform-alerts.test.sh, which extracts the rules first).
 rule_files:
-  - rules.yaml
+  - platform.yaml
+  - progressive-delivery.yaml
 evaluation_interval: 1m
 tests:
   # The Kyverno case of 2026-10-08: a restart every ten minutes, each one clean (no CrashLoopBackOff).
@@ -62,3 +64,72 @@ tests:
               description: >-
                 Find what it is doing before giving it more: its logs, its own metrics, what changed
                 in its configuration. Scaling a component that loops only makes the loop bigger.
+
+  # Chapter 19: the synthetic traffic stops at minute 10. Five minutes later rate()[5m] is 0, and
+  # after five more the alert fires - before a release would meet an analysis with no data.
+  - interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="develop-frontend-primary-8080@kubernetes", code="200"}'
+        values: '0+120x10 1200x30'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: CanaryAnalysisHasNoTraffic
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: CanaryAnalysisHasNoTraffic
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No requests reach the develop frontend - the canary analysis has nothing to measure"
+              description: >-
+                The next frontend release in develop will fail its checks with "no values" and be rolled
+                back. Check the synthetic traffic: kubectl -n develop get deploy frontend-synthetic-traffic,
+                and its requests (Traefik's metrics for develop-frontend).
+
+  # No series at all - the module just switched on, or Traefik never scraped: still no traffic.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="observability/traefik"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: CanaryAnalysisHasNoTraffic
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CanaryAnalysisHasNoTraffic
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No requests reach the develop frontend - the canary analysis has nothing to measure"
+              description: >-
+                The next frontend release in develop will fail its checks with "no values" and be rolled
+                back. Check the synthetic traffic: kubectl -n develop get deploy frontend-synthetic-traffic,
+                and its requests (Traefik's metrics for develop-frontend).
+
+  # CanaryRolledBack reads the Canary's namespace from exported_namespace (Flagger's own pod is in
+  # flagger-system). A failed analysis (2) fires; promoted (1) and running (0) do not.
+  - interval: 1m
+    input_series:
+      - series: 'flagger_canary_status{namespace="flagger-system", exported_namespace="develop", name="frontend"}'
+        values: '1x4 0x4 2x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CanaryRolledBack
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: CanaryRolledBack
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              exported_namespace: develop
+              name: frontend
+            exp_annotations:
+              summary: "Canary develop/frontend was rolled back"
+              description: >-
+                The last release of frontend failed its analysis and the previous version
+                still serves. Find out why before the next release: kubectl -n develop
+                describe canary frontend (Events) - a failed check with no values means the
+                analysis had no traffic to measure.
+
