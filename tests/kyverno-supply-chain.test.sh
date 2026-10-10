@@ -48,13 +48,14 @@ check_mode verify-images-audit.yaml Audit Ignore NotIn
 
 # Settings both copies must have - checked per file, not only through the parity check below:
 # a 30 s webhook timeout (an uncached verification takes seconds), the verified digest pinned into
-# the pod and required (mutateDigest, verifyDigest - Kyverno >= 1.19) and no background scan (it
+# the pod (mutateDigest - Kyverno >= 1.19; verifyDigest stays off until the mutation is seen on kind -
+# this CLI validates without mutating, so it cannot show it) and no background scan (it
 # re-verified every running image on every resync and kept the reports controller at several
 # cores); see the policy header.
 for file in verify-images-enforce.yaml verify-images-audit.yaml; do
   got="$(yq '[.spec.validationConfigurations.mutateDigest, .spec.validationConfigurations.verifyDigest, .spec.webhookConfiguration.timeoutSeconds, .spec.evaluation.background.enabled] | join(" ")' "${PACK}/${file}")"
-  if [[ "${got}" != "true true 30 false" ]]; then
-    echo "kyverno-supply-chain: ${file}: expected 'true true 30 false' (mutateDigest, verifyDigest, timeoutSeconds, background), got '${got}'" >&2
+  if [[ "${got}" != "true false 30 false" ]]; then
+    echo "kyverno-supply-chain: ${file}: expected 'true false 30 false' (mutateDigest, verifyDigest, timeoutSeconds, background), got '${got}'" >&2
     exit 1
   fi
 done
