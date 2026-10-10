@@ -183,23 +183,23 @@ variable "k3s_version" {
 }
 
 variable "auto_upgrade_k3s" {
-  description = "Automatically upgrade K3s when a new patch appears on the selected channel."
+  description = "Automatically upgrade K3s when a new patch appears on the selected channel. Off: k3s moves only when k3s_version changes in a reviewed pull request."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "auto_upgrade_os" {
-  description = "Automatically apply OS security updates (requires kured for reboots). Disable for single-node clusters."
+  description = "Automatically install OS updates (the nodes' transactional-update timer). Off: updates are installed by scripts/node-maintenance.sh, at a time we choose - with one worker every reboot is an outage."
   type        = bool
-  default     = true
+  default     = false
 }
 
 # ─── Kured (Kubernetes Reboot Daemon) ───────────────────────────────────────
 
 variable "kured_enabled" {
-  description = "Enable kured for coordinated node reboots after OS updates."
+  description = "Deploy kured, which reboots nodes by itself after automatic OS updates, inside the window below. Off together with auto_upgrade_os: a reboot happens when scripts/node-maintenance.sh runs, not when kured decides."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "kured_reboot_days" {

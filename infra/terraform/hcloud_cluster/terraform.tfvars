@@ -28,13 +28,15 @@ workers_count       = 1
 # ─── K3s & OS Upgrades ──────────────────────────────────────────────────────
 k3s_channel = "stable"
 k3s_version = "v1.36.4+k3s1" # pinned: the same Kubernetes as the kind cluster
-# a pinned version must not move by itself; OS updates stay automatic (kured)
+# Nothing on the nodes moves by itself: k3s changes through k3s_version in a pull request, OS updates
+# and reboots through scripts/node-maintenance.sh at a time we choose. With one worker, a reboot kured
+# chose would be an outage nobody planned. Monthly is the intended cadence; the Renovate dashboard issue is the reminder.
 auto_upgrade_k3s = false
-auto_upgrade_os  = true
+auto_upgrade_os  = false
 
 # ─── Kured (Kubernetes Reboot Daemon) ───────────────────────────────────────
-# Required for auto_upgrade_os — coordinates node reboots after OS updates.
-kured_enabled = true
+# Off with auto_upgrade_os: nothing installs updates by itself, so nothing needs an automatic reboot.
+kured_enabled = false
 # kured_reboot_days = "sat,sun"   # default: sat,sun
 # kured_start_time  = "02:00"     # default: 02:00
 # kured_end_time    = "05:00"     # default: 05:00
