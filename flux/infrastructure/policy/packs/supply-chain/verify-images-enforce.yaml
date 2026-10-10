@@ -17,10 +17,11 @@
 # (mutateDigest): the kubelet pulls exactly what was verified, even if the tag is moved a moment
 # later. Needs Kyverno 1.19 (chart 3.9.x): 1.17 does not implement mutateDigest for
 # ImageValidatingPolicy and silently did nothing.
-# verifyDigest (fail an image the mutation did not pin - denied by the enforce copy, reported by the
-# audit copy) stays off until the mutation is seen on kind: with it on, a cluster whose mutation does
-# not run refuses every pod deployed by tag. The Kyverno CLI cannot show it either - it validates
-# without mutating, so a pod by tag fails there ("does not have a digest").
+# verifyDigest then fails an image the mutation did not pin - denied by the enforce copy, reported by
+# the audit copy. It was turned on only after the mutation was seen on kind (2026-10-10: develop and
+# staging backend pods, init container included, ran <tag>@sha256 equal to the registry's digest):
+# the Kyverno CLI validates without mutating, so no test shows the mutation, and with verifyDigest on
+# a cluster whose mutation does not run would refuse every pod deployed by tag.
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:
@@ -34,7 +35,7 @@ spec:
   failurePolicy: Fail
   validationConfigurations:
     mutateDigest: true    # Kyverno >= 1.19 - see the header
-    verifyDigest: false   # on once mutateDigest is seen working on kind - see the header
+    verifyDigest: true
   # Verifying a signature and an SBOM costs about ten seconds when the result is not cached (ghcr.io,
   # Sigstore): on kind the default 10 s timeout cut every first verification off, and the pod was
   # refused although its image was signed. 30 s is the maximum; a verified digest is then cached

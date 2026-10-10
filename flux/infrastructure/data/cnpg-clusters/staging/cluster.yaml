@@ -7,7 +7,10 @@ metadata:
     cnpg.io/validation: "disabled"
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  # Pinned to a minor and its digest: the major tag (:17) moved to every new PostgreSQL minor by
+  # itself. Changing this restarts the instance once - with one instance, a short outage.
+  # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.11@sha256:70664ebcfa1100361b5bdc28bbf06fdbe08db2dc4ad7bd14de33c5e05fe8ea8e
   primaryUpdateStrategy: unsupervised
   bootstrap:
     initdb:

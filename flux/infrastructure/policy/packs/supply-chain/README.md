@@ -26,10 +26,10 @@ is a referrer fails the SBOM check: with a referrer present, only the referrers 
 
 Tags are verified as they resolve at admission, and the verified digest is pinned into the pod
 (`mutateDigest`): the kubelet pulls what was verified even if the tag moves a moment later.
-It needs Kyverno 1.19 (chart 3.9.x). `verifyDigest` - fail an image the mutation did not pin (denied by
-`verify-images-enforce`, reported by `verify-images-audit`) - stays off until the mutation is seen on
-kind: if it did not run, every pod deployed by tag would be refused. The Kyverno CLI validates without
-mutating, so the policy test cannot show the mutation.
+It needs Kyverno 1.19 (chart 3.9.x). `verifyDigest` fails an image the mutation did not pin:
+`verify-images-enforce` denies it in develop, staging and production; `verify-images-audit` reports it.
+It was turned on after the mutation was seen on kind - the Kyverno CLI validates without mutating, so
+the policy test cannot show it.
 
 Verification costs about ten seconds uncached per webhook call (ghcr.io, Sigstore); the webhooks get
 the maximum timeout, 30 s.

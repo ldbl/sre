@@ -67,8 +67,8 @@ locals {
     },
   ] : []
 
-  # Kured options — only populated when enabled. Kured reboots a node after an OS update
-  # (MicroOS updates itself), one node at a time, inside this window. https://kured.dev/docs/
+  # Kured options — only populated when enabled. Kured reboots a node after an OS update, one node
+  # at a time, inside this window. https://kured.dev/docs/ Off on this platform (see variables.tf).
   kured_options = var.kured_enabled ? {
     "reboot-days" = var.kured_reboot_days
     "start-time"  = var.kured_start_time
@@ -135,7 +135,9 @@ module "kube_hetzner" {
   # cert-manager is managed by Flux, not kube-hetzner
   enable_cert_manager = false
 
-  # Kured
+  # Kured: deployed only when enabled. The module deploys it by default (enable_kured = true) -
+  # without this line kured_enabled = false would still leave kured running.
+  enable_kured  = var.kured_enabled
   kured_options = local.kured_options
 
   # etcd backup to Hetzner Object Storage

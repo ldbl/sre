@@ -108,6 +108,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: tool-versions-test
+        name: The tests run the Kyverno and Prometheus versions the cluster runs (helm show)
+        entry: tests/tool-versions.test.sh
+        language: script
+        files: ^(flux/infrastructure/policy/kyverno/release\.yaml|flux/infrastructure/observability/kube-prometheus-stack/base/release\.yaml|\.github/workflows/pre-commit\.yml|tests/tool-versions\.test\.sh)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: platform-alerts-test
         name: Platform alerts fire where they should, and only there (promtool test rules, no cluster)
         entry: tests/platform-alerts.test.sh
