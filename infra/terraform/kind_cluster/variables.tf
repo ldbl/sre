@@ -40,13 +40,15 @@ variable "flux_kustomization_name" {
 variable "flux_operator_version" {
   description = "Flux Operator release to install (install.yaml from its GitHub release)."
   type        = string
-  default     = "0.60.0"
+  # renovate: datasource=github-releases depName=controlplaneio-fluxcd/flux-operator
+  default = "0.60.0"
 }
 
 variable "flux_version" {
   description = "Flux version the FluxInstance installs. Pinned, so a rebuild gets the same Flux."
   type        = string
-  default     = "2.9.5"
+  # renovate: datasource=github-releases depName=fluxcd/flux2
+  default = "2.9.5"
 }
 
 # ─── Credentials (all optional for the public course repository) ────────────
@@ -193,17 +195,20 @@ variable "age_key_file" {
 variable "kind_node_image" {
   description = "kindest/node image, pinned by digest. Kubernetes v1.36.4, the same minor as k3s on the Hetzner track."
   type        = string
-  default     = "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+  # renovate: datasource=docker depName=kindest/node
+  default = "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
 }
 
 variable "traefik_chart_version" {
   description = "Traefik Helm chart version."
   type        = string
-  default     = "41.6.0"
+  # renovate: datasource=helm depName=traefik registryUrl=https://traefik.github.io/charts
+  default = "41.6.0"
 }
 
 variable "metrics_server_chart_version" {
   description = "metrics-server Helm chart version."
   type        = string
-  default     = "3.14.0"
+  # renovate: datasource=helm depName=metrics-server registryUrl=https://kubernetes-sigs.github.io/metrics-server/
+  default = "3.14.0"
 }

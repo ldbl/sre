@@ -27,6 +27,7 @@ workers_count       = 1
 
 # ─── K3s & OS Upgrades ──────────────────────────────────────────────────────
 k3s_channel = "stable"
+# renovate: datasource=github-releases depName=k3s-io/k3s versioning=regex:^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\+k3s(?<build>\d+)$
 k3s_version = "v1.36.4+k3s1" # pinned: the same Kubernetes as the kind cluster
 # Nothing on the nodes moves by itself: k3s changes through k3s_version in a pull request, OS updates
 # and reboots through scripts/node-maintenance.sh at a time we choose. With one worker, a reboot kured
