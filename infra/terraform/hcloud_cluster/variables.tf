@@ -245,12 +245,14 @@ variable "traefik_autoscaling" {
 variable "flux_operator_version" {
   description = "Flux Operator release to install (install.yaml from its GitHub release)."
   type        = string
+  # renovate: datasource=github-releases depName=controlplaneio-fluxcd/flux-operator
   default     = "0.60.0"
 }
 
 variable "flux_version" {
   description = "Flux version the FluxInstance installs. Pinned, so a rebuild gets the same Flux."
   type        = string
+  # renovate: datasource=github-releases depName=fluxcd/flux2
   default     = "2.9.5"
 }
 

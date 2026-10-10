@@ -27,6 +27,7 @@ workers_count       = 1
 
 # ─── K3s & OS Upgrades ──────────────────────────────────────────────────────
 k3s_channel = "stable"
+# renovate: datasource=github-releases depName=k3s-io/k3s versioning=regex:^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\+k3s(?<build>\d+)$
 k3s_version = "v1.36.4+k3s1" # pinned: the same Kubernetes as the kind cluster
 # a pinned version must not move by itself; OS updates stay automatic (kured)
 auto_upgrade_k3s = false

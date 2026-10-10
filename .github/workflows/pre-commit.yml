@@ -47,6 +47,7 @@ jobs:
       # >= 1.19). Pinned and checked against the release's checksums.txt.
       - name: Setup Kyverno CLI
         env:
+          # renovate: datasource=github-releases depName=kyverno/kyverno
           KYVERNO_VERSION: "1.19.1"
           KYVERNO_SHA256: "b38228f367fc0fdc2b08f4c83ea50ac5f16c60ff8d62d76a66157c33c47b70ae"
         run: |
@@ -60,6 +61,7 @@ jobs:
       # Pinned and checked against the release's sha256sums.txt.
       - name: Setup promtool
         env:
+          # renovate: datasource=github-releases depName=prometheus/prometheus
           PROMETHEUS_VERSION: "3.9.1"
           PROMETHEUS_SHA256: "86a6999dd6aacbd994acde93c77cfa314d4be1c8e7b7c58f444355c77b32c584"
         run: |

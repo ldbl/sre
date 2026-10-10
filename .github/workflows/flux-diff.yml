@@ -24,6 +24,7 @@ jobs:
 
       - name: Setup kubeconform
         run: |
+          # renovate: datasource=github-releases depName=yannh/kubeconform
           KUBECONFORM_VERSION="v0.6.7"
           curl -sLO "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           tar xzf kubeconform-linux-amd64.tar.gz
