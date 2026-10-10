@@ -4,7 +4,8 @@
     "Dependency updates on our own schedule (Chapter 20): Renovate opens no pull requests. It keeps one",
     "issue - the dependency dashboard - listing what is out of date; updates are made by hand, all in one",
     "pull request, after reading the release notes and testing against the version the cluster runs.",
-    "Versions outside a standard file carry a '# renovate: datasource=... depName=...' comment above them."
+    "Versions outside a standard file carry a '# renovate: datasource=... depName=...' comment above them.",
+    "Vulnerability alerts stay with GitHub's own alerts (on for the repository); the workflow token cannot read them."
   ],
   "extends": [
     "config:recommended"
@@ -12,6 +13,9 @@
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Platform maintenance: dependency updates",
   "dependencyDashboardApproval": true,
+  "vulnerabilityAlerts": {
+    "enabled": false
+  },
   "flux": {
     "managerFilePatterns": [
       "/^flux/.+\\.ya?ml$/"

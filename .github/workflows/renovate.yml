@@ -47,6 +47,8 @@ jobs:
           RENOVATE_REPOSITORIES: ${{ github.repository }}
           RENOVATE_ONBOARDING: "false"
           RENOVATE_REQUIRE_CONFIG: optional
-          # A pull request only checks the configuration: look versions up, write nothing.
+          # A pull request only checks the configuration: look versions up on the pull request's own
+          # branch (Renovate reads the default branch otherwise), write nothing, and log what it found.
           RENOVATE_DRY_RUN: ${{ github.event_name == 'pull_request' && 'lookup' || '' }}
-          LOG_LEVEL: info
+          RENOVATE_BASE_BRANCH_PATTERNS: ${{ github.event_name == 'pull_request' && format('["{0}"]', github.head_ref) || '' }}
+          LOG_LEVEL: ${{ github.event_name == 'pull_request' && 'debug' || 'info' }}
