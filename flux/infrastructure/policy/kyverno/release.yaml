@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: kyverno
-      version: "3.7.1"
+      version: "3.9.1"   # Kyverno 1.19.1 - the same version as the CLI in tests and CI
       sourceRef:
         kind: HelmRepository
         name: kyverno
@@ -44,6 +44,13 @@ spec:
       policyExceptions:
         enabled: true
         namespace: policy-exceptions
+      # Credentials for reading images and signatures. The chart's default adds the google, amazon,
+      # azure and github helpers, which look for each cloud's credentials on registry reads. The
+      # platform's images are public on ghcr.io and need none, so only the default keychain: nothing
+      # to look up, on kind, Hetzner or GKE alike.
+      registryClient:
+        credentialHelpers:
+          - default
     admissionController:
       replicas: 2
     backgroundController:
