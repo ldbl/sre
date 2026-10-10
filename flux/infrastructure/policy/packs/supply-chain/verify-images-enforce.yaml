@@ -51,9 +51,15 @@ spec:
   evaluation:
     background:
       enabled: false
+  # Pods only - no autogen for Deployments, Jobs and the other pod controllers. On Kyverno 1.19 the
+  # generated controller rules verified every image again on each Flux dry-run of a Deployment (a
+  # timeout on a slow network blocked backend and frontend), and they fail without the
+  # image-verification-outcomes annotation that only the pod mutation writes (minio's Job was denied
+  # even by the audit copy) - both seen on kind. A refused pod still shows on its ReplicaSet
+  # (FailedCreate) and in Flux's health check.
   autogen:
     podControllers:
-      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+      controllers: []
   matchConstraints:
     resourceRules:
       - apiGroups: [""]

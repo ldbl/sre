@@ -23,3 +23,19 @@ spec:
               still serves. Find out why before the next release: kubectl -n {{ $labels.exported_namespace }}
               describe canary {{ $labels.name }} (Events) - a failed check with no values means the
               analysis had no traffic to measure.
+        # The analysis needs requests to measure; without them every check fails with "no values"
+        # and every release is rolled back - the story of this chapter. Watched on the traffic itself,
+        # not on the generator's pod: a running pod whose requests never arrive (a network policy, DNS,
+        # a Traefik route) counts as no traffic too. `or vector(0)`: with no series at all, rate()
+        # returns nothing and `== 0` would never fire.
+        - alert: CanaryAnalysisHasNoTraffic
+          expr: (sum(rate(traefik_service_requests_total{service=~"develop-frontend.*"}[5m])) or vector(0)) == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "No requests reach the develop frontend - the canary analysis has nothing to measure"
+            description: >-
+              The next frontend release in develop will fail its checks with "no values" and be rolled
+              back. Check the synthetic traffic: kubectl -n develop get deploy frontend-synthetic-traffic,
+              and its requests (Traefik's metrics for develop-frontend).

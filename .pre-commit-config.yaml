@@ -112,7 +112,7 @@ repos:
         name: Platform alerts fire where they should, and only there (promtool test rules, no cluster)
         entry: tests/platform-alerts.test.sh
         language: script
-        files: ^(flux/infrastructure/observability/kube-prometheus-stack/monitoring/platform-alerts\.yaml|tests/platform-alerts/.*|tests/platform-alerts\.test\.sh)$
+        files: ^(flux/infrastructure/observability/kube-prometheus-stack/monitoring/platform-alerts\.yaml|flux/infrastructure/progressive-delivery/develop/alerts\.yaml|tests/platform-alerts/.*|tests/platform-alerts\.test\.sh)$
         pass_filenames: false
         stages: [pre-commit]
 
