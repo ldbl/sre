@@ -24,9 +24,12 @@ ClusterPolicy `verifyImages` finds none of them; the ImageValidatingPolicy verif
 older `.sig` format. An image whose signature and SBOM are in the old format while GitHub's provenance
 is a referrer fails the SBOM check: with a referrer present, only the referrers are read.
 
-Tags are verified as they resolve at admission. Pinning the verified digest into the pod (`mutateDigest`)
-needs Kyverno 1.19 - 1.17 does not implement it for ImageValidatingPolicy - so a tag moved between
-admission and the pull is accepted tech debt until that upgrade.
+Tags are verified as they resolve at admission, and the verified digest is pinned into the pod
+(`mutateDigest`): the kubelet pulls what was verified even if the tag moves a moment later.
+It needs Kyverno 1.19 (chart 3.9.x). `verifyDigest` - fail an image the mutation did not pin (denied by
+`verify-images-enforce`, reported by `verify-images-audit`) - stays off until the mutation is seen on
+kind: if it did not run, every pod deployed by tag would be refused. The Kyverno CLI validates without
+mutating, so the policy test cannot show the mutation.
 
 Verification costs about ten seconds uncached per webhook call (ghcr.io, Sigstore); the webhooks get
 the maximum timeout, 30 s.

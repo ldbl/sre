@@ -6,18 +6,21 @@
 # ImageValidatingPolicy (CEL), not a ClusterPolicy verifyImages rule: the CI signs with cosign v3,
 # whose signatures are Sigstore bundles stored as OCI referrers; Kyverno's ClusterPolicy verifyImages
 # finds none of them ("no signatures found"), the ImageValidatingPolicy verifies both the bundles and
-# the older .sig format (checked with the Kyverno CLI 1.17 against the real images).
+# the older .sig format (checked with the Kyverno CLI against the real images).
 #
 # Two copies, identical but for the name, the namespaces, the action and the failure policy -
 # tests/kyverno-supply-chain.test.sh fails when they drift apart:
 #   verify-images-enforce  develop, staging, production - Deny, failurePolicy Fail
 #   verify-images-audit    every other namespace         - Audit (PolicyReports), failurePolicy Ignore
 #
-# Tags are verified as they resolve at admission. Pinning the verified digest into the pod
-# (mutateDigest) is what closes the gap of a tag moved between admission and the pull - but Kyverno
-# 1.17 does not implement it for ImageValidatingPolicy (pkg/cel/policies/ivpol/engine: added in
-# 1.19.0); set to true, it silently does nothing and verifyDigest refuses nothing (checked on kind).
-# So both are false here, explicitly: the gap is accepted tech debt until the Kyverno 1.19 upgrade.
+# Tags are verified as they resolve at admission, and the verified digest is pinned into the pod
+# (mutateDigest): the kubelet pulls exactly what was verified, even if the tag is moved a moment
+# later. Needs Kyverno 1.19 (chart 3.9.x): 1.17 does not implement mutateDigest for
+# ImageValidatingPolicy and silently did nothing.
+# verifyDigest (fail an image the mutation did not pin - denied by the enforce copy, reported by the
+# audit copy) stays off until the mutation is seen on kind: with it on, a cluster whose mutation does
+# not run refuses every pod deployed by tag. The Kyverno CLI cannot show it either - it validates
+# without mutating, so a pod by tag fails there ("does not have a digest").
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:
@@ -30,8 +33,8 @@ spec:
   validationActions: [Deny]
   failurePolicy: Fail
   validationConfigurations:
-    mutateDigest: false   # true from Kyverno 1.19 on - see the header
-    verifyDigest: false
+    mutateDigest: true    # Kyverno >= 1.19 - see the header
+    verifyDigest: false   # on once mutateDigest is seen working on kind - see the header
   # Verifying a signature and an SBOM costs about ten seconds when the result is not cached (ghcr.io,
   # Sigstore): on kind the default 10 s timeout cut every first verification off, and the pod was
   # refused although its image was signed. 30 s is the maximum; a verified digest is then cached
