@@ -43,6 +43,21 @@ jobs:
           curl -sLO "https://dl.k8s.io/release/v1.36.5/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
+      # Helm for the tool-versions-test hook: it asks the pinned charts what they install (helm show).
+      # Pinned and checked against the release's sha256sum.
+      - name: Setup Helm
+        env:
+          # renovate: datasource=github-releases depName=helm/helm
+          HELM_VERSION: "v4.3.0"
+          HELM_SHA256: "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb"
+        run: |
+          archive="helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          curl -sSLfO "https://get.helm.sh/${archive}"
+          echo "${HELM_SHA256}  ${archive}" | sha256sum -c -
+          tar xzf "${archive}" --strip-components=1 linux-amd64/helm
+          sudo mv helm /usr/local/bin/ && rm "${archive}"
+          helm version --short
+
       # The Kyverno CLI for the kyverno-policies-test hook (tests/kyverno-policies.test.sh says why
       # >= 1.19). Pinned and checked against the release's checksums.txt.
       - name: Setup Kyverno CLI

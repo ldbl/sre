@@ -24,12 +24,13 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Versions pinned in Terraform variables, tfvars, the Makefile and CI workflows, each under a '# renovate:' comment.",
+      "description": "Versions pinned in Terraform variables, tfvars, the Makefile, CI workflows and Flux manifests (where no standard manager reads them), each under a '# renovate:' comment.",
       "managerFilePatterns": [
         "/(^|/)Makefile$/",
         "/\\.tf$/",
         "/\\.tfvars$/",
-        "/^\\.github/workflows/.+\\.ya?ml$/"
+        "/^\\.github/workflows/.+\\.ya?ml$/",
+        "/^flux/.+\\.ya?ml$/"
       ],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+registryUrl=(?<registryUrl>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n\\s*[A-Za-z_][A-Za-z0-9_]*\\s*(?::=|:|=)\\s*\"?(?:[^\"\\s:@]+:)?(?<currentValue>[^\"\\s@#]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?"
