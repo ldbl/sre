@@ -53,9 +53,11 @@ check_mode verify-images-audit.yaml Audit Ignore NotIn
 # re-verified every running image on every resync and kept the reports controller at several
 # cores) and no autogen for pod controllers (pods only); see the policy header.
 for file in verify-images-enforce.yaml verify-images-audit.yaml; do
-  got="$(yq '[.spec.validationConfigurations.mutateDigest, .spec.validationConfigurations.verifyDigest, .spec.webhookConfiguration.timeoutSeconds, .spec.evaluation.background.enabled, (.spec.autogen.podControllers.controllers | length)] | join(" ")' "${PACK}/${file}")"
-  if [[ "${got}" != "true false 30 false 0" ]]; then
-    echo "kyverno-supply-chain: ${file}: expected 'true false 30 false 0' (mutateDigest, verifyDigest, timeoutSeconds, background, autogen controllers), got '${got}'" >&2
+  got="$(yq '[.spec.validationConfigurations.mutateDigest, .spec.validationConfigurations.verifyDigest, .spec.webhookConfiguration.timeoutSeconds, .spec.evaluation.background.enabled, ((.spec.autogen.podControllers.controllers | type) + ":" + (.spec.autogen.podControllers.controllers | length | tostring))] | join(" ")' "${PACK}/${file}")"
+  # The autogen list must be there and empty (!!seq:0): a missing or null field would read as length 0
+  # and let Kyverno's default - autogen for every pod controller - back in.
+  if [[ "${got}" != "true false 30 false !!seq:0" ]]; then
+    echo "kyverno-supply-chain: ${file}: expected 'true false 30 false !!seq:0' (mutateDigest, verifyDigest, timeoutSeconds, background, autogen controllers: an empty list), got '${got}'" >&2
     exit 1
   fi
 done
