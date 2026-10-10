@@ -8,13 +8,18 @@ spec:
   chart:
     spec:
       chart: kyverno
-      version: "3.9.1"   # Kyverno 1.19.1 - the same version as the CLI in tests and CI
+      version: "3.9.1"   # Kyverno 1.19.1 - tests/tool-versions.test.sh checks the CLI in CI is the same
       sourceRef:
         kind: HelmRepository
         name: kyverno
         namespace: flux-system
       interval: 12h
   targetNamespace: kyverno
+  # How long Helm waits for every Kyverno pod to be Ready before it calls an install or upgrade failed
+  # (and Flux rolls back). The default 5 minutes was too short on a slow network: the 3.9.1 upgrade
+  # pulled each image for about 2 minutes, timed out, was rolled back, and only the retry - with the
+  # images already on the node - went through (kind, 2026-10-10).
+  timeout: 15m
   install:
     createNamespace: false
     remediation:
@@ -53,6 +58,11 @@ spec:
           - default
     admissionController:
       replicas: 2
+      # One admission controller always answers through a node drain. The chart creates this budget
+      # by itself whenever replicas > 1; written out here so it does not hang on that rule.
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
     backgroundController:
       enabled: true
     cleanupController:

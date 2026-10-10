@@ -189,17 +189,54 @@ if [[ ${#TARGET_DIRS[@]} -eq 0 ]]; then
   exit 0
 fi
 
-kubeconform_config=(-strict -ignore-missing-schemas -schema-location default)
+# The Kubernetes version the clusters run: kind's node image is where it is pinned (k3s on Hetzner
+# follows it). Without -kubernetes-version, kubeconform checks against the newest schemas - an API
+# removed after our version would pass here and fail on the cluster.
+KUBERNETES_VERSION="$(sed -n 's|.*kindest/node:v\([0-9][0-9.]*\)@.*|\1|p' "${REPO_ROOT}/infra/terraform/kind_cluster/variables.tf")"
+[[ -n "${KUBERNETES_VERSION}" ]] || fail "cannot read the Kubernetes version from kind's node image (infra/terraform/kind_cluster/variables.tf)"
+kubeconform_config=(-strict -ignore-missing-schemas -kubernetes-version "${KUBERNETES_VERSION}" -schema-location default)
 if [[ ${run_kubeconform} -eq 1 ]]; then
   ensure_flux_schemas
   if has_local_flux_schemas; then
-    kubeconform_config+=(-schema-location "${SCHEMA_ROOT}")
+    # A full template: a bare directory would make kubeconform look for a v<version>-standalone-strict
+    # subdirectory the Flux bundle does not have, and -ignore-missing-schemas would skip every Flux object.
+    kubeconform_config+=(-schema-location "${SCHEMA_DIR}/{{ .ResourceKind }}{{ .KindSuffix }}.json")
   elif [[ "${ALLOW_NO_FLUX_SCHEMAS}" == "1" ]]; then
     echo "[flux-validate] WARNING: skipping kubeconform (no local schemas available in fallback mode)."
     run_kubeconform=0
   fi
 else
   echo "[flux-validate] kubeconform not installed: building only; the schema check runs in CI (Flux Diff)."
+fi
+
+# -ignore-missing-schemas must not hide a whole schema set: one object of each kind must find its
+# schema (no -ignore-missing-schemas here), or the run stops - a Kubernetes version the schema
+# repository does not have yet would otherwise turn every check into a skip.
+if [[ ${run_kubeconform} -eq 1 ]]; then
+  probe_config=()
+  for flag in "${kubeconform_config[@]}"; do
+    [[ "${flag}" == "-ignore-missing-schemas" ]] || probe_config+=("${flag}")
+  done
+  probe_objects='apiVersion: apps/v1
+kind: Deployment
+metadata: {name: probe}
+spec:
+  selector: {matchLabels: {app: probe}}
+  template:
+    metadata: {labels: {app: probe}}
+    spec: {containers: [{name: probe, image: probe}]}'
+  if [[ -d "${SCHEMA_DIR}" ]] && has_local_flux_schemas; then
+    probe_objects+='
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata: {name: probe, namespace: flux-system}
+spec: {interval: 10m, path: ./, prune: true, sourceRef: {kind: GitRepository, name: probe}}'
+  fi
+  if ! probe_out="$(printf '%s\n' "${probe_objects}" | kubeconform "${probe_config[@]}" 2>&1)"; then
+    echo "${probe_out}" >&2
+    fail "kubeconform has no schemas for Kubernetes ${KUBERNETES_VERSION} or the Flux CRDs - it would skip every object silently"
+  fi
 fi
 
 failed=0
