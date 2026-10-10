@@ -30,7 +30,7 @@ k3s_channel = "stable"
 k3s_version = "v1.36.4+k3s1" # pinned: the same Kubernetes as the kind cluster
 # Nothing on the nodes moves by itself: k3s changes through k3s_version in a pull request, OS updates
 # and reboots through scripts/node-maintenance.sh at a time we choose. With one worker, a reboot kured
-# chose would be an outage nobody planned. Updates are due monthly - the maintenance issue says when.
+# chose would be an outage nobody planned. Monthly is the intended cadence; the Renovate dashboard issue is the reminder.
 auto_upgrade_k3s = false
 auto_upgrade_os  = false
 

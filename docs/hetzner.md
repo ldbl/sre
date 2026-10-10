@@ -168,8 +168,10 @@ Optional `/etc/hosts` for browser testing:
 
 Nothing on the nodes changes by itself: `auto_upgrade_k3s`, `auto_upgrade_os` and `kured_enabled` are
 `false` (`infra/terraform/hcloud_cluster`). k3s moves only when `k3s_version` changes in a reviewed pull
-request; OS updates and reboots happen when `scripts/node-maintenance.sh` runs - monthly, at a time
-chosen and announced, one node at a time.
+request; OS updates and reboots happen when `scripts/node-maintenance.sh` runs - at a time chosen and
+announced, one node at a time. The intended cadence is monthly: the Renovate workflow
+(`.github/workflows/renovate.yml`, the 1st of every month) refreshes the "Platform maintenance:
+dependency updates" issue, and that issue is the reminder to run this too.
 
 ```bash
 scripts/node-maintenance.sh hetzner-sre-control-plane <node>                  # dry run: what a drain would evict, what blocks it
