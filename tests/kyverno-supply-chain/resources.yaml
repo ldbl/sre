@@ -7,7 +7,9 @@
 #   frontend sha256:3ac8955f8bb18eebce622bfda77fa415aba2ed009470dc154e087bef5d1390f4 - mixed formats: signature and
 #     SBOM as cosign v2 (.sig/.att), GitHub's SLSA provenance as an OCI referrer. With a referrer present,
 #     the verifier reads only the referrers: the SBOM is never found. Signed, and still refused.
+#   backend  sha256:38322b024e1944b82f9cfefad58dab4bd6afd19cca1335fdb58f90f851453644 - one SBOM per platform (amd64, arm64), Go 1.27.2 (backend#36-#38)
 # The busybox container in "signed-with-foreign-image" is not ours: the policy must ignore it.
+# "backend-with-migrate" runs that image twice (initContainer and app), as the backend Deployment does.
 apiVersion: v1
 kind: Pod
 metadata: {name: backend-signed, namespace: develop}
@@ -52,3 +54,10 @@ apiVersion: v1
 kind: Pod
 metadata: {name: guardian-signed, namespace: production}
 spec: {containers: [{name: app, image: "ghcr.io/safeops-course/k8s-ai-monitor@sha256:9ca189570118f4aad680f8b4c4bde4fabdc08ec3a9015498af87cf8492b0259b"}]}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: backend-with-migrate, namespace: develop}
+spec:
+  initContainers: [{name: migrate, image: "ghcr.io/safeops-course/backend@sha256:38322b024e1944b82f9cfefad58dab4bd6afd19cca1335fdb58f90f851453644"}]
+  containers: [{name: app, image: "ghcr.io/safeops-course/backend@sha256:38322b024e1944b82f9cfefad58dab4bd6afd19cca1335fdb58f90f851453644"}]

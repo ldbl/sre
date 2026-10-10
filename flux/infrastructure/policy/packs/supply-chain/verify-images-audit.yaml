@@ -91,11 +91,14 @@ spec:
       intoto:
         type: "https://spdx.dev/Document"
   variables:
-    # Every container, init container and ephemeral container (kubectl debug) whose image is ours.
+    # Every container, init container and ephemeral container (kubectl debug) whose image is ours -
+    # each image once (distinct): the backend's migrate initContainer runs the app's own image, and
+    # verifying it twice per request (signature, then two SBOMs per image) took past the webhook's 30 s
+    # on kind - every new backend pod was refused with a timeout.
     - name: ours
       expression: >-
         (images.?containers.orValue([]) + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))
-        .filter(image, image.startsWith('${image_registry}/'))
+        .filter(image, image.startsWith('${image_registry}/')).distinct()
     # Which signer each repository of the registry has. A repository not listed has none, so its images
     # fail both checks (unsigned-demo, or anything pushed there by hand): the enforce copy refuses them,
     # the audit copy reports them.
