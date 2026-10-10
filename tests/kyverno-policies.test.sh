@@ -8,7 +8,7 @@
 #
 # Kyverno CLI >= 1.19: 1.17 reports a wrong expectation ("Want fail, got pass") but still counts it
 # as passed and exits 0 when the test loads exceptions - a test that cannot fail. The cluster runs
-# Kyverno 1.17 (chart 3.7.1); every verdict here was also checked against CLI 1.17.
+# Kyverno 1.19 (chart 3.9.1) - the same engine as this test.
 #
 # Run: tests/kyverno-policies.test.sh   (pre-commit runs it when a policy or this test changes)
 # Needs: kyverno (CLI). Read-only: changes no file in the repository and no cluster.
