@@ -164,6 +164,27 @@ Optional `/etc/hosts` for browser testing:
 - Token: Cloudflare API token "Zone / SSL and Certificates / Edit" for the zone, SOPS secret
   `flux/secrets/cloudflare/cloudflare-origin-ca-token.yaml`.
 
+## Node Maintenance (OS Updates and Reboots)
+
+Nothing on the nodes changes by itself: `auto_upgrade_k3s`, `auto_upgrade_os` and `kured_enabled` are
+`false` (`infra/terraform/hcloud_cluster`). k3s moves only when `k3s_version` changes in a reviewed pull
+request; OS updates and reboots happen when `scripts/node-maintenance.sh` runs - monthly, at a time
+chosen and announced, one node at a time.
+
+```bash
+scripts/node-maintenance.sh hetzner-sre-control-plane <node>                  # dry run: what a drain would evict, what blocks it
+scripts/node-maintenance.sh hetzner-sre-control-plane <node> --apply          # cordon, drain, transactional-update, reboot, uncordon
+```
+
+With one worker a drain cannot complete: the pods have nowhere to go, and CloudNativePG's
+PodDisruptionBudget keeps its single instance (`app-postgres-1` in every namespace - the dry run on kind
+names exactly these). `--apply` then stops at the drain. `--apply --accept-outage` is the decision to take
+the outage: the pods are deleted past their budgets and come back with the node. That is the honest cost
+of one worker and one database instance - acceptable for a course cluster that exists for a few hours,
+not for production, which needs at least two workers (and a database that survives one of them).
+
+Between nodes: Flux Ready, `make smoke-test KUBE_CONTEXT=hetzner-sre-control-plane`. A failed run leaves the node cordoned - the script says so.
+
 ## Private Repo Variant (Non-MVP)
 
 If the repo is private:
