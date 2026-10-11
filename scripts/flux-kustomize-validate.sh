@@ -9,10 +9,14 @@
 #      it on every pull request and fails on errors, so nothing reaches main unchecked.
 # YAML syntax of single files is the yamllint hook's job.
 #
-# Needs only kubectl (already a lab tool). Optional: kubeconform, plus curl and tar for the schemas.
+# Needs only kubectl (already a lab tool). Optional: kubeconform - and with it, tar and curl for the
+# schemas and yq (required then) to pick Kubernetes' own APIs for the removed-API pass.
 # Runs on macOS (bash 3.2) and Linux.
 #
 # Usage: scripts/flux-kustomize-validate.sh [changed files...]   (pre-commit passes the changed files)
+#        FLUX_VALIDATE_KUBERNETES_VERSION=1.37.0 scripts/flux-kustomize-validate.sh
+#          - before a Kubernetes upgrade: every manifest against the version you upgrade TO; an object
+#            whose API that version removed fails (Chapter 20)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,10 +39,14 @@ if ! command -v kubectl >/dev/null 2>&1; then
   exit 1
 fi
 
-# kubeconform is optional locally; when it is there, it needs tar (and curl to download schemas).
+# kubeconform is optional locally; when it is there, it needs tar (and curl to download schemas), and
+# yq to pick Kubernetes' own APIs for the removed-API pass.
 run_kubeconform=1
 if ! command -v kubeconform >/dev/null 2>&1; then
   run_kubeconform=0
+elif ! command -v yq >/dev/null 2>&1; then
+  echo "[flux-validate] required tool missing: yq (for the removed-API check; make check-tools)" >&2
+  exit 1
 elif ! command -v tar >/dev/null 2>&1; then
   echo "[flux-validate] required tool missing: tar (for the Flux CRD schemas)" >&2
   exit 1
@@ -192,8 +200,15 @@ fi
 # The Kubernetes version the clusters run: kind's node image is where it is pinned (k3s on Hetzner
 # follows it). Without -kubernetes-version, kubeconform checks against the newest schemas - an API
 # removed after our version would pass here and fail on the cluster.
-KUBERNETES_VERSION="$(sed -n 's|.*kindest/node:v\([0-9][0-9.]*\)@.*|\1|p' "${REPO_ROOT}/infra/terraform/kind_cluster/variables.tf")"
+KUBERNETES_VERSION="${FLUX_VALIDATE_KUBERNETES_VERSION:-$(sed -n 's|.*kindest/node:v\([0-9][0-9.]*\)@.*|\1|p' "${REPO_ROOT}/infra/terraform/kind_cluster/variables.tf")}"
 [[ -n "${KUBERNETES_VERSION}" ]] || fail "cannot read the Kubernetes version from kind's node image (infra/terraform/kind_cluster/variables.tf)"
+echo "[flux-validate] Kubernetes ${KUBERNETES_VERSION}"
+
+# -ignore-missing-schemas is needed for the CRDs whose schemas we do not have (Kyverno, CNPG, the
+# monitoring stack, ...) - but it also skips an object whose API the Kubernetes version REMOVED: no
+# schema, so "skipped", exit 0. Kubernetes' own API groups always have schemas, so for them a missing
+# schema means a removed (or misspelled) API. They are checked a second time without the flag.
+BUILTIN_GROUPS='^(|apps|batch|autoscaling|policy|extensions|authentication\.k8s\.io|authorization\.k8s\.io|networking\.k8s\.io|rbac\.authorization\.k8s\.io|storage\.k8s\.io|admissionregistration\.k8s\.io|apiextensions\.k8s\.io|scheduling\.k8s\.io|coordination\.k8s\.io|discovery\.k8s\.io|node\.k8s\.io|flowcontrol\.apiserver\.k8s\.io|certificates\.k8s\.io|events\.k8s\.io|resource\.k8s\.io|apiregistration\.k8s\.io)$'
 kubeconform_config=(-strict -ignore-missing-schemas -kubernetes-version "${KUBERNETES_VERSION}" -schema-location default)
 if [[ ${run_kubeconform} -eq 1 ]]; then
   ensure_flux_schemas
@@ -268,6 +283,14 @@ for dir in ${TARGET_DIRS[@]+"${TARGET_DIRS[@]}"}; do
   if [[ ${run_kubeconform} -eq 1 ]]; then
     if ! printf '%s\n' "${rendered}" | kubeconform "${kubeconform_flags[@]}" "${kubeconform_config[@]}"; then
       echo "[flux-validate] FAILED schema validation for ${rel_dir}" >&2
+      failed=1
+      continue
+    fi
+    # Kubernetes' own APIs once more, without -ignore-missing-schemas (probe_config): a removed API fails.
+    builtin="$(printf '%s\n' "${rendered}" | yq "select(.apiVersion != null and ((.apiVersion | split(\"/\") | .[:-1] | join(\"/\")) | test(\"${BUILTIN_GROUPS}\")))")"
+    if [[ -n "${builtin}" ]] && ! builtin_out="$(printf '%s\n' "${builtin}" | kubeconform "${kubeconform_flags[@]}" "${probe_config[@]}" 2>&1)"; then
+      echo "[flux-validate] FAILED ${rel_dir}: a Kubernetes API that ${KUBERNETES_VERSION} does not serve" >&2
+      grep -v '^Summary' <<<"${builtin_out}" >&2 || true
       failed=1
       continue
     fi
