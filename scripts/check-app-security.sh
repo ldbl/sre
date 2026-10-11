@@ -13,7 +13,8 @@
 #   - every app container waits before it stops: lifecycle.preStop.sleep of at least MIN_PRESTOP
 #     seconds, shorter than the pod's grace period. A stopping pod is removed from the Service's
 #     endpoints and from Traefik while it already shuts down; without the wait it refuses requests
-#     still sent to it (a rollout on kind: 14-25 failed requests without, 0-3 with - Chapter 20)
+#     still sent to it. Measured on kind (Chapter 20): the wait removed the frontend's failures and
+#     the backend's refused connections; a few backend timeouts remained, with 5 s and with 10 s
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
 #     "false" in production
@@ -46,7 +47,7 @@ overlays=(
 )
 
 failures=()
-MIN_PRESTOP=5   # seconds; measured on kind: 5 removed the refused requests, 10 did not do better
+MIN_PRESTOP=5   # seconds; on kind 10 s did no better than 5 s
 
 # The only accepted CHAOS_ENABLED per backend overlay (a case, not an associative array: macOS /bin/bash is 3.2).
 expected_chaos_for() {
@@ -115,6 +116,10 @@ for overlay in "${overlays[@]}"; do
   while IFS=$'\t' read -r dep container sleep grace; do
     [[ -n "${dep}" && "${dep}" != "---" ]] || continue   # yq separates the documents with ---
     where="${overlay}: Deployment ${dep} container ${container}"
+    if [[ ! "${grace}" =~ ^[0-9]+$ ]]; then
+      failures+=("${where}: terminationGracePeriodSeconds must be a whole number of seconds (got: ${grace})")
+      continue
+    fi
     if [[ ! "${sleep}" =~ ^[0-9]+$ ]] || ((sleep < MIN_PRESTOP)); then
       failures+=("${where}: lifecycle.preStop.sleep.seconds must be at least ${MIN_PRESTOP} (got: ${sleep})")
     elif ((sleep >= grace)); then
