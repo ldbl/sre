@@ -20,9 +20,18 @@ terraform plan        # read every replace/destroy before you apply
 terraform apply
 ```
 
-- A new `kind_node_image` **recreates the cluster** (`kind_cluster.sre must be replaced`). Flux, the
-  kubeconfig merge and the FluxInstance run again on the new cluster (`replace_triggered_by`), and
-  the generated passwords stay the same (`random_password` is not replaced).
+- A new `kind_node_image` means a **new cluster**, and that is a destroy, then an apply - not one
+  plan. The Kubernetes and Helm providers are configured from the cluster being replaced: in one plan
+  they have no address, and refreshing the objects in the old cluster fails with `connection refused`
+  on `localhost` (seen on the v1.36 -> v1.37 upgrade, 2026-10-11). So:
+
+  ```bash
+  make kind-destroy                  # the lab's databases and MinIO data go with it; age.agekey stays
+  make kind-plan && make kind-apply  # expect: everything to add, nothing to change or destroy
+  ```
+
+  The generated passwords are new (their `random_password` goes with the state); Flux rebuilds
+  everything else from your fork.
 - A new `flux_operator_version` or `flux_version` re-applies the operator or the FluxInstance.
 - After the apply: `flux get kustomizations -A` (all Ready), `make smoke-test` (9/9), and
   `terraform plan -detailed-exitcode` returns `0`.
