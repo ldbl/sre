@@ -51,6 +51,13 @@ spec:
             teamNameField: slug
       oauth2:
         skipApprovalScreen: true
+      # How fast taking access away works. The API server trusts an ID token until it expires - it
+      # cannot be revoked. Dex's default is 24h: someone removed from the GitHub team kept kubectl
+      # access for up to a day. With 1h, kubelogin refreshes every hour, and on refresh Dex reads the
+      # person's teams from GitHub again (connector/github Refresh): out of the team, no group, no
+      # role. Removal now takes effect within an hour (Chapter 21).
+      expiry:
+        idTokens: 1h
       staticClients:
         - id: headlamp
           name: Headlamp
