@@ -40,6 +40,15 @@ spec:
       - name: frontend
         image: frontend:latest  # name/tag set by the environment overlay (images: transformer)
         imagePullPolicy: IfNotPresent
+        # Stopping, the pod is removed from the Service's endpoints and from Traefik - but not at once,
+        # while the container already gets SIGTERM. The sleep keeps it serving until they have caught
+        # up; then the app shuts down. Measured on kind (a rollout, ~115 requests/s): without it 14-25
+        # failed requests (refused, or 502 from Traefik), with it 0-3 (Chapter 20). The kubelet's own
+        # sleep - no shell in the image needed. 5 s + the app's shutdown fit in the 30 s grace period.
+        lifecycle:
+          preStop:
+            sleep:
+              seconds: 5
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
