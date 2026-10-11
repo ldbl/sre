@@ -28,7 +28,10 @@ workers_count       = 1
 # ─── K3s & OS Upgrades ──────────────────────────────────────────────────────
 k3s_channel = "stable"
 # renovate: datasource=github-releases depName=k3s-io/k3s versioning=regex:^v(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)\+k3s(?<build>\d+)$
-k3s_version = "v1.37.1+k3s1" # pinned: the same Kubernetes as the kind cluster
+# TEMPORARY (2026-10): v1.37.0 so the Hetzner cycle can test an in-place upgrade - the next pull request
+# moves it back to v1.37.1 and an apply upgrades the running nodes (Chapter 20). kind runs 1.36 until its
+# provider supports 1.37 (kind_cluster/variables.tf).
+k3s_version = "v1.37.0+k3s1"
 # Nothing on the nodes moves by itself: k3s changes through k3s_version in a pull request, OS updates
 # and reboots through scripts/node-maintenance.sh at a time we choose. With one worker, a reboot kured
 # chose would be an outage nobody planned. Monthly is the intended cadence; the Renovate dashboard issue is the reminder.
