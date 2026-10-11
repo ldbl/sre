@@ -65,6 +65,9 @@ run_case "an unknown class" fail "${E}.class = \"password\""
 # The provider's own end date.
 run_case "expires in 30 days" pass "${E}.expires = \"2026-11-10\""
 run_case "expires in 10 days" fail "${E}.expires = \"2026-10-21\""
+run_case "expires on the rotation due date" pass "${E}.expires = \"2026-11-30\""
+run_case "expires after the rotation is due" fail "${E}.expires = \"2026-12-01\""
+run_case "a key may expire up to 180 days after rotation" pass "${E}.class = \"key\" | ${E}.expires = \"2027-02-28\""
 # A leaked value is due at once - unless replaced after the leak.
 run_case "exposed, not replaced since" fail "${E}.exposed = \"2026-09-20\""
 run_case "exposed, replaced after" pass "${E}.exposed = \"2026-08-20\""

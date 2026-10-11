@@ -10,7 +10,8 @@
 #   - token and key: rotated - a real date, not in the future. Due 90 (token) or 180 (key) days later;
 #     the check fails WARN_DAYS before that, so there are two weeks to do it. cluster: no rotated -
 #     the credential lives and dies with the cluster;
-#   - expires (optional, the provider's own end date): fails WARN_DAYS before it too;
+#   - expires (optional, the provider's own end date): fails WARN_DAYS before it too, and when it is
+#     later than the rotation due date - the provider's end is the backstop if our reminder fails;
 #   - exposed (optional): a value seen by someone who should not have it is due at once - fails until
 #     rotated is after that day;
 #   - accepted (optional) {until, reason}: holds back an overdue or exposed failure until `until`, at
@@ -118,6 +119,7 @@ for ((i = 0; i < count; i++)); do
   expires="$(field expires)"
   exposed="$(field exposed)"
   due_now=()   # failures that an accepted entry may hold back
+  due=""       # the day our own rotation is due (token and key)
   case "${class}" in
     token | key)
       [[ "${class}" == token ]] && days=90 || days=180
@@ -146,6 +148,10 @@ for ((i = 0; i < count; i++)); do
       failures+=("${where}: expires must be a real date, YYYY-MM-DD (got '${expires}')")
     elif [[ ! "${expires}" > "${SOON}" ]]; then
       failures+=("${where}: the provider ends it on ${expires} - replace it before then")
+    elif [[ -n "${due}" && "${expires}" > "${due}" ]]; then
+      # The provider's end is the backstop when our own reminder fails (a disabled scheduled workflow,
+      # a missed e-mail): it must not outlive the rotation date.
+      failures+=("${where}: expires ${expires}, after its rotation is due (${due}) - create it with an expiry by ${due}")
     fi
   fi
   if [[ -n "${exposed}" ]]; then
