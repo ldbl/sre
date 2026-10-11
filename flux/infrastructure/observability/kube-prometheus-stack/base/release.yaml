@@ -73,6 +73,12 @@ spec:
       persistence:
         enabled: true
         size: 5Gi
+      # One ReadWriteOnce volume holds Grafana's SQLite database. A rolling update starts the new Grafana
+      # next to the old one on the same database: on the 12 -> 13 upgrade the new one migrated it while
+      # the old one still served from it, and both failed. Recreate stops the old pod first - a short
+      # gap in the dashboards instead of two writers on one database.
+      deploymentStrategy:
+        type: Recreate
       # Grafana 13 registers its API groups and runs storage migrations at start: at a 100m limit it took
       # over the liveness probe's 160 s and was restarted in a loop, and it uses ~230Mi once up (measured
       # on kind). The CPU limit is for the start; at rest it uses little.
