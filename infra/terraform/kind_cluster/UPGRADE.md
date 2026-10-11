@@ -6,9 +6,9 @@ Every version this module installs is pinned, so a rebuild gives the same cluste
 |---|---|---|
 | Terraform providers | `main.tf` (`required_providers`) | kind ~> 0.11, helm ~> 3.3, kubernetes ~> 3.2, null, random, local, time |
 | Kubernetes | `variables.tf` `kind_node_image` | `kindest/node:v1.36.4@sha256:...` (same minor as k3s on Hetzner) |
-| Flux Operator | `variables.tf` `flux_operator_version` | `0.60.0` (install.yaml of that GitHub release) |
-| Flux | `variables.tf` `flux_version` | `2.9.5` |
-| Traefik chart | `variables.tf` `traefik_chart_version` | `41.6.0` |
+| Flux Operator | `variables.tf` `flux_operator_version` | `0.61.0` (install.yaml of that GitHub release) |
+| Flux | `variables.tf` `flux_version` | `2.9.6` |
+| Traefik chart | `variables.tf` `traefik_chart_version` | `41.7.1` |
 | metrics-server chart | `variables.tf` `metrics_server_chart_version` | `3.14.0` |
 
 To upgrade one of them: change the default (or set it in `terraform.tfvars`), then plan, read, apply:

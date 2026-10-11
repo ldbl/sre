@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   guard:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Confirm destroy string
         env:
@@ -37,7 +37,7 @@ jobs:
           }
 
   destroy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: guard
     # Approval: the "production" environment requires a reviewer (Settings > Environments). The job
     # waits in the run page ("Review deployments") - no issue, no third-party action with a token.
@@ -55,7 +55,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          terraform_version: "1.16.4"
+          terraform_version: "1.16.5"
 
       - name: Load the node SSH key into ssh-agent
         env:

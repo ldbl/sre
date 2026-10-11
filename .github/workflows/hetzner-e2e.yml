@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Required secrets and variables are set
         env:
@@ -63,7 +63,7 @@ jobs:
           exit "$missing"
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: preflight
     timeout-minutes: 120
     # Approval: the "production" environment requires a reviewer (Settings > Environments). The job
@@ -102,14 +102,14 @@ jobs:
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       - name: Setup flux CLI
-        uses: fluxcd/flux2/action@dd233c4fadef306a62b7893204f8e3817fecc2b2 # v2.9.5
+        uses: fluxcd/flux2/action@b9c17924adb533d3617ec7de97a7b0f4acc07b39 # v2.9.6
         with:
-          version: 2.9.5
+          version: 2.9.6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          terraform_version: "1.16.4"
+          terraform_version: "1.16.5"
           terraform_wrapper: false
 
       - name: Load the node SSH key into ssh-agent

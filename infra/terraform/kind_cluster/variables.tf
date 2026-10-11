@@ -41,14 +41,14 @@ variable "flux_operator_version" {
   description = "Flux Operator release to install (install.yaml from its GitHub release)."
   type        = string
   # renovate: datasource=github-releases depName=controlplaneio-fluxcd/flux-operator
-  default = "0.60.0"
+  default = "0.61.0"
 }
 
 variable "flux_version" {
   description = "Flux version the FluxInstance installs. Pinned, so a rebuild gets the same Flux."
   type        = string
   # renovate: datasource=github-releases depName=fluxcd/flux2
-  default = "2.9.5"
+  default = "2.9.6"
 }
 
 # ─── Credentials (all optional for the public course repository) ────────────
@@ -203,7 +203,7 @@ variable "traefik_chart_version" {
   description = "Traefik Helm chart version."
   type        = string
   # renovate: datasource=helm depName=traefik registryUrl=https://traefik.github.io/charts
-  default = "41.6.0"
+  default = "41.7.1"
 }
 
 variable "metrics_server_chart_version" {

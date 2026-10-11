@@ -39,7 +39,7 @@ jobs:
   # Does this run concern the Hetzner Terraform? Pushes to main come here only through the path filter
   # above and manual runs always do; a pull request does when it changes these paths.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       terraform: ${{ steps.diff.outputs.terraform }}
     steps:
@@ -71,7 +71,7 @@ jobs:
   plan:
     needs: changes
     if: needs.changes.outputs.terraform == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Job-level, not workflow-level: a pull request without Terraform changes must not wait in the
     # queue that the plans, the applies, the destroy and the e2e check share (never two runs on the
     # same state).
@@ -105,7 +105,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          terraform_version: "1.16.4"
+          terraform_version: "1.16.5"
           terraform_wrapper: false
 
       - name: Terraform fmt
@@ -232,7 +232,7 @@ jobs:
 
       - name: Upload encrypted tfplan
         if: env.APPLY == 'true' && steps.plan.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: terraform-hcloud-tfplan
           path: |
@@ -242,7 +242,7 @@ jobs:
           retention-days: 1
 
   apply:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: plan
     if: github.event_name == 'workflow_dispatch' && inputs.apply && github.ref == 'refs/heads/main' && needs.plan.outputs.has_changes == 'true'
     # Approval: the "production" environment requires a reviewer (Settings > Environments). The job
@@ -271,7 +271,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          terraform_version: "1.16.4"
+          terraform_version: "1.16.5"
 
       - name: Load the node SSH key into ssh-agent
         env:
@@ -291,7 +291,7 @@ jobs:
         run: terraform init -input=false
 
       - name: Download tfplan artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: terraform-hcloud-tfplan
           path: infra/terraform/hcloud_cluster
@@ -340,7 +340,7 @@ jobs:
   terraform-plan-gate:
     needs: [changes, plan]
     if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Plan result
         env:

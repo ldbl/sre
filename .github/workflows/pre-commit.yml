@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   hooks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -35,7 +35,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          terraform_version: "1.16.4"
+          terraform_version: "1.16.5"
           terraform_wrapper: false
 
       - name: Setup kubectl
@@ -77,7 +77,7 @@ jobs:
       - name: Setup promtool
         env:
           # renovate: datasource=github-releases depName=prometheus/prometheus
-          PROMETHEUS_VERSION: "3.9.1"
+          PROMETHEUS_VERSION: "3.11.0"
           PROMETHEUS_SHA256: "86a6999dd6aacbd994acde93c77cfa314d4be1c8e7b7c58f444355c77b32c584"
         run: |
           archive="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
