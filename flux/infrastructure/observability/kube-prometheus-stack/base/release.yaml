@@ -7,16 +7,22 @@ metadata:
 spec:
   interval: 30m
   timeout: 10m
+  # The chart's CRDs (prometheus-operator) are in its crds/ directory, which Helm installs once and never
+  # upgrades. A major version of this chart usually brings a new operator that needs its new CRDs
+  # (UPGRADE.md: "update the CRDs before applying the upgrade"). CreateReplace makes Flux apply them on
+  # every install and upgrade - the CRDs move with the chart, in the same pull request.
   install:
+    crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
+    crds: CreateReplace
     remediation:
       retries: 3
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: "82.18.0"
+      version: "92.3.0"
       sourceRef:
         kind: HelmRepository
         name: prometheus-community
@@ -67,13 +73,16 @@ spec:
       persistence:
         enabled: true
         size: 5Gi
+      # Grafana 13 registers its API groups and runs storage migrations at start: at a 100m limit it took
+      # over the liveness probe's 160 s and was restarted in a loop, and it uses ~230Mi once up (measured
+      # on kind). The CPU limit is for the start; at rest it uses little.
       resources:
         requests:
-          cpu: 10m
-          memory: 64Mi
+          cpu: 50m
+          memory: 192Mi
         limits:
-          cpu: 100m
-          memory: 256Mi
+          cpu: "1"
+          memory: 512Mi
       # Default dashboards
       defaultDashboardsEnabled: true
       defaultDashboardsTimezone: UTC
