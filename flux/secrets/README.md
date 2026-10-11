@@ -50,8 +50,11 @@ environment only isolate anything when each environment has its own cluster.
 | `sops-encrypted` (`scripts/check-sops-encrypted.sh`) | pre-commit + CI | a file under `flux/secrets/` without SOPS metadata, or with a plaintext value added by hand |
 | `no-secrets` (`scripts/block-secrets.sh`) | pre-commit + CI | files named `kubeconfig` / `kubeconfig.yaml`, `*.key`, `*.pem`, `credentials*` (name starts with `credentials`), `*.env` / `*.env.*` - anywhere in the repository, `*.example` excepted |
 
-CI (`.github/workflows/secrets-guard.yml`) runs both on every pull request and push to `main`,
-because `git commit --no-verify` skips the local hooks.
+| `credentials` (`scripts/check-credentials.sh`) | pre-commit + CI + daily | a file here that is not in the credential registry (`docs/credential-registry.yaml`), or a credential due for rotation |
+
+CI (`.github/workflows/secrets-guard.yml`) runs the first two on every pull request and push to `main`,
+because `git commit --no-verify` skips the local hooks. Every value here is also a credential in
+`docs/credential-registry.yaml`, with its rotation runbook in `docs/credential-rotation.md`.
 
 ## Create, edit, view
 
@@ -72,11 +75,12 @@ Never add a value to an encrypted file with a plain text editor: sops then refus
 at all, and the `sops-encrypted` check rejects it. Delete the line and add the value with `sops edit`.
 
 **A changed Secret does not restart anything.** Flux updates the Secret object; pods that read it as
-environment variables keep the old value until they restart:
-
-```bash
-kubectl -n develop rollout restart deployment/backend
-```
+environment variables keep the old value until they restart. Restart them through Git, in the same
+pull request: set `safeops.io/secrets-rotated` on the reader's pod template to the current UTC time
+(`date -u +%FT%TZ`; the backend: `flux/apps/backend/<env>/kustomization.yaml`), and Flux rolls the pods
+like any release. Not `kubectl rollout restart`: it adds an annotation that is not in Git, and Flux
+removes that annotation on its next reconcile - mid-rollout, the old pods stay, with the old value
+(`docs/credential-rotation.md`).
 
 ## Troubleshooting
 

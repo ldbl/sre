@@ -18,6 +18,20 @@ images:
     newName: ${image_registry}/backend
     newTag: staging-v0.0.0-a3b31ee-1791655990 # {"$imagepolicy": "staging:backend:tag"}
 patches:
+  # The backend reads backend-secrets and app-postgres-app as env vars, once, at start. A rotation sets
+  # this to the current UTC time (date -u +%FT%TZ) in the same pull request as the Secret: the pod template changes, and Flux rolls the pods
+  # like any release. Not `kubectl rollout restart` - Flux removes its annotation on the next reconcile
+  # and, mid-rollout, keeps the old pods with the old value (docs/credential-rotation.md).
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+      spec:
+        template:
+          metadata:
+            annotations:
+              safeops.io/secrets-rotated: "2026-09-26T00:00:00Z"
   # Chaos labs (Ch11/13/14/15/19) use /panic and the probe toggles here. Production keeps the base: off.
   - patch: |-
       apiVersion: apps/v1

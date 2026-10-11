@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: k8s-ai-monitor
+      # The token and keys are read as env vars at start. Rotating the Secret sets this to the current UTC
+      # time (date -u +%FT%TZ) in a pull request, so Flux rolls the pod - not `kubectl rollout restart`, which Flux undoes (README).
+      annotations:
+        safeops.io/secrets-rotated: "2026-09-26T00:00:00Z"
     spec:
       serviceAccountName: k8s-ai-monitor
       securityContext:
