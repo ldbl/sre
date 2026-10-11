@@ -52,6 +52,16 @@ spec:
         object.kind == 'Pod' ? object.spec
         : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
         : object.spec.template.spec
+    # An UPDATE that leaves the spec as it was - a label, an annotation, a finalizer removed. It is let
+    # through: ClusterPolicy did the same (allowExistingViolations), and refusing it would leave a pod
+    # that already breaks the rule - one admitted before the rule, or under an exception that has since
+    # expired - unable to get a label or lose a finalizer, stuck in Terminating. A changed spec, an
+    # added ephemeral container and every CREATE are checked; the background scan still reports the
+    # existing violation (it has no request, so this is false there).
+    - name: metadataOnly
+      expression: >-
+        request.?operation.orValue('') == 'UPDATE' && oldObject != null && has(oldObject.spec)
+        && object.spec == oldObject.spec
     # Every container (init containers included) without a CPU or memory request or limit.
     - name: missing
       expression: >-
@@ -59,7 +69,7 @@ spec:
         .filter(c, !['cpu', 'memory'].all(r,
           r in c.?resources.?requests.orValue({}) && r in c.?resources.?limits.orValue({}))).map(c, c.name)
   validations:
-    - expression: size(variables.missing) == 0
+    - expression: variables.metadataOnly || size(variables.missing) == 0
       messageExpression: >-
         'CPU and memory requests and limits are required for all containers and init containers.
         Missing in: ' + variables.missing.join(', ')
@@ -107,6 +117,16 @@ spec:
         object.kind == 'Pod' ? object.spec
         : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
         : object.spec.template.spec
+    # An UPDATE that leaves the spec as it was - a label, an annotation, a finalizer removed. It is let
+    # through: ClusterPolicy did the same (allowExistingViolations), and refusing it would leave a pod
+    # that already breaks the rule - one admitted before the rule, or under an exception that has since
+    # expired - unable to get a label or lose a finalizer, stuck in Terminating. A changed spec, an
+    # added ephemeral container and every CREATE are checked; the background scan still reports the
+    # existing violation (it has no request, so this is false there).
+    - name: metadataOnly
+      expression: >-
+        request.?operation.orValue('') == 'UPDATE' && oldObject != null && has(oldObject.spec)
+        && object.spec == oldObject.spec
     # Every container (init containers included) without a CPU or memory request or limit.
     - name: missing
       expression: >-
@@ -114,7 +134,7 @@ spec:
         .filter(c, !['cpu', 'memory'].all(r,
           r in c.?resources.?requests.orValue({}) && r in c.?resources.?limits.orValue({}))).map(c, c.name)
   validations:
-    - expression: size(variables.missing) == 0
+    - expression: variables.metadataOnly || size(variables.missing) == 0
       messageExpression: >-
         'CPU and memory requests and limits are required for all containers and init containers.
         Missing in: ' + variables.missing.join(', ')

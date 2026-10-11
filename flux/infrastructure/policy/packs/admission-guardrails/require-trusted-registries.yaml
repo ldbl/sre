@@ -53,6 +53,16 @@ spec:
         object.kind == 'Pod' ? object.spec
         : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
         : object.spec.template.spec
+    # An UPDATE that leaves the spec as it was - a label, an annotation, a finalizer removed. It is let
+    # through: ClusterPolicy did the same (allowExistingViolations), and refusing it would leave a pod
+    # that already breaks the rule - one admitted before the rule, or under an exception that has since
+    # expired - unable to get a label or lose a finalizer, stuck in Terminating. A changed spec, an
+    # added ephemeral container and every CREATE are checked; the background scan still reports the
+    # existing violation (it has no request, so this is false there).
+    - name: metadataOnly
+      expression: >-
+        request.?operation.orValue('') == 'UPDATE' && oldObject != null && has(oldObject.spec)
+        && object.spec == oldObject.spec
     # Every image not from a trusted source. A reference is compared as registry/repository, without
     # the tag or digest; ${image_registry} and ghcr.io/cloudnative-pg are trusted with everything below
     # them, the Docker Hub images by exact repository.
@@ -65,7 +75,7 @@ spec:
           && !(image(i).registry() == 'index.docker.io'
                && image(i).repository() in ['library/busybox', 'library/postgres', 'curlimages/curl']))
   validations:
-    - expression: size(variables.untrusted) == 0
+    - expression: variables.metadataOnly || size(variables.untrusted) == 0
       messageExpression: >-
         'Images must come from ${image_registry}/*, ghcr.io/cloudnative-pg/* or be one of the lab images
         (docker.io busybox, postgres, curlimages/curl). Not trusted here: ' + variables.untrusted.join(', ')
@@ -113,6 +123,16 @@ spec:
         object.kind == 'Pod' ? object.spec
         : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
         : object.spec.template.spec
+    # An UPDATE that leaves the spec as it was - a label, an annotation, a finalizer removed. It is let
+    # through: ClusterPolicy did the same (allowExistingViolations), and refusing it would leave a pod
+    # that already breaks the rule - one admitted before the rule, or under an exception that has since
+    # expired - unable to get a label or lose a finalizer, stuck in Terminating. A changed spec, an
+    # added ephemeral container and every CREATE are checked; the background scan still reports the
+    # existing violation (it has no request, so this is false there).
+    - name: metadataOnly
+      expression: >-
+        request.?operation.orValue('') == 'UPDATE' && oldObject != null && has(oldObject.spec)
+        && object.spec == oldObject.spec
     # Every image not from a trusted source. A reference is compared as registry/repository, without
     # the tag or digest; ${image_registry} and ghcr.io/cloudnative-pg are trusted with everything below
     # them, the Docker Hub images by exact repository.
@@ -125,7 +145,7 @@ spec:
           && !(image(i).registry() == 'index.docker.io'
                && image(i).repository() in ['library/busybox', 'library/postgres', 'curlimages/curl']))
   validations:
-    - expression: size(variables.untrusted) == 0
+    - expression: variables.metadataOnly || size(variables.untrusted) == 0
       messageExpression: >-
         'Images must come from ${image_registry}/*, ghcr.io/cloudnative-pg/* or be one of the lab images
         (docker.io busybox, postgres, curlimages/curl). Not trusted here: ' + variables.untrusted.join(', ')

@@ -41,8 +41,8 @@ results:
   - {policy: require-trusted-registries-enforce, kind: Pod, resources: [lab-images, tag-digest], result: pass}
   - {policy: require-trusted-registries-enforce, kind: Pod, resources: [registry-untrusted, registry-dockerhub-other, registry-untrusted-init, vendor-agent-elsewhere], result: fail}
 
-  # Privileged: in a container or an init container.
-  - {policy: disallow-privileged-containers-enforce, kind: Pod, resources: [privileged, privileged-init], result: fail}
+  # Privileged: in a container, an init container or an ephemeral one (kubectl debug --profile=sysadmin).
+  - {policy: disallow-privileged-containers-enforce, kind: Pod, resources: [privileged, privileged-init, privileged-ephemeral], result: fail}
 
   # Security context: runAsNonRoot per pod or per container; missing, turned off, or escalation allowed fails.
   - {policy: require-security-context-enforce, kind: Pod, resources: [nonroot-per-container], result: pass}

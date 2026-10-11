@@ -1,7 +1,8 @@
 # A privileged container has the host's devices and kernel capabilities - one escape from it is an
 # escape from the node. Init containers are checked too: they run with the same privileges, only
-# earlier. In the application namespaces Pod Security "restricted" (Chapter 07) refuses this as well;
-# Kyverno adds the PolicyReport in the namespaces Pod Security does not restrict.
+# earlier - and ephemeral ones: `kubectl debug --profile=sysadmin` adds exactly such a container to a
+# running pod. In the application namespaces Pod Security "restricted" (Chapter 07) refuses this as
+# well; Kyverno adds the PolicyReport in the namespaces Pod Security does not restrict.
 #
 # Two copies, identical but for the name, the action, the failure policy and the namespace operator
 # (tests/kyverno-policies.test.sh fails when they drift apart):
@@ -51,15 +52,26 @@ spec:
         object.kind == 'Pod' ? object.spec
         : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
         : object.spec.template.spec
-    # Every container (init containers included) that sets privileged: true.
+    # An UPDATE that leaves the spec as it was - a label, an annotation, a finalizer removed. It is let
+    # through: ClusterPolicy did the same (allowExistingViolations), and refusing it would leave a pod
+    # that already breaks the rule - one admitted before the rule, or under an exception that has since
+    # expired - unable to get a label or lose a finalizer, stuck in Terminating. A changed spec, an
+    # added ephemeral container and every CREATE are checked; the background scan still reports the
+    # existing violation (it has no request, so this is false there).
+    - name: metadataOnly
+      expression: >-
+        request.?operation.orValue('') == 'UPDATE' && oldObject != null && has(oldObject.spec)
+        && object.spec == oldObject.spec
+    # Every container (init and ephemeral containers included) that sets privileged: true.
     - name: privileged
       expression: >-
-        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]) + variables.podSpec.?ephemeralContainers.orValue([]))
         .filter(c, c.?securityContext.?privileged.orValue(false)).map(c, c.name)
   validations:
-    - expression: size(variables.privileged) == 0
+    - expression: variables.metadataOnly || size(variables.privileged) == 0
       messageExpression: >-
-        'Privileged containers (and init containers) are not allowed: ' + variables.privileged.join(', ')
+        'Privileged containers (init and ephemeral containers included) are not allowed: '
+        + variables.privileged.join(', ')
 ---
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
@@ -104,12 +116,23 @@ spec:
         object.kind == 'Pod' ? object.spec
         : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
         : object.spec.template.spec
-    # Every container (init containers included) that sets privileged: true.
+    # An UPDATE that leaves the spec as it was - a label, an annotation, a finalizer removed. It is let
+    # through: ClusterPolicy did the same (allowExistingViolations), and refusing it would leave a pod
+    # that already breaks the rule - one admitted before the rule, or under an exception that has since
+    # expired - unable to get a label or lose a finalizer, stuck in Terminating. A changed spec, an
+    # added ephemeral container and every CREATE are checked; the background scan still reports the
+    # existing violation (it has no request, so this is false there).
+    - name: metadataOnly
+      expression: >-
+        request.?operation.orValue('') == 'UPDATE' && oldObject != null && has(oldObject.spec)
+        && object.spec == oldObject.spec
+    # Every container (init and ephemeral containers included) that sets privileged: true.
     - name: privileged
       expression: >-
-        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]) + variables.podSpec.?ephemeralContainers.orValue([]))
         .filter(c, c.?securityContext.?privileged.orValue(false)).map(c, c.name)
   validations:
-    - expression: size(variables.privileged) == 0
+    - expression: variables.metadataOnly || size(variables.privileged) == 0
       messageExpression: >-
-        'Privileged containers (and init containers) are not allowed: ' + variables.privileged.join(', ')
+        'Privileged containers (init and ephemeral containers included) are not allowed: '
+        + variables.privileged.join(', ')

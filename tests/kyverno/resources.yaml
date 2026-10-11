@@ -573,6 +573,34 @@ spec:
         requests: {cpu: 10m, memory: 32Mi}
         limits: {cpu: 100m, memory: 64Mi}
 ---
+# kubectl debug --profile=sysadmin: a privileged ephemeral container added to a compliant pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-ephemeral
+  namespace: develop
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: ghcr.io/safeops-course/backend:develop-v0.0.0-abc1234-1791000000
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests: {cpu: 50m, memory: 64Mi}
+        limits: {cpu: 200m, memory: 128Mi}
+  ephemeralContainers:
+    - name: debugger
+      image: busybox:1.37
+      securityContext:
+        privileged: true
+---
 # The same checks through a CronJob: the pod spec sits three levels deeper (jobTemplate).
 apiVersion: batch/v1
 kind: CronJob
