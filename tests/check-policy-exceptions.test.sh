@@ -74,7 +74,7 @@ run_case "two policies in one exception" fail "${R} += [{\"name\": \"disallow-la
 run_case "no policy" fail "${R} = []"
 run_case "a policy that does not exist (typo)" fail "${R}[0].name = \"require-trusted-registry-enforce\""
 run_case "the audit copy of a guardrail" pass "${R}[0].name = \"require-trusted-registries-audit\""
-run_case "an ImageValidatingPolicy" pass "${R}[0] = {\"name\": \"verify-images-enforce\", \"kind\": \"ImageValidatingPolicy\"}"
+run_case "the supply-chain policy (Chapter 17: never excepted)" fail "${R}[0] = {\"name\": \"verify-images-enforce\", \"kind\": \"ImageValidatingPolicy\"}"
 run_case "the right name with the wrong kind" fail "${R}[0].kind = \"ImageValidatingPolicy\""
 run_case "an image allow-list on top" fail '.spec.images = ["quay.io/*"]'
 

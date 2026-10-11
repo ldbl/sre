@@ -12,8 +12,9 @@ everything else stays under the guardrail. This directory is the only way one re
   - `metadata.namespace: policy-exceptions`;
   - the annotations `safeops.io/owner` and `safeops.io/reason` (a link to the issue or incident);
   - `spec.expiresAt` (`2026-12-31T00:00:00Z`, UTC), in the future and at most 90 days ahead;
-  - one `policyRefs` entry naming a policy that exists in `../packs/` - for a guardrail, the copy
-    that judges the namespace (`<name>-enforce` for `develop`/`staging`/`production`);
+  - one `policyRefs` entry naming a guardrail policy that exists in `../packs/admission-guardrails/` -
+    the copy that judges the namespace (`<name>-enforce` for `develop`/`staging`/`production`). The
+    supply-chain policies (Chapter 17) take no exceptions: an unverifiable image is rebuilt;
   - one `matchConditions` entry in this form, and nothing else in `spec`:
     ```
     object.metadata.namespace == 'develop' && object.metadata.name == 'vendor-agent'

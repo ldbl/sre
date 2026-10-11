@@ -11,8 +11,10 @@
 #   - the annotations safeops.io/owner and safeops.io/reason;
 #   - spec.expiresAt (RFC 3339, UTC: 2026-12-31T00:00:00Z) in the future and at most MAX_DAYS ahead.
 #     Kyverno stops applying an exception at that moment; this check makes the date exist and short;
-#   - exactly one policyRefs entry, naming a ValidatingPolicy or ImageValidatingPolicy that exists in
-#     flux/infrastructure/policy/packs/ - a typo would except nothing and look as if it did;
+#   - exactly one policyRefs entry, naming a ValidatingPolicy of the admission guardrails
+#     (flux/infrastructure/policy/packs/admission-guardrails/) that exists - a typo would except nothing
+#     and look as if it did. Not the supply-chain policies (Chapter 17): an image that cannot be
+#     verified is rebuilt by its pipeline, never excepted;
 #   - exactly one matchCondition, in one fixed form - one literal namespace and one workload name or
 #     name prefix (a Deployment's pods are named <deployment>-<hash>-<id>):
 #       object.metadata.namespace == 'develop' && object.metadata.name == 'vendor-agent'
@@ -37,7 +39,7 @@ cd "${repo_root}"
 command -v yq >/dev/null || { echo "check-policy-exceptions: yq is required (make check-tools)" >&2; exit 1; }
 
 EXCEPTIONS_DIR="flux/infrastructure/policy/exceptions"
-PACKS_DIR="flux/infrastructure/policy/packs"
+GUARDRAILS_DIR="flux/infrastructure/policy/packs/admission-guardrails"
 MAX_DAYS=90
 NOW="${NOW:-$(date -u +%FT%TZ)}"
 TODAY="${NOW%%T*}"
@@ -62,9 +64,9 @@ is_calendar_date() {
 K8S_NAME="[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 MATCH_FORM="^object\.metadata\.namespace == '${K8S_NAME}' && object\.metadata\.name( == '[a-z0-9][-a-z0-9.]*'|\.startsWith\('[a-z0-9][-a-z0-9.]*'\))$"
 
-# Every "<kind>/<name>" a PolicyException may reference: the CEL policies of the packs.
-known_policies="$(find "${PACKS_DIR}" -name '*.yaml' -exec yq -N \
-  'select(.kind | test("^(Image)?ValidatingPolicy$")) | [.kind, .metadata.name] | join("/")' {} + | sort -u)"
+# Every "<kind>/<name>" a PolicyException may reference: the ValidatingPolicies of the admission guardrails.
+known_policies="$(find "${GUARDRAILS_DIR}" -name '*.yaml' -exec yq -N \
+  'select(.kind == "ValidatingPolicy") | [.kind, .metadata.name] | join("/")' {} + | sort -u)"
 
 failures=()
 checked=0
@@ -112,7 +114,7 @@ while IFS= read -r file; do
     else
       ref="$(yq '(.spec.policyRefs[0].kind // "") + "/" + (.spec.policyRefs[0].name // "")' <<<"${doc}")"
       grep -qxF -- "${ref}" <<<"${known_policies}" \
-        || failures+=("${where}: spec.policyRefs names ${ref}, which is not a ValidatingPolicy or ImageValidatingPolicy in ${PACKS_DIR}/")
+        || failures+=("${where}: spec.policyRefs names ${ref}, which is not a ValidatingPolicy in ${GUARDRAILS_DIR}/ (only the admission guardrails take exceptions)")
     fi
 
     # What it matches: one namespace, one workload - in the fixed form.
