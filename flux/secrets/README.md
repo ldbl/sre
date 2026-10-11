@@ -75,11 +75,11 @@ Never add a value to an encrypted file with a plain text editor: sops then refus
 at all, and the `sops-encrypted` check rejects it. Delete the line and add the value with `sops edit`.
 
 **A changed Secret does not restart anything.** Flux updates the Secret object; pods that read it as
-environment variables keep the old value until they restart:
-
-```bash
-kubectl -n develop rollout restart deployment/backend
-```
+environment variables keep the old value until they restart. Restart them through Git, in the same
+pull request: change the date of `safeops.io/secrets-rotated` on the reader's pod template (the
+backend: `flux/apps/backend/<env>/kustomization.yaml`), and Flux rolls the pods like any release.
+Not `kubectl rollout restart`: Flux removes the annotation it sets on the next reconcile - mid-rollout,
+the old pods stay, with the old value (`docs/credential-rotation.md`).
 
 ## Troubleshooting
 

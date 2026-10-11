@@ -42,7 +42,8 @@ spec:
   # initdb sets the owner's password only once. managed.roles keeps the app role's password equal to
   # the app-postgres-app Secret on every reconcile, so rotating the Secret (SOPS or Terraform) rotates
   # the database password too. The backend reads POSTGRES_PASSWORD as an env var at start: after a
-  # rotation, restart it (kubectl -n production rollout restart deploy/backend) or new connections fail.
+  # rotation, roll it through Git (safeops.io/secrets-rotated in flux/apps/backend/production) or new
+  # connections fail - not kubectl rollout restart, which Flux undoes (docs/credential-rotation.md).
   managed:
     roles:
       - name: app

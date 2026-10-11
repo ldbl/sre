@@ -16,8 +16,9 @@ editor).
    plan the short gap.
 2. **Update every place in `lives_in`.** A copy left behind keeps the old value alive - or breaks the
    first time it is used.
-3. **Make the users pick it up.** A changed Secret restarts nothing: pods that read it as environment
-   variables keep the old value until they restart (`kubectl rollout restart`).
+3. **Make the readers pick it up.** A changed Secret restarts nothing: pods that read it as environment
+   variables keep the old value until they restart - through Git, see
+   [Restarting the Readers](#restarting-the-readers).
 4. **Verify with the new value** - the check named in the section below.
 5. **Revoke the old value** at the provider. Until then the rotation has changed nothing for whoever
    holds the old one.
@@ -27,14 +28,34 @@ After a leak, do all of it at once, starting with the revocation if the holder c
 and treat every value the leaked credential could read as leaked too (the age key opens every SOPS
 file in the history: `flux/secrets/README.md#key-rotation`).
 
+## Restarting the Readers
+
+A workload Flux manages is restarted by a change in Git: the date in the annotation
+`safeops.io/secrets-rotated` on its pod template, in the same pull request as the Secret. The template
+changes, and Flux rolls the pods like any release - a new pod Ready before an old one goes.
+
+| Reader | Where the date lives |
+|---|---|
+| backend | `flux/apps/backend/<env>/kustomization.yaml` - the `secrets-rotated` patch |
+| k8s-ai-monitor | `flux/infrastructure/observability/k8s-ai-monitor/deployment.yaml` |
+| Dex, Headlamp, external-dns, OpenTelemetry collector | the HelmRelease's `spec.values.podAnnotations` |
+| origin-ca-issuer | the HelmRelease's `spec.values.controller.podAnnotations` |
+
+**Not `kubectl rollout restart`** on a Flux-managed Deployment. It sets an annotation that is not in
+Git, and Flux removes it on its next reconcile. If that reconcile comes while the rollout is still
+running, the new pods are scaled away and the old ones stay - with the old value, and nothing reports
+it (seen on kind, 2026-10-11). Kubernetes objects Flux does not manage - the Hetzner cloud controller
+and CSI driver in `kube-system` - are restarted with `kubectl rollout restart` as usual.
+
 ## Hetzner API Token
 
 1. Hetzner Console → the SafeOps project → **Security → API tokens → Generate** (Read & Write).
 2. `gh secret set HCLOUD_TOKEN --org safeops-course --visibility selected --repos sre` (paste at the
    prompt); the owner's context: `HCLOUD_CONFIG=~/sre/.local/hcloud-safeops.toml hcloud context create safeops`.
 3. **A cluster is running:** apply Terraform (the workflow with *apply*). kube-hetzner re-applies the
-   Secrets `kube-system/hcloud` and `hcloud-csi` when the token changes; then restart what reads them:
-   `kubectl -n kube-system get deploy,ds | grep hcloud` and `kubectl -n kube-system rollout restart` each.
+   Secrets `kube-system/hcloud` and `hcloud-csi` when the token changes; then restart what reads them
+   (kube-hetzner deploys them, not Flux): `kubectl -n kube-system get deploy,ds | grep hcloud` and
+   `kubectl -n kube-system rollout restart` each.
    **No cluster:** nothing else - the next one is created with the new token.
 4. Verify: `hcloud server list` works; on a running cluster the cloud controller logs no `401`.
 5. Delete the old token in the console.
@@ -95,9 +116,9 @@ each limited to its own bucket.
 A GitHub OAuth App holds two client secrets at once, so this rotation has no gap.
 
 1. Organization settings → Developer settings → OAuth Apps → *SafeOps Dex* → **Generate a new client secret**.
-2. `sops edit flux/secrets/auth/dex-secrets.yaml` → `DEX_GITHUB_CLIENT_SECRET`.
-3. Merge; Flux updates the Secret; `kubectl -n auth rollout restart deployment/dex` (it reads the
-   Secret as environment variables).
+2. `sops edit flux/secrets/auth/dex-secrets.yaml` → `DEX_GITHUB_CLIENT_SECRET`; in the same pull
+   request, the date in Dex's `podAnnotations` (it reads the Secret as environment variables).
+3. Merge; Flux updates the Secret and rolls Dex.
 4. Verify: `kubectl oidc-login` (or Headlamp) signs in through GitHub.
 5. Delete the old secret in the OAuth App.
 
@@ -109,9 +130,9 @@ the merge, DNS changes and certificate requests fail and are retried.
 
 1. Cloudflare → My Profile → **API Tokens** → the token → **Roll**.
 2. `sops edit` `flux/secrets/cloudflare/external-dns-cloudflare-api-token.yaml` or
-   `cloudflare-origin-ca-token.yaml` → `api-token`.
-3. Merge; restart the reader: `kubectl -n external-dns rollout restart deployment/external-dns` or
-   `kubectl -n cert-manager rollout restart deployment/origin-ca-issuer`.
+   `cloudflare-origin-ca-token.yaml` → `api-token`; in the same pull request, the date in the reader's
+   pod annotations (external-dns: `podAnnotations`; origin-ca-issuer: `controller.podAnnotations`).
+3. Merge; Flux updates the Secret and rolls the reader.
 4. Verify: external-dns logs no `403`; `kubectl get certificates -A` all Ready.
 
 ## Generated Secrets
@@ -121,8 +142,9 @@ values we generate.
 
 1. `sops edit` the file in `lives_in` and replace the value with the output of `openssl rand -base64 48`
    (generated inside the editor's buffer, or copied from a terminal you then clear).
-2. Merge; restart what reads it: `kubectl -n <env> rollout restart deployment/backend`, or for the
-   Headlamp client both `deployment/dex` and `deployment/headlamp` in `auth`.
+2. In the same pull request, the date of the readers
+   ([Restarting the Readers](#restarting-the-readers)): the backend of that environment, or for the
+   Headlamp client both Dex and Headlamp. Merge.
 3. **What it costs:** a new JWT secret signs everyone out - tokens signed with the old one are refused.
    Rotate all three environments, one at a time.
 4. Verify: `kubectl -n <env> rollout status deployment/backend`, then sign in on that environment's
@@ -137,15 +159,18 @@ records the Secret version it applied. Existing connections stay open; new ones 
 
 **develop, staging** (SOPS):
 
-1. `sops edit flux/secrets/<env>/cnpg-postgres-secret.yaml` → `password` (`openssl rand -base64 32 | tr -d '/+='`).
-2. Merge. Wait until the role has the new version:
+1. `sops edit flux/secrets/<env>/cnpg-postgres-secret.yaml` → `password` (`openssl rand -base64 32 | tr -d '/+='`);
+   in the same pull request, the date of `safeops.io/secrets-rotated` in `flux/apps/backend/<env>/kustomization.yaml`.
+2. Merge. The role follows within seconds (4 s on kind) - the Secret's version and the one the role
+   applied are then equal:
 
    ```bash
    kubectl -n <env> get secret app-postgres-app -o jsonpath='{.metadata.resourceVersion}{"\n"}'
    kubectl -n <env> get cluster app-postgres -o jsonpath='{.status.managedRolesStatus.passwordStatus.app.resourceVersion}{"\n"}'
    ```
 
-3. `kubectl -n <env> rollout restart deployment/backend` - the backend reads the password at start.
+3. Flux rolls the backend - it reads the password at start. Until its new pods run, the old ones keep
+   their open connections, but a new connection with the old password is refused.
 4. Verify: `kubectl -n <env> rollout status deployment/backend` completes - every new pod's `migrate`
    init container signs in to the database before the backend starts, so a wrong password stops the
    rollout and the old pods keep serving.
@@ -160,8 +185,9 @@ kubectl -n production patch secret app-postgres-app --type merge \
   -p "{\"stringData\":{\"password\":\"$(openssl rand -base64 32 | tr -d '/+=')\"}}"
 ```
 
-Then steps 2-4 for `production`. The state still holds the old seed - harmless, it is used only when
-the Secret is created.
+Then, at once, a pull request with the new date in `flux/apps/backend/production/kustomization.yaml`,
+and steps 2-4 for `production`: between the patch and the rollout, new backend connections fail. The
+state still holds the old seed - harmless, it is used only when the Secret is created.
 
 ## Break-Glass Access
 
@@ -189,8 +215,8 @@ can report that Alertmanager is alive, and the DSN lets anyone send data into th
 1. Create the new one at the provider (a new heartbeat check URL; a new DSN in the Uptrace project's
    settings).
 2. `sops edit` every file in `lives_in` - the DSN is in four.
-3. Merge; restart the readers (`kubectl -n <env> rollout restart deployment/backend`; the collector:
-   `kubectl -n observability rollout restart deployment` of the OpenTelemetry collector; Alertmanager
-   reads its configuration without a restart).
+3. In the same pull request, the date of the readers: the backend of each environment and the
+   collector's `podAnnotations` ([Restarting the Readers](#restarting-the-readers)). Alertmanager
+   reads its configuration without a restart. Merge.
 4. Verify: the heartbeat check shows a fresh ping; new traces arrive in Uptrace.
 5. Delete the old check or DSN.
