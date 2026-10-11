@@ -101,6 +101,8 @@ run_case "a bare file name covers every key" pass "${E}.lives_in[0] = \"flux/sec
   "printf '  webhook-url: ENC[AES256_GCM,data:y]\n' >> flux/secrets/develop/example.yaml"
 run_case "lives_in names a key the file does not have" fail "${E}.lives_in[0] = \"flux/secrets/develop/example.yaml (api-token, gone)\""
 run_case "a SOPS file nobody lists" fail "" "printf 'kind: Secret\n' > flux/secrets/develop/new.yaml"
+run_case "a SOPS file ending in .yml nobody lists" fail "" "printf 'kind: Secret\nstringData:\n  token: ENC[AES256_GCM,data:z]\n' > flux/secrets/develop/new.yml"
+run_case "a kustomization.yml is not a credential" pass "" "printf 'resources: []\n' > flux/secrets/develop/kustomization.yml"
 run_case "an .example template is not a credential" pass "" "printf 'kind: Secret\n' > flux/secrets/develop/new.yaml.example"
 run_case "lives_in names a file that does not exist" fail "${E}.lives_in += [\"flux/secrets/staging/gone.yaml\"]"
 run_case "no credentials at all" fail ".credentials = []"

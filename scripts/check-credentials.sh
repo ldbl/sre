@@ -217,7 +217,8 @@ while IFS= read -r secret; do
     [[ " ${declared[*]-} " == *" ${secret}:${key} "* ]] \
       || failures+=("${secret}: key ${key} is not in ${REGISTRY} - add the credential it holds")
   done <<<"${keys}"
-done < <(find flux/secrets -name '*.yaml' ! -name 'kustomization.yaml' ! -name '*.example' 2>/dev/null | sort)
+done < <(find flux/secrets -type f \( -name '*.yaml' -o -name '*.yml' \) \
+  ! -name 'kustomization.yaml' ! -name 'kustomization.yml' 2>/dev/null | sort)
 
 if [[ ${#failures[@]} -gt 0 ]]; then
   echo "check-credentials: ${#failures[@]} problem(s) (today ${TODAY}):" >&2
