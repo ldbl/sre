@@ -152,6 +152,21 @@ patches:
       metadata: { name: secrets-production, namespace: flux-system }
       $patch: delete
 
+  # --- cert-manager: certificates for the Barman Cloud plugin only ---------
+  # On kind it signs the plugin's mTLS certificates and nothing else: the Ingresses carry the Hetzner
+  # issuer annotation (Cloudflare Origin CA), which does not exist here, so the ingress-shim controller
+  # is off - otherwise it creates a frontend-tls Certificate per environment that can never be issued.
+  - target: { kind: Kustomization, name: cert-manager }
+    patch: |-
+      - op: add
+        path: /spec/patches
+        value:
+          - target: { kind: HelmRelease, name: cert-manager }
+            patch: |-
+              - op: add
+                path: /spec/values/extraArgs
+                value: ["--controllers=*,-ingress-shim"]
+
   # --- observability no longer waits for cert-manager -----------------------
   - target: { kind: Kustomization, name: observability }
     patch: |-
