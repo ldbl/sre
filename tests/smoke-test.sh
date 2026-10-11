@@ -93,12 +93,14 @@ done
 # No `--rm -i`: attaching to a pod that exits in <1s races and reports a
 # timeout; create it, wait for completion, read the exit status, delete it.
 # smoke_curl - true when the probe pod's curl to the backend's /healthz succeeded (waits up to 60s).
+# curl retries a refused connection for up to ~10 s: a new pod's NetworkPolicy allow rules take a moment
+# to apply - k3s (kube-router) refused the first second on Hetzner, kind's kindnet did not (2026-10-11).
 # The pod gets a unique name, so two runs never collide and no pod of anyone else is deleted.
 smoke_curl() {
   local ns="develop" pod
   pod="smoke-curl-$(date +%s)-$RANDOM"
   k run "$pod" --image=curlimages/curl:8.22.0 --labels=app=frontend --restart=Never -n "$ns" \
-    --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl:8.22.0","command":["curl","-sf","-m","10","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
+    --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke-curl","image":"curlimages/curl:8.22.0","command":["curl","-sf","-m","10","--retry","10","--retry-delay","1","--retry-connrefused","http://backend.develop.svc.cluster.local/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' >/dev/null
   local phase=""
   for _ in $(seq 1 30); do
     phase="$(k -n "$ns" get pod "$pod" -o jsonpath='{.status.phase}' 2>/dev/null)"
