@@ -78,7 +78,7 @@ jobs:
         env:
           # renovate: datasource=github-releases depName=prometheus/prometheus
           PROMETHEUS_VERSION: "3.11.0"
-          PROMETHEUS_SHA256: "86a6999dd6aacbd994acde93c77cfa314d4be1c8e7b7c58f444355c77b32c584"
+          PROMETHEUS_SHA256: "ff799c3e4c318e17dec14aaaa406a4da328fabb4578336b36d96d893870c3b76"
         run: |
           archive="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
           curl -sSLfO "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${archive}"
