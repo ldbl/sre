@@ -182,9 +182,13 @@ cluster gets a new password. On a cluster that lives on, Terraform cannot change
 password in the Secret itself, and the managed role follows:
 
 ```bash
-kubectl -n production patch secret app-postgres-app --type merge \
-  -p "{\"stringData\":{\"password\":\"$(openssl rand -base64 32 | tr -d '/+=')\"}}"
+printf '{"stringData":{"password":"%s"}}' "$(openssl rand -base64 32 | tr -d '/+=')" \
+  | kubectl -n production patch secret app-postgres-app --type merge --patch-file /dev/stdin
 ```
+
+The value goes through a pipe, not an argument: an argument is visible to every process on the machine
+(`ps`) and may reach shell history or command telemetry. `printf` is a shell builtin - it runs no
+process that could show it.
 
 Then, at once, a pull request with a new `safeops.io/secrets-rotated` in `flux/apps/backend/production/kustomization.yaml`,
 and steps 2-4 for `production`: between the patch and the rollout, new backend connections fail. The
