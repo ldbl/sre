@@ -1,43 +1,118 @@
 # A mutable tag ("latest", or no tag at all - the runtime pulls "latest" then) means the same manifest
 # can run a different image tomorrow: no artifact identity, no reliable rollback (Chapter 10).
-# The rule reads Kyverno's parsed image references (`images`), not the image string, so
-# `curlimages/curl` without a tag is caught as "latest". An image pinned by digest has no tag to check.
-# Init and ephemeral containers (kubectl debug - Kyverno also sees pods/ephemeralcontainers) count too.
+# image() parses a reference the way the runtime does: `curlimages/curl` has the tag "latest", and an
+# image pinned by digest passes whatever its tag says. Init and ephemeral containers count too.
 # Any other tag passes, though most registries let a tag be moved: only a digest names one image.
 #
-# Mode (Chapter 16): Enforce in the application namespaces, Audit - a PolicyReport only - everywhere
-# else. Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+# Two copies, identical but for the name, the action, the failure policy and the namespace operator
+# (tests/kyverno-policies.test.sh fails when they drift apart):
+#   disallow-latest-tag-enforce  develop, staging, production - Deny, failurePolicy Fail
+#   disallow-latest-tag-audit    every other namespace         - Audit (a PolicyReport), failurePolicy Ignore
+# Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
-  name: disallow-latest-tag
+  name: disallow-latest-tag-enforce
   annotations:
-    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/title: Disallow Latest Tag (enforce)
     policies.kyverno.io/category: Best Practices
     policies.kyverno.io/severity: medium
-    policies.kyverno.io/description: >-
-      Mutable image tags like 'latest' - or no tag, which means 'latest' - break artifact
-      identity and make rollback unreliable. Require an immutable tag or a digest.
 spec:
-  background: true
-  rules:
-    - name: no-latest
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      validate:
-        failureAction: Audit
-        failureActionOverrides:
-          - action: Enforce
-            namespaces: [develop, staging, production]
-        message: >-
-          Image tag 'latest' (or no tag) is not allowed - use an immutable tag or a digest.
-          Tags without a digest here: {{ images.[containers, initContainers, ephemeralContainers][].*[] | [?digest == null].tag }}
-        deny:
-          conditions:
-            any:
-              - key: "{{ images.[containers, initContainers, ephemeralContainers][].*[] | [?digest == null].tag }}"
-                operator: AnyIn
-                value: ["latest"]
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every image whose tag is "latest" (written or implied) and that has no digest.
+    - name: latest
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]) + variables.podSpec.?ephemeralContainers.orValue([]))
+        .map(c, c.image).filter(i, !image(i).containsDigest() && image(i).tag() == 'latest')
+  validations:
+    - expression: size(variables.latest) == 0
+      messageExpression: >-
+        'Image tag latest (or no tag) is not allowed - use an immutable tag or a digest: '
+        + variables.latest.join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag-audit
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag (audit)
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every image whose tag is "latest" (written or implied) and that has no digest.
+    - name: latest
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]) + variables.podSpec.?ephemeralContainers.orValue([]))
+        .map(c, c.image).filter(i, !image(i).containsDigest() && image(i).tag() == 'latest')
+  validations:
+    - expression: size(variables.latest) == 0
+      messageExpression: >-
+        'Image tag latest (or no tag) is not allowed - use an immutable tag or a digest: '
+        + variables.latest.join(', ')

@@ -1,52 +1,120 @@
 # Requests make scheduling honest, limits keep one container from starving its neighbours (Chapter 08).
 # A Pod is checked after admission defaults are applied, so in a namespace with a LimitRange (all
 # application namespaces have one) a pod without resources gets the defaults and passes; a Deployment
-# - checked through Kyverno's generated rule for pod controllers - has no LimitRange applied and
-# must set them itself. Init containers are checked too (`=(initContainers)`: when the pod has
-# them); ephemeral containers cannot have resources and are not.
+# has no LimitRange applied and must set them itself. Init containers are checked too; ephemeral
+# containers cannot have resources and are not.
 #
-# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+# Two copies, identical but for the name, the action, the failure policy and the namespace operator
+# (tests/kyverno-policies.test.sh fails when they drift apart):
+#   require-requests-limits-enforce  develop, staging, production - Deny, failurePolicy Fail
+#   require-requests-limits-audit    every other namespace         - Audit (a PolicyReport), failurePolicy Ignore
+# Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
-  name: require-requests-limits
+  name: require-requests-limits-enforce
   annotations:
-    policies.kyverno.io/title: Require Resource Requests and Limits
+    policies.kyverno.io/title: Require Resource Requests and Limits (enforce)
     policies.kyverno.io/category: Best Practices
     policies.kyverno.io/severity: medium
-    policies.kyverno.io/description: >-
-      CPU and memory requests/limits are required for all containers and init containers
-      to prevent noisy-neighbor impact and enable fair scheduling.
 spec:
-  background: true
-  rules:
-    - name: require-cpu-memory-requests-limits
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      validate:
-        failureAction: Audit
-        failureActionOverrides:
-          - action: Enforce
-            namespaces: [develop, staging, production]
-        message: "CPU and memory requests/limits are required for all containers and init containers."
-        pattern:
-          spec:
-            containers:
-              - resources:
-                  requests:
-                    cpu: "?*"
-                    memory: "?*"
-                  limits:
-                    cpu: "?*"
-                    memory: "?*"
-            =(initContainers):
-              - resources:
-                  requests:
-                    cpu: "?*"
-                    memory: "?*"
-                  limits:
-                    cpu: "?*"
-                    memory: "?*"
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every container (init containers included) without a CPU or memory request or limit.
+    - name: missing
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        .filter(c, !['cpu', 'memory'].all(r,
+          r in c.?resources.?requests.orValue({}) && r in c.?resources.?limits.orValue({}))).map(c, c.name)
+  validations:
+    - expression: size(variables.missing) == 0
+      messageExpression: >-
+        'CPU and memory requests and limits are required for all containers and init containers.
+        Missing in: ' + variables.missing.join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-requests-limits-audit
+  annotations:
+    policies.kyverno.io/title: Require Resource Requests and Limits (audit)
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every container (init containers included) without a CPU or memory request or limit.
+    - name: missing
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        .filter(c, !['cpu', 'memory'].all(r,
+          r in c.?resources.?requests.orValue({}) && r in c.?resources.?limits.orValue({}))).map(c, c.name)
+  validations:
+    - expression: size(variables.missing) == 0
+      messageExpression: >-
+        'CPU and memory requests and limits are required for all containers and init containers.
+        Missing in: ' + variables.missing.join(', ')

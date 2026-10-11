@@ -1,48 +1,131 @@
 # Only images from known sources may run: the platform's own registry, the CloudNativePG images and
 # the three Docker Hub images the labs use. Everything else needs an exception through a pull request.
-# The rule compares Kyverno's parsed references (`images`: registry + repository, without the tag),
-# so `busybox:1.36` and `docker.io/library/busybox:1.36` are the same image - the one the runtime
-# pulls. Docker Hub official images are listed one by one, not as docker.io/*: that would admit any
-# Docker Hub account. Init and ephemeral containers (kubectl debug) are checked too.
+# image() parses the reference the way the runtime does, so `busybox:1.36` and
+# `docker.io/library/busybox:1.36` are the same image (registry index.docker.io, repository
+# library/busybox). Docker Hub official images are listed one by one, not as all of docker.io: that
+# would admit any Docker Hub account. Init and ephemeral containers (kubectl debug) are checked too.
 #
-# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+# Two copies, identical but for the name, the action, the failure policy and the namespace operator
+# (tests/kyverno-policies.test.sh fails when they drift apart):
+#   require-trusted-registries-enforce  develop, staging, production - Deny, failurePolicy Fail
+#   require-trusted-registries-audit    every other namespace         - Audit (a PolicyReport), failurePolicy Ignore
+# Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
-  name: require-trusted-registries
+  name: require-trusted-registries-enforce
   annotations:
-    policies.kyverno.io/title: Require Trusted Container Registries
+    policies.kyverno.io/title: Require Trusted Container Registries (enforce)
     policies.kyverno.io/category: Supply Chain Security
     policies.kyverno.io/severity: high
-    policies.kyverno.io/description: >-
-      Only images from trusted sources may be admitted: ${image_registry}/*,
-      ghcr.io/cloudnative-pg/* and the lab images busybox, postgres and curlimages/curl.
 spec:
-  background: true
-  rules:
-    - name: trusted-registries-only
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      validate:
-        failureAction: Audit
-        failureActionOverrides:
-          - action: Enforce
-            namespaces: [develop, staging, production]
-        message: >-
-          Images must come from ${image_registry}/*, ghcr.io/cloudnative-pg/* or be one of the lab
-          images (docker.io busybox, postgres, curlimages/curl). This pod uses:
-          {{ images.[containers, initContainers, ephemeralContainers][].*[] | [].join('/', [registry, trim_prefix(path, 'library/')]) }}
-        deny:
-          conditions:
-            any:
-              - key: "{{ images.[containers, initContainers, ephemeralContainers][].*[] | [].join('/', [registry, trim_prefix(path, 'library/')]) }}"
-                operator: AnyNotIn
-                value:
-                  - "${image_registry}/*"
-                  - "ghcr.io/cloudnative-pg/*"
-                  - "docker.io/busybox"
-                  - "docker.io/postgres"
-                  - "docker.io/curlimages/curl"
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every image not from a trusted source. A reference is compared as registry/repository, without
+    # the tag or digest; ${image_registry} and ghcr.io/cloudnative-pg are trusted with everything below
+    # them, the Docker Hub images by exact repository.
+    - name: untrusted
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]) + variables.podSpec.?ephemeralContainers.orValue([]))
+        .map(c, c.image).filter(i,
+          !(image(i).registry() + '/' + image(i).repository()).startsWith('${image_registry}/')
+          && !(image(i).registry() + '/' + image(i).repository()).startsWith('ghcr.io/cloudnative-pg/')
+          && !(image(i).registry() == 'index.docker.io'
+               && image(i).repository() in ['library/busybox', 'library/postgres', 'curlimages/curl']))
+  validations:
+    - expression: size(variables.untrusted) == 0
+      messageExpression: >-
+        'Images must come from ${image_registry}/*, ghcr.io/cloudnative-pg/* or be one of the lab images
+        (docker.io busybox, postgres, curlimages/curl). Not trusted here: ' + variables.untrusted.join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-trusted-registries-audit
+  annotations:
+    policies.kyverno.io/title: Require Trusted Container Registries (audit)
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every image not from a trusted source. A reference is compared as registry/repository, without
+    # the tag or digest; ${image_registry} and ghcr.io/cloudnative-pg are trusted with everything below
+    # them, the Docker Hub images by exact repository.
+    - name: untrusted
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]) + variables.podSpec.?ephemeralContainers.orValue([]))
+        .map(c, c.image).filter(i,
+          !(image(i).registry() + '/' + image(i).repository()).startsWith('${image_registry}/')
+          && !(image(i).registry() + '/' + image(i).repository()).startsWith('ghcr.io/cloudnative-pg/')
+          && !(image(i).registry() == 'index.docker.io'
+               && image(i).repository() in ['library/busybox', 'library/postgres', 'curlimages/curl']))
+  validations:
+    - expression: size(variables.untrusted) == 0
+      messageExpression: >-
+        'Images must come from ${image_registry}/*, ghcr.io/cloudnative-pg/* or be one of the lab images
+        (docker.io busybox, postgres, curlimages/curl). Not trusted here: ' + variables.untrusted.join(', ')

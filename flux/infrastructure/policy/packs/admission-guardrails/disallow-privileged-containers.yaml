@@ -3,38 +3,113 @@
 # earlier. In the application namespaces Pod Security "restricted" (Chapter 07) refuses this as well;
 # Kyverno adds the PolicyReport in the namespaces Pod Security does not restrict.
 #
-# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+# Two copies, identical but for the name, the action, the failure policy and the namespace operator
+# (tests/kyverno-policies.test.sh fails when they drift apart):
+#   disallow-privileged-containers-enforce  develop, staging, production - Deny, failurePolicy Fail
+#   disallow-privileged-containers-audit    every other namespace         - Audit (a PolicyReport), failurePolicy Ignore
+# Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
-  name: disallow-privileged-containers
+  name: disallow-privileged-containers-enforce
   annotations:
-    policies.kyverno.io/title: Disallow Privileged Containers
+    policies.kyverno.io/title: Disallow Privileged Containers (enforce)
     policies.kyverno.io/category: Pod Security
     policies.kyverno.io/severity: high
-    policies.kyverno.io/description: >-
-      Privileged containers have full access to the host. This policy
-      blocks privileged mode to enforce workload isolation boundaries.
 spec:
-  background: true
-  rules:
-    - name: no-privileged
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      validate:
-        failureAction: Audit
-        failureActionOverrides:
-          - action: Enforce
-            namespaces: [develop, staging, production]
-        message: "Privileged containers (and init containers) are not allowed."
-        pattern:
-          spec:
-            =(initContainers):
-              - =(securityContext):
-                  =(privileged): "false"
-            containers:
-              - =(securityContext):
-                  =(privileged): "false"
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every container (init containers included) that sets privileged: true.
+    - name: privileged
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        .filter(c, c.?securityContext.?privileged.orValue(false)).map(c, c.name)
+  validations:
+    - expression: size(variables.privileged) == 0
+      messageExpression: >-
+        'Privileged containers (and init containers) are not allowed: ' + variables.privileged.join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-privileged-containers-audit
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers (audit)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # Every container (init containers included) that sets privileged: true.
+    - name: privileged
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        .filter(c, c.?securityContext.?privileged.orValue(false)).map(c, c.name)
+  validations:
+    - expression: size(variables.privileged) == 0
+      messageExpression: >-
+        'Privileged containers (and init containers) are not allowed: ' + variables.privileged.join(', ')

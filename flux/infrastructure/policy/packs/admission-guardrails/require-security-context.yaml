@@ -1,57 +1,126 @@
 # Least privilege for the process: not root, and no way to gain more privileges than it started with.
 # runAsNonRoot may be set for the whole pod (spec.securityContext) or per container - both are what
-# Pod Security "restricted" accepts (Chapter 07), so both pass here. allowPrivilegeEscalation exists
-# only per container and must be false in every one, init containers included.
+# Pod Security "restricted" accepts (Chapter 07). A container's own value wins over the pod's, so a
+# container may not turn it off. allowPrivilegeEscalation exists only per container and must be false
+# in every one, init containers included.
 #
-# Mode (Chapter 16): Enforce in the application namespaces, Audit everywhere else.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+# Two copies, identical but for the name, the action, the failure policy and the namespace operator
+# (tests/kyverno-policies.test.sh fails when they drift apart):
+#   require-security-context-enforce  develop, staging, production - Deny, failurePolicy Fail
+#   require-security-context-audit    every other namespace         - Audit (a PolicyReport), failurePolicy Ignore
+# Exceptions: flux/infrastructure/policy/exceptions/, through a pull request.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
-  name: require-security-context
+  name: require-security-context-enforce
   annotations:
-    policies.kyverno.io/title: Require Security Context
+    policies.kyverno.io/title: Require Security Context (enforce)
     policies.kyverno.io/category: Pod Security
     policies.kyverno.io/severity: medium
-    policies.kyverno.io/description: >-
-      Containers must run as non-root and disallow privilege escalation.
-      This enforces least-privilege at the container runtime level.
 spec:
-  background: true
-  rules:
-    - name: require-container-security-context
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      validate:
-        failureAction: Audit
-        failureActionOverrides:
-          - action: Enforce
-            namespaces: [develop, staging, production]
-        message: >-
-          Containers must run as non-root (pod or container securityContext.runAsNonRoot: true)
-          and set allowPrivilegeEscalation: false - init containers included.
-        anyPattern:
-          # runAsNonRoot for the whole pod; a container may repeat it, but not turn it off.
-          - spec:
-              securityContext:
-                runAsNonRoot: true
-              =(initContainers):
-                - securityContext:
-                    =(runAsNonRoot): true
-                    allowPrivilegeEscalation: false
-              containers:
-                - securityContext:
-                    =(runAsNonRoot): true
-                    allowPrivilegeEscalation: false
-          # runAsNonRoot in every container.
-          - spec:
-              =(initContainers):
-                - securityContext:
-                    runAsNonRoot: true
-                    allowPrivilegeEscalation: false
-              containers:
-                - securityContext:
-                    runAsNonRoot: true
-                    allowPrivilegeEscalation: false
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # runAsNonRoot for the whole pod; false when not set.
+    - name: podNonRoot
+      expression: variables.podSpec.?securityContext.?runAsNonRoot.orValue(false)
+    # Every container (init containers included) that may run as root or escalate privileges.
+    - name: weak
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        .filter(c, !c.?securityContext.?runAsNonRoot.orValue(variables.podNonRoot)
+          || c.?securityContext.?allowPrivilegeEscalation.orValue(true)).map(c, c.name)
+  validations:
+    - expression: size(variables.weak) == 0
+      messageExpression: >-
+        'Containers must run as non-root (pod or container securityContext.runAsNonRoot: true) and set
+        allowPrivilegeEscalation: false - init containers included. Not here: ' + variables.weak.join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-security-context-audit
+  annotations:
+    policies.kyverno.io/title: Require Security Context (audit)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: medium
+spec:
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    # Pods - and the controllers that create them, listed here instead of Kyverno's autogen: autogen
+    # only works for a policy that matches pods alone, and kubectl debug's pods/ephemeralcontainers
+    # must be matched too. A bad Deployment is refused at apply, not later when its pods are created.
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods, pods/ephemeralcontainers]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [develop, staging, production]
+  variables:
+    # The pod spec, wherever this kind keeps it.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec
+        : object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec
+        : object.spec.template.spec
+    # runAsNonRoot for the whole pod; false when not set.
+    - name: podNonRoot
+      expression: variables.podSpec.?securityContext.?runAsNonRoot.orValue(false)
+    # Every container (init containers included) that may run as root or escalate privileges.
+    - name: weak
+      expression: >-
+        (variables.podSpec.containers + variables.podSpec.?initContainers.orValue([]))
+        .filter(c, !c.?securityContext.?runAsNonRoot.orValue(variables.podNonRoot)
+          || c.?securityContext.?allowPrivilegeEscalation.orValue(true)).map(c, c.name)
+  validations:
+    - expression: size(variables.weak) == 0
+      messageExpression: >-
+        'Containers must run as non-root (pod or container securityContext.runAsNonRoot: true) and set
+        allowPrivilegeEscalation: false - init containers included. Not here: ' + variables.weak.join(', ')
