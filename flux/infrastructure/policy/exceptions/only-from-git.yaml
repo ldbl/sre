@@ -15,7 +15,8 @@ spec:
   failurePolicy: Fail
   matchConstraints:
     resourceRules:
-      # kyverno.io: exceptions to ClusterPolicies; policies.kyverno.io: to the newer CEL policies.
+      # policies.kyverno.io: exceptions to the CEL policies (the ones in use); kyverno.io: the older
+      # kind, for ClusterPolicies - guarded too, so that it cannot be a way around.
       - apiGroups: ["kyverno.io", "policies.kyverno.io"]
         apiVersions: ["*"]
         operations: ["CREATE", "UPDATE"]

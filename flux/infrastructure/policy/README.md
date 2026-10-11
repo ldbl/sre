@@ -3,7 +3,7 @@
 | Directory | Flux Kustomization | What it holds |
 |---|---|---|
 | `kyverno/` | `kyverno` | the engine (HelmRelease): admission webhooks, background scans, PolicyReports; PolicyExceptions read only from `policy-exceptions` |
-| `packs/admission-guardrails/` | `policy-admission-guardrails` | five ClusterPolicies - Enforce in `develop`/`staging`/`production`, Audit elsewhere (Chapter 16) |
+| `packs/admission-guardrails/` | `policy-admission-guardrails` | five guardrails, each a pair of ValidatingPolicies (CEL) - Deny in `develop`/`staging`/`production`, Audit elsewhere (Chapter 16) |
 | `packs/supply-chain/` | `policy-supply-chain` | an ImageValidatingPolicy: our images signed by their own CI, with an SBOM - Deny in `develop`/`staging`/`production`, Audit elsewhere (Chapter 17) |
 | `exceptions/` | `policy-exceptions` | the `policy-exceptions` namespace, the guard that lets only Flux write exceptions, and the exceptions (Chapter 16) |
 

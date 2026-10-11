@@ -4,21 +4,30 @@
 # Why: a PolicyException switches a guardrail off for what it matches (Chapter 16). The cluster lets
 # only Flux write one (flux/infrastructure/policy/exceptions/only-from-git.yaml), so this pull request
 # check is where an exception is judged. For every PolicyException under flux/ it requires:
+#   - apiVersion policies.kyverno.io/v1 - the guardrails are ValidatingPolicies; an older kyverno.io
+#     exception names ClusterPolicy rules that no longer exist and would silently do nothing;
 #   - the file is in flux/infrastructure/policy/exceptions/ and metadata.namespace is policy-exceptions
 #     (Kyverno reads no other namespace - an exception elsewhere would silently do nothing);
-#   - the annotations safeops.io/owner, safeops.io/reason and safeops.io/expires (YYYY-MM-DD);
-#   - an expiry date not in the past and at most MAX_DAYS ahead - temporary means a date;
-#   - exactly one policy and one rule (plus its autogen-<rule> variants), no "*";
-#   - in every match entry exactly one literal namespace and at least one resource name that is not
-#     only wildcards (*, ?) - no exception for a whole namespace or the whole cluster.
+#   - the annotations safeops.io/owner and safeops.io/reason;
+#   - spec.expiresAt (RFC 3339, UTC: 2026-12-31T00:00:00Z) in the future and at most MAX_DAYS ahead.
+#     Kyverno stops applying an exception at that moment; this check makes the date exist and short;
+#   - exactly one policyRefs entry, naming a ValidatingPolicy or ImageValidatingPolicy that exists in
+#     flux/infrastructure/policy/packs/ - a typo would except nothing and look as if it did;
+#   - exactly one matchCondition, in one fixed form - one literal namespace and one workload name or
+#     name prefix (a Deployment's pods are named <deployment>-<hash>-<id>):
+#       object.metadata.namespace == 'develop' && object.metadata.name == 'vendor-agent'
+#       object.metadata.namespace == 'develop' && object.metadata.name.startsWith('vendor-agent')
+#     CEL can say anything; the fixed form is what keeps an exception reviewable - no exception for a
+#     whole namespace, by label, or for the whole cluster;
+#   - nothing else in spec (images, allowedValues, reportResult, ...).
 # The expiry is checked on every run, not only when the file changes: CI runs every hook on every
 # pull request, so an expired exception fails all of them until it is removed or renewed on purpose.
-# The date does not switch an applied exception off - nothing in the cluster reads it - so
-# .github/workflows/policy-exceptions-expiry.yml also runs this check on main every day.
+# .github/workflows/policy-exceptions-expiry.yml also runs this check on main every day: Kyverno has
+# stopped applying an expired exception, and the file left in Git says otherwise.
 #
 # Runs in pre-commit (and with it in the CI `hooks` job). Needs yq (v4).
 # Usage: scripts/check-policy-exceptions.sh   (no arguments; reads flux/)
-#        TODAY=2026-10-06 scripts/check-policy-exceptions.sh   (tests: a fixed "today", UTC)
+#        NOW=2026-10-06T12:00:00Z scripts/check-policy-exceptions.sh   (tests: a fixed "now", UTC)
 # Read-only: changes no file and no cluster. Exit 0 when every exception passes, 1 otherwise.
 set -euo pipefail
 
@@ -28,8 +37,10 @@ cd "${repo_root}"
 command -v yq >/dev/null || { echo "check-policy-exceptions: yq is required (make check-tools)" >&2; exit 1; }
 
 EXCEPTIONS_DIR="flux/infrastructure/policy/exceptions"
+PACKS_DIR="flux/infrastructure/policy/packs"
 MAX_DAYS=90
-TODAY="${TODAY:-$(date -u +%F)}"
+NOW="${NOW:-$(date -u +%FT%TZ)}"
+TODAY="${NOW%%T*}"
 
 # latest_expiry - TODAY + MAX_DAYS as YYYY-MM-DD; BSD date (macOS) and GNU date (Linux) differ here.
 latest_expiry() {
@@ -46,6 +57,15 @@ is_calendar_date() {
   [[ "${normalized}" == "$1" ]]
 }
 
+# The one accepted matchCondition: a literal namespace (a Kubernetes name) and a literal name or name
+# prefix - never empty, no regex, no label, no "||".
+K8S_NAME="[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+MATCH_FORM="^object\.metadata\.namespace == '${K8S_NAME}' && object\.metadata\.name( == '[a-z0-9][-a-z0-9.]*'|\.startsWith\('[a-z0-9][-a-z0-9.]*'\))$"
+
+# Every "<kind>/<name>" a PolicyException may reference: the CEL policies of the packs.
+known_policies="$(find "${PACKS_DIR}" -name '*.yaml' -exec yq -N \
+  'select(.kind | test("^(Image)?ValidatingPolicy$")) | [.kind, .metadata.name] | join("/")' {} + | sort -u)"
+
 failures=()
 checked=0
 
@@ -60,6 +80,8 @@ while IFS= read -r file; do
     where="${file}: PolicyException '${name}'"
     checked=$((checked + 1))
 
+    [[ "$(yq '.apiVersion' <<<"${doc}")" == "policies.kyverno.io/v1" ]] \
+      || failures+=("${where}: apiVersion must be policies.kyverno.io/v1 (an exception to the CEL policies)")
     [[ "$(dirname "${file}")" == "${EXCEPTIONS_DIR}" ]] \
       || failures+=("${where}: must live in ${EXCEPTIONS_DIR}/")
     [[ "$(yq '.metadata.namespace' <<<"${doc}")" == "policy-exceptions" ]] \
@@ -70,61 +92,37 @@ while IFS= read -r file; do
       [[ -n "${value}" ]] || failures+=("${where}: annotation safeops.io/${key} is missing")
     done
 
-    expires="$(yq '.metadata.annotations["safeops.io/expires"] // ""' <<<"${doc}")"
-    if [[ ! "${expires}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || ! is_calendar_date "${expires}"; then
-      failures+=("${where}: annotation safeops.io/expires must be a real date, YYYY-MM-DD (got '${expires}')")
-    elif [[ "${expires}" < "${TODAY}" ]]; then
-      failures+=("${where}: expired on ${expires} - remove it, or renew it in a pull request that says why")
-    elif [[ "${expires}" > "${LATEST}" ]]; then
+    # RFC 3339 in UTC compares as a string: "2026-10-06T00:00:00Z" < "2026-10-06T12:00:00Z".
+    expires="$(yq '.spec.expiresAt // ""' <<<"${doc}")"
+    if [[ ! "${expires}" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$ ]] \
+      || ! is_calendar_date "${BASH_REMATCH[1]}"; then
+      failures+=("${where}: spec.expiresAt must be a real UTC time, YYYY-MM-DDTHH:MM:SSZ (got '${expires}')")
+    elif [[ ! "${expires}" > "${NOW}" ]]; then
+      failures+=("${where}: expired at ${expires} - Kyverno no longer applies it; remove it, or renew it in a pull request that says why")
+    elif [[ "${BASH_REMATCH[1]}" > "${LATEST}" ]]; then
       failures+=("${where}: expires ${expires}, more than ${MAX_DAYS} days ahead (latest ${LATEST})")
     fi
 
-    # What it switches off: one policy, one rule. ruleNames may add the rule's generated variants for
-    # pod controllers (autogen-<rule>, autogen-cronjob-<rule>) - an exception for a Deployment needs
-    # them - but no other rule and no "*".
-    if [[ "$(yq '.spec.exceptions | length' <<<"${doc}")" != "1" ]]; then
-      failures+=("${where}: spec.exceptions must have exactly one entry (one policy)")
+    extra="$(yq '.spec | keys | map(select(. != "expiresAt" and . != "policyRefs" and . != "matchConditions")) | join(", ")' <<<"${doc}")"
+    [[ -z "${extra}" ]] || failures+=("${where}: spec may hold only expiresAt, policyRefs and matchConditions (also has: ${extra})")
+
+    # What it switches off: one policy that exists.
+    if [[ "$(yq '.spec.policyRefs | length' <<<"${doc}")" != "1" ]]; then
+      failures+=("${where}: spec.policyRefs must have exactly one entry (one policy)")
     else
-      policy="$(yq '.spec.exceptions[0].policyName // ""' <<<"${doc}")"
-      [[ -n "${policy}" && "${policy}" != *"*"* ]] \
-        || failures+=("${where}: spec.exceptions[0].policyName must name one policy, without \"*\"")
-      rules="$(yq '.spec.exceptions[0].ruleNames[]' <<<"${doc}" 2>/dev/null || true)"
-      base=""
-      [[ -n "${rules}" ]] || failures+=("${where}: spec.exceptions[0].ruleNames must name the rule")
-      while IFS= read -r rule; do
-        [[ -n "${rule}" ]] || continue
-        if [[ "${rule}" == *"*"* ]]; then
-          failures+=("${where}: rule name '${rule}' uses \"*\"")
-          continue
-        fi
-        stripped="${rule#autogen-cronjob-}"
-        stripped="${stripped#autogen-}"
-        if [[ -z "${base}" ]]; then
-          base="${stripped}"
-        elif [[ "${stripped}" != "${base}" ]]; then
-          failures+=("${where}: ruleNames name more than one rule ('${base}' and '${stripped}') - one exception per rule")
-        fi
-      done <<<"${rules}"
+      ref="$(yq '(.spec.policyRefs[0].kind // "") + "/" + (.spec.policyRefs[0].name // "")' <<<"${doc}")"
+      grep -qxF -- "${ref}" <<<"${known_policies}" \
+        || failures+=("${where}: spec.policyRefs names ${ref}, which is not a ValidatingPolicy or ImageValidatingPolicy in ${PACKS_DIR}/")
     fi
 
-    # Every match entry (any and all): one namespace, named resources, no "*".
-    entries="$(yq '[.spec.match.any[], .spec.match.all[]] | length' <<<"${doc}" 2>/dev/null || echo 0)"
-    [[ "${entries}" -gt 0 ]] || failures+=("${where}: spec.match names nothing")
-    for ((m = 0; m < entries; m++)); do
-      entry="[.spec.match.any[], .spec.match.all[]] | .[${m}].resources"
-      [[ "$(yq "${entry}.namespaces | length" <<<"${doc}")" == "1" ]] \
-        || failures+=("${where}: match entry ${m} must name exactly one namespace")
-      [[ "$(yq "${entry}.names | length" <<<"${doc}")" -ge 1 ]] \
-        || failures+=("${where}: match entry ${m} must name the resources (resources.names)")
-      # Kyverno matches namespaces and names as wildcards (* and ?). A namespace must be literal; a
-      # name may be a prefix such as vendor-agent-*, but not only wildcards (*, ?*, ...).
-      if [[ "$(yq "[${entry}.namespaces[]] | any_c(test(\"[*?]\"))" <<<"${doc}")" == "true" ]]; then
-        failures+=("${where}: match entry ${m} uses a wildcard (* or ?) in a namespace")
-      fi
-      if [[ "$(yq "[${entry}.names[]] | any_c(test(\"^[*?]+\$\"))" <<<"${doc}")" == "true" ]]; then
-        failures+=("${where}: match entry ${m} has a name made only of wildcards (* or ?)")
-      fi
-    done
+    # What it matches: one namespace, one workload - in the fixed form.
+    if [[ "$(yq '.spec.matchConditions | length' <<<"${doc}")" != "1" ]]; then
+      failures+=("${where}: spec.matchConditions must have exactly one entry")
+    else
+      expression="$(yq '.spec.matchConditions[0].expression // ""' <<<"${doc}")"
+      [[ "${expression}" =~ ${MATCH_FORM} ]] \
+        || failures+=("${where}: matchConditions[0].expression must be object.metadata.namespace == '<namespace>' && object.metadata.name == '<name>' (or .startsWith('<prefix>')), got: ${expression}")
+    fi
   done
 done < <(find flux -name '*.yaml' -o -name '*.yml' | sort)
 
@@ -133,4 +131,4 @@ if [[ ${#failures[@]} -gt 0 ]]; then
   printf '  - %s\n' "${failures[@]}" >&2
   exit 1
 fi
-echo "check-policy-exceptions: ${checked} exception(s) OK (today ${TODAY}, latest allowed expiry ${LATEST})"
+echo "check-policy-exceptions: ${checked} exception(s) OK (now ${NOW}, latest allowed expiry ${LATEST})"

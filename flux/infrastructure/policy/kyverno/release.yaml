@@ -69,3 +69,13 @@ spec:
       enabled: true
     reportsController:
       enabled: true
+      # The admission guardrails (Chapter 16) also match pods/ephemeralcontainers - kubectl debug
+      # writes there - and Kyverno marks a policy "not ready for reporting" until this controller may
+      # read every resource the policy matches (RBACPermissionsGranted=False, seen on kind with
+      # 1.19.1). Read-only; the pod spec it returns is the one the controller already reads.
+      rbac:
+        clusterRole:
+          extraResources:
+            - apiGroups: [""]
+              resources: [pods/ephemeralcontainers]
+              verbs: [get, list, watch]
