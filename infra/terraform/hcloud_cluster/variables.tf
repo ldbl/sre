@@ -188,6 +188,19 @@ variable "auto_upgrade_k3s" {
   default     = false
 }
 
+variable "k3s_upgrade_eviction" {
+  description = <<-EOT
+    Evict pods (respecting PodDisruptionBudgets) when the system-upgrade-controller drains a node for a k3s
+    upgrade. Off: pods are deleted. Each database runs one instance whose budget allows no disruption, so
+    with eviction the drain waits forever - the node stays cordoned and the upgrade never finishes (Hetzner
+    cycle 2026-10-11, even with two workers). Off, the upgrade is a short planned outage of those pods,
+    as node maintenance already is (scripts/node-maintenance.sh --accept-outage). Turn it on with highly
+    available databases.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "auto_upgrade_os" {
   description = "Automatically install OS updates (the nodes' transactional-update timer). Off: updates are installed by scripts/node-maintenance.sh, at a time we choose - with one worker every reboot is an outage."
   type        = bool
