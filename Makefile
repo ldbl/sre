@@ -7,7 +7,7 @@ export PATH := $(BIN_DIR):$(PATH)
 # renovate: datasource=github-releases depName=hashicorp/terraform
 TERRAFORM_VERSION := 1.16.5
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
-KUBECTL_VERSION := 1.36.5
+KUBECTL_VERSION := 1.37.1
 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
 KIND_VERSION := 0.33.0
 # renovate: datasource=github-releases depName=fluxcd/flux2

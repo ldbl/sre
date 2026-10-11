@@ -5,7 +5,7 @@ Every version this module installs is pinned, so a rebuild gives the same cluste
 | What | Where | Pinned to |
 |---|---|---|
 | Terraform providers | `main.tf` (`required_providers`) | kind ~> 0.11, helm ~> 3.3, kubernetes ~> 3.2, null, random, local, time |
-| Kubernetes | `variables.tf` `kind_node_image` | `kindest/node:v1.36.4@sha256:...` (same minor as k3s on Hetzner) |
+| Kubernetes | `variables.tf` `kind_node_image` | `kindest/node:v1.37.0@sha256:...` (same minor as k3s on Hetzner) |
 | Flux Operator | `variables.tf` `flux_operator_version` | `0.61.0` (install.yaml of that GitHub release) |
 | Flux | `variables.tf` `flux_version` | `2.9.6` |
 | Traefik chart | `variables.tf` `traefik_chart_version` | `41.7.1` |
