@@ -229,3 +229,12 @@ patches:
                       kind: ImageUpdateAutomation
                       metadata: { name: placeholder }
                       $patch: delete
+          # kind has no secrets-<env> (Terraform creates the backend's Secrets): the backend waits only
+          # for what kind runs.
+          - target: { kind: Kustomization, name: "backend-(develop|staging|production)" }
+            patch: |-
+              - op: replace
+                path: /spec/dependsOn
+                value:
+                  - name: flux-system
+                  - name: observability

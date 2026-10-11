@@ -60,6 +60,10 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-config
+  # secrets-staging: the backend reads its Secrets at start. A rotation changes the Secret and
+  # safeops.io/secrets-rotated in one commit; with this, Flux restarts the backend only after the
+  # Secret of that commit is applied (same source, same revision) - never with the old value.
   dependsOn:
     - name: flux-system
     - name: observability
+    - name: secrets-staging
