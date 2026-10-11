@@ -129,7 +129,8 @@ scripts/             # Pre-commit hooks, automation scripts
   Deployment sets `automountServiceAccountToken: false` and, when an HPA targets it, no `spec.replicas`;
   every container runs non-root with a read-only root filesystem, no privilege escalation, capabilities
   drop ALL and seccomp RuntimeDefault (Pod Security restricted enforces all but the read-only root filesystem
-  at admission); every emptyDir has a sizeLimit;
+  at admission); every emptyDir has a sizeLimit; every app container has `lifecycle.preStop.sleep` >= 5 s,
+  a grace period covering that sleep plus 10 s of shutdown (a stopping pod still gets requests until the endpoints catch up);
   backend `PPROF_ENABLED` is `"false"` in Git;
   `CHAOS_ENABLED` is explicit - `"true"` only in develop/staging, `"false"` in production.
   `scripts/security-smoke.sh BASE_URL [HOST]` checks the public path from outside (no secrets on /api/env,

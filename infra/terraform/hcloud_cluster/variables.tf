@@ -179,7 +179,7 @@ variable "k3s_channel" {
 variable "k3s_version" {
   description = "Pin an exact K3s version (e.g. v1.34.0+k3s1). Overrides k3s_channel when set."
   type        = string
-  default     = "v1.36.4+k3s1"
+  default     = "v1.37.1+k3s1"
 }
 
 variable "auto_upgrade_k3s" {
@@ -246,14 +246,14 @@ variable "flux_operator_version" {
   description = "Flux Operator release to install (install.yaml from its GitHub release)."
   type        = string
   # renovate: datasource=github-releases depName=controlplaneio-fluxcd/flux-operator
-  default = "0.60.0"
+  default = "0.61.0"
 }
 
 variable "flux_version" {
   description = "Flux version the FluxInstance installs. Pinned, so a rebuild gets the same Flux."
   type        = string
   # renovate: datasource=github-releases depName=fluxcd/flux2
-  default = "2.9.5"
+  default = "2.9.6"
 }
 
 variable "flux_git_repository_url" {

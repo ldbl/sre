@@ -5,13 +5,13 @@ export PATH := $(BIN_DIR):$(PATH)
 
 # Pinned toolchain versions (minimums are checked by scripts/check-tools.sh)
 # renovate: datasource=github-releases depName=hashicorp/terraform
-TERRAFORM_VERSION := 1.16.4
+TERRAFORM_VERSION := 1.16.5
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
-KUBECTL_VERSION := 1.36.5
+KUBECTL_VERSION := 1.37.1
 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
 KIND_VERSION := 0.33.0
 # renovate: datasource=github-releases depName=fluxcd/flux2
-FLUX_VERSION := 2.9.5
+FLUX_VERSION := 2.9.6
 
 .PHONY: help check-tools versions tf install-hooks pre-commit fmt validate smoke-test \
 	kind-plan kind-apply kind-drift kind-destroy \
