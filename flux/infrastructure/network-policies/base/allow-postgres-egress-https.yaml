@@ -1,5 +1,6 @@
 # Postgres (CNPG) may open HTTPS to the internet: its backups and WAL archive go to S3-compatible object
-# storage (barmanObjectStore, BACKUP_S3_ENDPOINT - outside the cluster, an address that is not a pod).
+# storage (the Barman Cloud plugin's sidecar in the pod; BACKUP_S3_ENDPOINT - outside the cluster, an address that
+# is not a pod).
 # Trade-off: the ipBlock allows any address on TCP 443, not only the backup endpoint - NetworkPolicy
 # cannot select a host name. The residual risk: a compromised database pod could send data to any
 # HTTPS host. Narrow it to the endpoint's address range if the provider publishes a stable one.

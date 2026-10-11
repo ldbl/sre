@@ -20,18 +20,13 @@ spec:
         name: app-postgres-app
   storage:
     size: 30Gi
-  backup:
-    retentionPolicy: "30d"
-    barmanObjectStore:
-      destinationPath: s3://${BACKUP_S3_BUCKET}/cnpg-backups/production/app-postgres
-      endpointURL: ${BACKUP_S3_ENDPOINT}
-      s3Credentials:
-        accessKeyId:
-          name: cnpg-backup-s3
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: cnpg-backup-s3
-          key: ACCESS_SECRET_KEY
+  # Base backups and the WAL archive go through the Barman Cloud plugin to the ObjectStore
+  # app-postgres-backups (object-store.yaml); retention lives there too.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: app-postgres-backups
   resources:
     requests:
       cpu: 10m

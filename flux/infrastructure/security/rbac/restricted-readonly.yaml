@@ -75,4 +75,8 @@ rules:
       - backups
       - scheduledbackups
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["barmancloud.cnpg.io"] # where the backups go (Barman Cloud plugin)
+    resources:
+      - objectstores
+    verbs: ["get", "list", "watch"]
   # Explicitly NOT included: secrets, pods/exec, pods/portforward

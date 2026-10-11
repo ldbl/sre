@@ -2,7 +2,7 @@
 #
 # Same GitOps tree as production, minus everything that needs a cloud account,
 # a DNS zone, an LLM key or the author's SOPS key. What is removed:
-#   - cert-manager, dns-and-certificates, dex, headlamp              (Cloudflare DNS, OIDC sign-in)
+#   - dns-and-certificates, dex, headlamp                            (Cloudflare DNS, OIDC sign-in)
 #   - opentelemetry-collector                                        (Uptrace DSN)
 #   - image-automation                                                (needs git write token)
 #   - secrets-*                                                       (encrypted for the platform key)
@@ -10,6 +10,8 @@
 #   - minio          S3-compatible target for CNPG backups instead of Hetzner Object Storage
 #   - secrets-local  the learner's own SOPS-encrypted secrets (secrets chapter)
 #   - lab            scratch namespace with Pod Security warn/audit (admission-policy drills)
+# What stays although kind has no DNS zone: cert-manager - the Barman Cloud plugin of CloudNativePG makes
+# its certificates with it (no Cloudflare issuer on kind).
 # What stays although nobody signs in through OIDC here: oidc-rbac - the roles of the GitHub teams and
 # the policy on Flux fields. They need no Dex; `kubectl --as=<user> --as-group=safeops-course:members`
 # shows what a person in that team may do (Chapter 21).
@@ -36,11 +38,6 @@ patches:
       apiVersion: kustomize.toolkit.fluxcd.io/v1
       kind: Kustomization
       metadata: { name: image-automation, namespace: flux-system }
-      $patch: delete
-  - patch: |-
-      apiVersion: kustomize.toolkit.fluxcd.io/v1
-      kind: Kustomization
-      metadata: { name: cert-manager, namespace: flux-system }
       $patch: delete
   - patch: |-
       apiVersion: kustomize.toolkit.fluxcd.io/v1

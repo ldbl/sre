@@ -1,0 +1,32 @@
+# Where this environment's base backups and WAL archive go - the Barman Cloud plugin's ObjectStore
+# (flux/infrastructure/data/cnpg-operator/plugin-barman-cloud.yaml). The path and keys are the ones the
+# in-tree barmanObjectStore used, and the Cluster's name stays the server name, so the archive goes on
+# in the same place: backups taken before the move still restore.
+# https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: app-postgres-backups
+  namespace: develop
+spec:
+  retentionPolicy: "7d"
+  configuration:
+    destinationPath: s3://${BACKUP_S3_BUCKET}/cnpg-backups/develop/app-postgres
+    endpointURL: ${BACKUP_S3_ENDPOINT}
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-backup-s3
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: cnpg-backup-s3
+        key: ACCESS_SECRET_KEY
+  # The plugin runs as a sidecar in every database pod: its resources count against the namespace
+  # quota (scripts/check-app-resources.sh adds them).
+  instanceSidecarConfiguration:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

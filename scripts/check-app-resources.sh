@@ -4,7 +4,8 @@
 #   - staging and production differ for an app (staging is the pre-production copy of production)
 #   - production gets less than develop for any request or limit
 #   - a namespace quota cannot hold the worst case: every app at HPA maxReplicas + its rolling-update
-#     surge, plus the Postgres instances - checked for requests, limits and the pod count
+#     surge, plus the Postgres instances and their Barman Cloud sidecars - checked for requests, limits
+#     and the pod count
 # A pod's resources are what Kubernetes charges against the quota: for each request/limit the larger
 # of (the sum over regular containers) and (the largest single init container).
 #
@@ -174,6 +175,17 @@ for env in "${envs[@]}"; do
   v="$(to_mib "${plm}" "cnpg ${env} limits.memory")"; need[3]=$((need[3] + instances * v))
   need_pods=$((need_pods + instances))
   breakdown+=("postgres ${instances}x")
+  # The Barman Cloud plugin adds a sidecar to every instance pod, with the resources its ObjectStore
+  # names (instanceSidecarConfiguration) - same pod, so the same instance count.
+  sidecar="$(yqs 'select(.kind == "ObjectStore") | .spec.instanceSidecarConfiguration.resources | [.requests.cpu, .requests.memory, .limits.cpu, .limits.memory] | @tsv' <<<"${cnpg}")"
+  if [[ -n "${sidecar}" ]]; then
+    IFS=$'\t' read -r src srm slc slm <<<"${sidecar}"
+    v="$(to_milli "${src}" "barman sidecar ${env} requests.cpu")"; need[0]=$((need[0] + instances * v))
+    v="$(to_mib "${srm}" "barman sidecar ${env} requests.memory")"; need[1]=$((need[1] + instances * v))
+    v="$(to_milli "${slc}" "barman sidecar ${env} limits.cpu")"; need[2]=$((need[2] + instances * v))
+    v="$(to_mib "${slm}" "barman sidecar ${env} limits.memory")"; need[3]=$((need[3] + instances * v))
+    breakdown+=("barman-sidecar ${instances}x")
+  fi
 
   # What the namespace allows: the ResourceQuota's hard limits.
   quota="$(render "flux/infrastructure/resource-management/${env}")"
