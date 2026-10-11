@@ -49,8 +49,13 @@ kc() {
 }
 
 # api_exists RESOURCE - true when the cluster serves that resource type (e.g. a Flux CRD is installed).
+# The list is read into a variable first, not piped into grep -q: grep -q exits at the first match,
+# kubectl - still writing hundreds of lines - gets SIGPIPE, and under pipefail the pipeline fails:
+# "not served" for a type that is, and its objects would be skipped before the destroy.
 api_exists() {
-  kc api-resources -o name 2>/dev/null | grep -qx "$1"
+  local served
+  served="$(kc api-resources -o name 2>/dev/null)" || return 1
+  grep -qxF -- "$1" <<<"${served}"
 }
 
 # Wait until "$@" (a kubectl get ... -o name) succeeds AND prints nothing, or the timeout (seconds)

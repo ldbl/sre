@@ -68,7 +68,7 @@ contains_kustomization() {
 
 # has_local_flux_schemas - true when the Flux CRD schemas were already downloaded (cached in /tmp).
 has_local_flux_schemas() {
-  [[ -d "${SCHEMA_DIR}" ]] && find "${SCHEMA_DIR}" -type f -name '*.json' -print -quit | grep -q .
+  [[ -d "${SCHEMA_DIR}" ]] && [[ -n "$(find "${SCHEMA_DIR}" -type f -name '*.json' -print -quit)" ]]
 }
 
 # download_flux_schemas - fetch the Flux CRD JSON schemas of the pinned Flux release and unpack them.
@@ -259,7 +259,7 @@ validated=0
 skipped=0
 
 for dir in ${TARGET_DIRS[@]+"${TARGET_DIRS[@]}"}; do
-  rel_dir="${dir#${REPO_ROOT}/}"
+  rel_dir="${dir#"${REPO_ROOT}"/}"
   echo "[flux-validate] kustomize ${rel_dir}"
 
   set +e

@@ -13,7 +13,7 @@ set -Eeuo pipefail
 
 # Skip if not in git repo or no remotes or no commits
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
-git remote 2>/dev/null | grep -q . || exit 0
+[[ -n "$(git remote 2>/dev/null)" ]] || exit 0
 git rev-parse HEAD >/dev/null 2>&1 || exit 0
 
 # Only block amend operations: the message source is "commit" and the object is the commit being
@@ -28,8 +28,11 @@ target_sha="${PRE_COMMIT_COMMIT_OBJECT_NAME:-${3:-HEAD}}"
 # Any remote-tracking branch that contains the commit means it was pushed. Symbolic refs
 # ("origin/HEAD -> origin/main") are left out so the same branch is not counted twice.
 # -e: a pattern that starts with "-" would otherwise be read as an option, grep would fail, and the
-# hook would never block.
-if git branch -r --contains "$target_sha" 2>/dev/null | grep -vF -e '->' | grep -v 'origin/HEAD' | grep -q .; then
+# hook would never block. The list is read into a variable, not piped into grep -q: grep -q exits at
+# the first line, git gets SIGPIPE, and under pipefail the pipeline fails - "not pushed" for a commit
+# on many remote branches, and the amend goes through. (|| true: no remote branch is not an error.)
+remote_branches="$(git branch -r --contains "$target_sha" 2>/dev/null | grep -vF -e '->' | grep -v 'origin/HEAD' || true)"
+if [[ -n "${remote_branches}" ]]; then
   echo ""
   echo "BLOCKED: Cannot amend commits that have been pushed!"
   echo "Remote branches containing this commit:"
