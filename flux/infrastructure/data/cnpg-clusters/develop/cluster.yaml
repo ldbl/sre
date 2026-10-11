@@ -10,10 +10,13 @@ spec:
   # Pinned to a minor and its digest: the major tag (:17) moved to every new PostgreSQL minor by
   # itself. Changing this restarts the instance once - with one instance, a short outage.
   # The minimal Debian trixie image: the in-tree barman tools of the old "system" image are not needed
-  # with the Barman Cloud plugin (its sidecar brings them), and a major upgrade (pg_upgrade) needs the
-  # old and the new image on the same distribution - so 17 moves to trixie before 18.
+  # with the Barman Cloud plugin (its sidecar brings them).
+  # A new MAJOR version here is an offline in-place upgrade: CNPG stops the instance and runs
+  # pg_upgrade --link in a job - old and new image on the same distribution. Take a backup first; give
+  # the archive a new serverName below in the same change (point-in-time restore does not cross major
+  # versions); take a base backup right after (Chapter 12).
   # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.11-minimal-trixie@sha256:ca2c3bb893d185fe4e5d0401a010454bd87dcb67c53003c38fd828804928f5d9
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie@sha256:37ade18dbdddba430858c72725aceeec66f33fa5333e82ea1df4942f6c1c83a3
   primaryUpdateStrategy: unsupervised
   bootstrap:
     initdb:
@@ -30,6 +33,9 @@ spec:
       isWALArchiver: true
       parameters:
         barmanObjectName: app-postgres-backups
+        # One archive per major version: 17's backups and WAL stay under app-postgres and still restore
+        # into a 17 cluster; 18 starts its own.
+        serverName: app-postgres-pg18
   resources:
     requests:
       cpu: 10m

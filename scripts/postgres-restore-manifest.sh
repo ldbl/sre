@@ -21,8 +21,9 @@
 # Run by hand from the runbook and the Chapter 12 lab. Needs: kubectl and jq.
 # Why these fields:
 #   - barmanObjectName: app-postgres-backups - the ObjectStore that holds the path and the keys.
-#   - serverName: app-postgres - the archive lives under the SOURCE cluster's name; without it CNPG
-#     looks under the external cluster's name and finds nothing.
+#   - serverName: the archive the source writes to - its plugin parameter serverName (one per
+#     PostgreSQL major version: app-postgres-pg18), or the source cluster's name when it sets none;
+#     without it CNPG looks under the external cluster's name and finds nothing.
 #   - No WAL archiving for the restored cluster (no spec.plugins): it is for proving and inspecting the
 #     restore. Archiving it into the same store would need its own serverName.
 #   - imageName, storage, resources copied from the source - a physical restore needs the same
@@ -73,6 +74,7 @@ k get objectstores.barmancloud.cnpg.io "$OBJECT_STORE" -o name >/dev/null \
   || { echo "cannot read ObjectStore $OBJECT_STORE in $NAMESPACE ($CONTEXT)" >&2; exit 1; }
 
 image=$(jq -r '.spec.imageName' <<<"$source_json")
+server=$(jq -r --arg s "$SOURCE" '[.spec.plugins[]? | select(.name == "barman-cloud.cloudnative-pg.io") | .parameters.serverName // empty][0] // $s' <<<"$source_json")
 size=$(jq -r '.spec.storage.size' <<<"$source_json")
 resources=$(jq -c '.spec.resources // {}' <<<"$source_json")
 
@@ -104,5 +106,5 @@ spec:
         name: barman-cloud.cloudnative-pg.io
         parameters:
           barmanObjectName: $OBJECT_STORE
-          serverName: $SOURCE
+          serverName: $server
 EOF
