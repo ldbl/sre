@@ -4,9 +4,10 @@ name: Policy exceptions expiry
 # pre-commit and on every pull request - but an exception that is already applied stays active after
 # that date: nothing in the cluster reads the annotation, and Flux would recreate a deleted exception
 # from Git anyway. Without a pull request, nothing ran the check and nothing said the date had passed.
-# This runs the same check on main every morning: an expired exception fails the run, and GitHub
-# reports the failed scheduled run to the repository's maintainers. The fix is a pull request that
-# removes the exception - or renews it, saying why (Chapter 16).
+# This runs the same check on main every morning: an expired exception fails the run. GitHub e-mails
+# a failed scheduled run to the person who last changed the cron line below - not to every maintainer;
+# and it disables scheduled workflows in a public repository after 60 days without activity. The fix
+# is a pull request that removes the exception - or renews it, saying why (Chapter 16).
 
 on:
   schedule:

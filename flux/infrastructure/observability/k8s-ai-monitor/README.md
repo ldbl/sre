@@ -35,8 +35,9 @@ restart (Alertmanager picks it up by itself):
 1. Change the Secret - Hetzner: edit and re-encrypt the SOPS file, commit; kind: `terraform apply
    -replace='random_password.guardian_internal_token[0]'`.
 2. Wait until it is applied (`flux get kustomizations secrets-observability` on Hetzner).
-3. `kubectl -n observability rollout restart deployment/k8s-ai-monitor` - until then Alertmanager's
-   calls get 403.
+3. Set `safeops.io/secrets-rotated` in `deployment.yaml` to the current UTC time (`date -u +%FT%TZ`) and commit - Flux rolls the pod;
+   until then Alertmanager's calls get 403. Not `kubectl rollout restart`: Flux removes its annotation
+   on the next reconcile, and mid-rollout the old pod stays with the old token.
 
 ## Runtime Endpoints
 
