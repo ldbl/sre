@@ -16,8 +16,9 @@
 #     rotated is after that day;
 #   - accepted (optional) {until, reason}: holds back an overdue or exposed failure until `until`, at
 #     most MAX_ACCEPT_DAYS ahead. Accepting what is not failing fails - remove it.
-# And the other way round: every SOPS file under flux/secrets/ (not *.example) is named in some
-# lives_in, and every flux/secrets/ path named there exists - a new Secret cannot skip the registry.
+# And the other way round: every key of every SOPS file under flux/secrets/ (not *.example) is named
+# in some lives_in - "FILE (key, key)" names those keys, a bare "FILE" all of them - and every file and
+# key named there exists. A new Secret, or a new key in a listed one, cannot skip the registry.
 #
 # Runs in pre-commit when the registry, flux/secrets/ or this check changes, and every day on main
 # (.github/workflows/credential-rotation.yml): a date passes without a commit. Needs yq (v4).
@@ -68,13 +69,19 @@ has_anchor() {
   return 1
 }
 
+# secret_keys FILE - the keys of a Secret manifest's data and stringData. SOPS encrypts only the
+# values, so the key names are readable without the private key.
+secret_keys() {
+  yq '((.data // {}) + (.stringData // {})) | keys | .[]' "$1"
+}
+
 [[ -f "${REGISTRY}" ]] || { echo "check-credentials: ${REGISTRY} not found" >&2; exit 1; }
 
 SOON="$(add_days "${TODAY}" "${WARN_DAYS}")"
 ACCEPT_LIMIT="$(add_days "${TODAY}" "${MAX_ACCEPT_DAYS}")"
 failures=()
 names=()
-declared_paths=()
+declared=()   # "FILE:key" for each key a lives_in names, "FILE:*" for a bare FILE
 count="$(yq '.credentials | length' "${REGISTRY}")"
 [[ "${count}" -gt 0 ]] || failures+=("${REGISTRY}: no credentials listed")
 
@@ -97,8 +104,21 @@ for ((i = 0; i < count; i++)); do
   while IFS= read -r place; do
     [[ "${place}" == flux/secrets/* ]] || continue
     path="${place%% *}"
-    declared_paths+=("${path}")
-    [[ -f "${path}" ]] || failures+=("${where}: lives_in names ${path}, which does not exist")
+    if [[ ! -f "${path}" ]]; then
+      failures+=("${where}: lives_in names ${path}, which does not exist")
+      continue
+    fi
+    if [[ "${place}" =~ \(([^\)]*)\)$ ]]; then
+      IFS=',' read -ra listed <<<"${BASH_REMATCH[1]}"
+      for key in "${listed[@]}"; do
+        key="${key// /}"
+        declared+=("${path}:${key}")
+        grep -qxF -- "${key}" < <(secret_keys "${path}") \
+          || failures+=("${where}: lives_in names key ${key} of ${path}, which has no such key")
+      done
+    else
+      declared+=("${path}:*")
+    fi
   done < <(yq ".credentials[${i}].lives_in[]" "${REGISTRY}")
 
   # How to replace it: a heading that exists.
@@ -183,10 +203,20 @@ for ((i = 0; i < count; i++)); do
   [[ ${#due_now[@]} -eq 0 ]] || failures+=("${due_now[@]}")
 done
 
-# Every SOPS file under flux/secrets/ is somebody's lives_in.
+# Every key of every SOPS file under flux/secrets/ is somebody's lives_in.
 while IFS= read -r secret; do
-  [[ " ${declared_paths[*]-} " == *" ${secret} "* ]] \
-    || failures+=("${secret}: not in ${REGISTRY} - add the credential it holds")
+  if [[ " ${declared[*]-} " == *" ${secret}:* "* ]]; then
+    continue
+  fi
+  keys="$(secret_keys "${secret}")"
+  if [[ -z "${keys}" ]]; then
+    failures+=("${secret}: not in ${REGISTRY} - add the credential it holds")
+    continue
+  fi
+  while IFS= read -r key; do
+    [[ " ${declared[*]-} " == *" ${secret}:${key} "* ]] \
+      || failures+=("${secret}: key ${key} is not in ${REGISTRY} - add the credential it holds")
+  done <<<"${keys}"
 done < <(find flux/secrets -name '*.yaml' ! -name 'kustomization.yaml' ! -name '*.example' 2>/dev/null | sort)
 
 if [[ ${#failures[@]} -gt 0 ]]; then

@@ -76,10 +76,11 @@ at all, and the `sops-encrypted` check rejects it. Delete the line and add the v
 
 **A changed Secret does not restart anything.** Flux updates the Secret object; pods that read it as
 environment variables keep the old value until they restart. Restart them through Git, in the same
-pull request: change the date of `safeops.io/secrets-rotated` on the reader's pod template (the
-backend: `flux/apps/backend/<env>/kustomization.yaml`), and Flux rolls the pods like any release.
-Not `kubectl rollout restart`: Flux removes the annotation it sets on the next reconcile - mid-rollout,
-the old pods stay, with the old value (`docs/credential-rotation.md`).
+pull request: set `safeops.io/secrets-rotated` on the reader's pod template to the current UTC time
+(`date -u +%FT%TZ`; the backend: `flux/apps/backend/<env>/kustomization.yaml`), and Flux rolls the pods
+like any release. Not `kubectl rollout restart`: it adds an annotation that is not in Git, and Flux
+removes that annotation on its next reconcile - mid-rollout, the old pods stay, with the old value
+(`docs/credential-rotation.md`).
 
 ## Troubleshooting
 

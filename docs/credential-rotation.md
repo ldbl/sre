@@ -30,11 +30,12 @@ file in the history: `flux/secrets/README.md#key-rotation`).
 
 ## Restarting the Readers
 
-A workload Flux manages is restarted by a change in Git: the date in the annotation
-`safeops.io/secrets-rotated` on its pod template, in the same pull request as the Secret. The template
+A workload Flux manages is restarted by a change in Git: the annotation `safeops.io/secrets-rotated`
+on its pod template, set to the current UTC time (`date -u +%FT%TZ`) in the same pull request as the
+Secret. A timestamp, not a day: two rotations on one day must still change the template. The template
 changes, and Flux rolls the pods like any release - a new pod Ready before an old one goes.
 
-| Reader | Where the date lives |
+| Reader | Where the annotation lives |
 |---|---|
 | backend | `flux/apps/backend/<env>/kustomization.yaml` - the `secrets-rotated` patch |
 | k8s-ai-monitor | `flux/infrastructure/observability/k8s-ai-monitor/deployment.yaml` |
@@ -117,7 +118,7 @@ A GitHub OAuth App holds two client secrets at once, so this rotation has no gap
 
 1. Organization settings → Developer settings → OAuth Apps → *SafeOps Dex* → **Generate a new client secret**.
 2. `sops edit flux/secrets/auth/dex-secrets.yaml` → `DEX_GITHUB_CLIENT_SECRET`; in the same pull
-   request, the date in Dex's `podAnnotations` (it reads the Secret as environment variables).
+   request, the annotation in Dex's `podAnnotations` (it reads the Secret as environment variables).
 3. Merge; Flux updates the Secret and rolls Dex.
 4. Verify: `kubectl oidc-login` (or Headlamp) signs in through GitHub.
 5. Delete the old secret in the OAuth App.
@@ -130,7 +131,7 @@ the merge, DNS changes and certificate requests fail and are retried.
 
 1. Cloudflare → My Profile → **API Tokens** → the token → **Roll**.
 2. `sops edit` `flux/secrets/cloudflare/external-dns-cloudflare-api-token.yaml` or
-   `cloudflare-origin-ca-token.yaml` → `api-token`; in the same pull request, the date in the reader's
+   `cloudflare-origin-ca-token.yaml` → `api-token`; in the same pull request, the annotation in the reader's
    pod annotations (external-dns: `podAnnotations`; origin-ca-issuer: `controller.podAnnotations`).
 3. Merge; Flux updates the Secret and rolls the reader.
 4. Verify: external-dns logs no `403`; `kubectl get certificates -A` all Ready.
@@ -142,7 +143,7 @@ values we generate.
 
 1. `sops edit` the file in `lives_in` and replace the value with the output of `openssl rand -base64 48`
    (generated inside the editor's buffer, or copied from a terminal you then clear).
-2. In the same pull request, the date of the readers
+2. In the same pull request, the annotation of the readers
    ([Restarting the Readers](#restarting-the-readers)): the backend of that environment, or for the
    Headlamp client both Dex and Headlamp. Merge.
 3. **What it costs:** a new JWT secret signs everyone out - tokens signed with the old one are refused.
@@ -160,7 +161,7 @@ records the Secret version it applied. Existing connections stay open; new ones 
 **develop, staging** (SOPS):
 
 1. `sops edit flux/secrets/<env>/cnpg-postgres-secret.yaml` → `password` (`openssl rand -base64 32 | tr -d '/+='`);
-   in the same pull request, the date of `safeops.io/secrets-rotated` in `flux/apps/backend/<env>/kustomization.yaml`.
+   in the same pull request, `safeops.io/secrets-rotated` in `flux/apps/backend/<env>/kustomization.yaml`.
 2. Merge. The role follows within seconds (4 s on kind) - the Secret's version and the one the role
    applied are then equal:
 
@@ -185,7 +186,7 @@ kubectl -n production patch secret app-postgres-app --type merge \
   -p "{\"stringData\":{\"password\":\"$(openssl rand -base64 32 | tr -d '/+=')\"}}"
 ```
 
-Then, at once, a pull request with the new date in `flux/apps/backend/production/kustomization.yaml`,
+Then, at once, a pull request with a new `safeops.io/secrets-rotated` in `flux/apps/backend/production/kustomization.yaml`,
 and steps 2-4 for `production`: between the patch and the rollout, new backend connections fail. The
 state still holds the old seed - harmless, it is used only when the Secret is created.
 
@@ -215,7 +216,7 @@ can report that Alertmanager is alive, and the DSN lets anyone send data into th
 1. Create the new one at the provider (a new heartbeat check URL; a new DSN in the Uptrace project's
    settings).
 2. `sops edit` every file in `lives_in` - the DSN is in four.
-3. In the same pull request, the date of the readers: the backend of each environment and the
+3. In the same pull request, the annotation of the readers: the backend of each environment and the
    collector's `podAnnotations` ([Restarting the Readers](#restarting-the-readers)). Alertmanager
    reads its configuration without a restart. Merge.
 4. Verify: the heartbeat check shows a fresh ping; new traces arrive in Uptrace.

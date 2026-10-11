@@ -18,8 +18,8 @@ images:
     newName: ${image_registry}/backend
     newTag: production-v0.0.0-13f9e84-1791575727 # {"$imagepolicy": "production:backend:tag"}
 patches:
-  # The backend reads backend-secrets and app-postgres-app as env vars, once, at start. A rotation changes
-  # this date in the same pull request as the Secret - or, for the Terraform-made database password, in a
+  # The backend reads backend-secrets and app-postgres-app as env vars, once, at start. A rotation sets
+  # this to the current UTC time (date -u +%FT%TZ) in the same pull request as the Secret - or, for the Terraform-made database password, in a
   # pull request right after it: the pod template changes, and Flux rolls the pods like any release
   # (one new pod Ready before an old one goes). Not `kubectl rollout restart` - Flux removes its
   # annotation on the next reconcile and, mid-rollout, keeps the old pods with the old value
@@ -33,4 +33,4 @@ patches:
         template:
           metadata:
             annotations:
-              safeops.io/secrets-rotated: "2026-09-26"
+              safeops.io/secrets-rotated: "2026-09-26T00:00:00Z"

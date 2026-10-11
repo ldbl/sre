@@ -21,7 +21,7 @@ run_case() {
   mkdir -p "${WORK}/repo/scripts" "${WORK}/repo/docs" "${WORK}/repo/flux/secrets/develop"
   cp "${ROOT}/scripts/check-credentials.sh" "${WORK}/repo/scripts/"
   printf '# Runbooks\n\n## Example API Token\n\nSteps.\n' > "${WORK}/repo/docs/credential-rotation.md"
-  printf 'kind: Secret\n' > "${WORK}/repo/flux/secrets/develop/example.yaml"
+  printf 'kind: Secret\nstringData:\n  api-token: ENC[AES256_GCM,data:x]\n' > "${WORK}/repo/flux/secrets/develop/example.yaml"
   printf 'resources: []\n' > "${WORK}/repo/flux/secrets/develop/kustomization.yaml"
   cat > "${WORK}/repo/docs/credential-registry.yaml" <<'EOF'
 credentials:
@@ -92,7 +92,14 @@ run_case "a name used twice" fail ".credentials += [.credentials[0]]"
 run_case "runbook without an anchor" fail "${E}.runbook = \"docs/credential-rotation.md\""
 run_case "runbook anchor with no heading" fail "${E}.runbook = \"docs/credential-rotation.md#another-token\""
 run_case "runbook file missing" fail "${E}.runbook = \"docs/missing.md#example-api-token\""
-# Coverage: every SOPS file is in the registry, every named file exists.
+# Coverage: every key of every SOPS file is in the registry, every named file and key exists.
+run_case "a second key in a listed file, not named" fail "" \
+  "printf '  webhook-url: ENC[AES256_GCM,data:y]\n' >> flux/secrets/develop/example.yaml"
+run_case "a second key, named in lives_in" pass "${E}.lives_in[0] = \"flux/secrets/develop/example.yaml (api-token, webhook-url)\"" \
+  "printf '  webhook-url: ENC[AES256_GCM,data:y]\n' >> flux/secrets/develop/example.yaml"
+run_case "a bare file name covers every key" pass "${E}.lives_in[0] = \"flux/secrets/develop/example.yaml\"" \
+  "printf '  webhook-url: ENC[AES256_GCM,data:y]\n' >> flux/secrets/develop/example.yaml"
+run_case "lives_in names a key the file does not have" fail "${E}.lives_in[0] = \"flux/secrets/develop/example.yaml (api-token, gone)\""
 run_case "a SOPS file nobody lists" fail "" "printf 'kind: Secret\n' > flux/secrets/develop/new.yaml"
 run_case "an .example template is not a credential" pass "" "printf 'kind: Secret\n' > flux/secrets/develop/new.yaml.example"
 run_case "lives_in names a file that does not exist" fail "${E}.lives_in += [\"flux/secrets/staging/gone.yaml\"]"
