@@ -36,12 +36,15 @@ chart_of() {
 }
 
 failed=0
-# compare WHAT TOOL_VERSION CLUSTER_VERSION - equal once a leading v is dropped.
+# compare WHAT TOOL_VERSION CLUSTER_VERSION - equal once a leading v and an image variant suffix
+# (v3.15.0-distroless) are dropped.
 compare() {
-  if [[ "${2#v}" == "${3#v}" ]]; then
-    echo "ok   $1: tests ${2#v} = cluster ${3#v}"
+  local tool="${2#v}" cluster="${3#v}"
+  cluster="${cluster%%-*}"
+  if [[ "${tool}" == "${cluster}" ]]; then
+    echo "ok   $1: tests ${tool} = cluster ${cluster}"
   else
-    echo "FAIL $1: the tests run ${2#v}, the cluster runs ${3#v} - bump them together" >&2
+    echo "FAIL $1: the tests run ${tool}, the cluster runs ${cluster} - bump them together" >&2
     failed=1
   fi
 }
