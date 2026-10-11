@@ -131,6 +131,7 @@ module "kube_hetzner" {
   k3s_version                      = var.k3s_version
   automatically_upgrade_kubernetes = var.auto_upgrade_k3s
   automatically_upgrade_os         = var.auto_upgrade_os
+  system_upgrade_enable_eviction   = var.k3s_upgrade_eviction
 
   # cert-manager is managed by Flux, not kube-hetzner
   enable_cert_manager = false
