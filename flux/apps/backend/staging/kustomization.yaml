@@ -16,7 +16,7 @@ resources:
 images:
   - name: backend
     newName: ${image_registry}/backend
-    newTag: staging-v0.0.0-a3b31ee-1791655990 # {"$imagepolicy": "staging:backend:tag"}
+    newTag: staging-v0.0.0-ed31677-1791744706 # {"$imagepolicy": "staging:backend:tag"}
 patches:
   # The backend reads backend-secrets and app-postgres-app as env vars, once, at start. A rotation sets
   # this to the current UTC time (date -u +%FT%TZ) in the same pull request as the Secret: the pod template changes, and Flux rolls the pods
