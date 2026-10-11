@@ -11,9 +11,10 @@
 #   - every emptyDir volume has a sizeLimit (an unlimited one can grow until the node's disk is full;
 #     the kubelet evicts a pod over its limit when it next measures - a budget, not a quota)
 #   - every app container waits before it stops: lifecycle.preStop.sleep of at least MIN_PRESTOP
-#     seconds, shorter than the pod's grace period. A stopping pod is removed from the Service's
-#     endpoints and from Traefik while it already shuts down; without the wait it refuses requests
-#     still sent to it. Measured on kind (Chapter 20): the wait removed the frontend's failures and
+#     seconds, and a grace period that still leaves MIN_SHUTDOWN seconds after the sleep - the
+#     grace countdown starts with the preStop hook, so the app's own shutdown comes out of it too.
+#     A stopping pod is removed from the Service's endpoints and from Traefik while it already
+#     shuts down; without the wait it refuses requests still sent to it. Measured on kind (Chapter 20): the wait removed the frontend's failures and
 #     the backend's refused connections; a few backend timeouts remained, with 5 s and with 10 s
 #   - backend: PPROF_ENABLED is "false" everywhere (profiling is turned on by hand, never in Git)
 #   - backend: CHAOS_ENABLED is exactly "true" in develop and staging (the chaos labs need it) and
@@ -48,6 +49,7 @@ overlays=(
 
 failures=()
 MIN_PRESTOP=5   # seconds; on kind 10 s did no better than 5 s
+MIN_SHUTDOWN=10 # seconds the app needs after the sleep: the backend's graceful shutdown timeout (cmd/api/main.go)
 
 # The only accepted CHAOS_ENABLED per backend overlay (a case, not an associative array: macOS /bin/bash is 3.2).
 expected_chaos_for() {
@@ -122,8 +124,8 @@ for overlay in "${overlays[@]}"; do
     fi
     if [[ ! "${sleep}" =~ ^[0-9]+$ ]] || ((sleep < MIN_PRESTOP)); then
       failures+=("${where}: lifecycle.preStop.sleep.seconds must be at least ${MIN_PRESTOP} (got: ${sleep})")
-    elif ((sleep >= grace)); then
-      failures+=("${where}: preStop sleep ${sleep}s must be shorter than terminationGracePeriodSeconds (${grace}s)")
+    elif ((grace < sleep + MIN_SHUTDOWN)); then
+      failures+=("${where}: terminationGracePeriodSeconds (${grace}s) must cover the preStop sleep (${sleep}s) plus ${MIN_SHUTDOWN}s of shutdown")
     fi
   done < <(yq 'select(.kind == "Deployment") | .metadata.name as $d
       | (.spec.template.spec.terminationGracePeriodSeconds // 30) as $g
