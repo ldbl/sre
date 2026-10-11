@@ -9,8 +9,11 @@ spec:
   instances: 1
   # Pinned to a minor and its digest: the major tag (:17) moved to every new PostgreSQL minor by
   # itself. Changing this restarts the instance once - with one instance, a short outage.
+  # The minimal Debian trixie image: the in-tree barman tools of the old "system" image are not needed
+  # with the Barman Cloud plugin (its sidecar brings them), and a major upgrade (pg_upgrade) needs the
+  # old and the new image on the same distribution - so 17 moves to trixie before 18.
   # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.11@sha256:70664ebcfa1100361b5bdc28bbf06fdbe08db2dc4ad7bd14de33c5e05fe8ea8e
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.11-minimal-trixie@sha256:ca2c3bb893d185fe4e5d0401a010454bd87dcb67c53003c38fd828804928f5d9
   primaryUpdateStrategy: unsupervised
   bootstrap:
     initdb:
