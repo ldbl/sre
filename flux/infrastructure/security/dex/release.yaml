@@ -55,7 +55,10 @@ spec:
       # cannot be revoked. Dex's default is 24h: someone removed from the GitHub team kept kubectl
       # access for up to a day. With 1h, kubelogin refreshes every hour, and on refresh Dex reads the
       # person's teams from GitHub again (connector/github Refresh): out of the team, no group, no
-      # role. Removal now takes effect within an hour (Chapter 21).
+      # role. Removal takes effect within an hour (Chapter 21) - for tokens issued after this setting
+      # is applied: a token issued before keeps the 24h it was signed with. The Hetzner cluster is
+      # rebuilt each cycle, so a new cluster starts with 1h tokens; on a cluster that lives on, the
+      # rule holds 24h after the change.
       expiry:
         idTokens: 1h
       staticClients:
