@@ -17,7 +17,7 @@ control_plane_count               = 1
 allow_scheduling_on_control_plane = false
 
 workers_server_type = "cx33"
-workers_count       = 1
+workers_count       = 2 # TEMPORARY (Hetzner cycle 2026-10-11): a drain with somewhere to go - back to 1 before destroy
 
 # ─── Autoscaling ─────────────────────────────────────────────────────────────
 # When enabled, workers_count is ignored; min/max nodes govern the pool instead.
