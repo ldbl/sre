@@ -9,8 +9,8 @@
 #      it on every pull request and fails on errors, so nothing reaches main unchecked.
 # YAML syntax of single files is the yamllint hook's job.
 #
-# Needs only kubectl (already a lab tool). Optional: kubeconform, plus curl and tar for the schemas, and
-# yq to pick Kubernetes' own APIs for the removed-API pass.
+# Needs only kubectl (already a lab tool). Optional: kubeconform - and with it, tar and curl for the
+# schemas and yq (required then) to pick Kubernetes' own APIs for the removed-API pass.
 # Runs on macOS (bash 3.2) and Linux.
 #
 # Usage: scripts/flux-kustomize-validate.sh [changed files...]   (pre-commit passes the changed files)
@@ -39,10 +39,14 @@ if ! command -v kubectl >/dev/null 2>&1; then
   exit 1
 fi
 
-# kubeconform is optional locally; when it is there, it needs tar (and curl to download schemas).
+# kubeconform is optional locally; when it is there, it needs tar (and curl to download schemas), and
+# yq to pick Kubernetes' own APIs for the removed-API pass.
 run_kubeconform=1
 if ! command -v kubeconform >/dev/null 2>&1; then
   run_kubeconform=0
+elif ! command -v yq >/dev/null 2>&1; then
+  echo "[flux-validate] required tool missing: yq (for the removed-API check; make check-tools)" >&2
+  exit 1
 elif ! command -v tar >/dev/null 2>&1; then
   echo "[flux-validate] required tool missing: tar (for the Flux CRD schemas)" >&2
   exit 1
@@ -204,7 +208,7 @@ echo "[flux-validate] Kubernetes ${KUBERNETES_VERSION}"
 # monitoring stack, ...) - but it also skips an object whose API the Kubernetes version REMOVED: no
 # schema, so "skipped", exit 0. Kubernetes' own API groups always have schemas, so for them a missing
 # schema means a removed (or misspelled) API. They are checked a second time without the flag.
-BUILTIN_GROUPS='^(|apps|batch|autoscaling|policy|networking\.k8s\.io|rbac\.authorization\.k8s\.io|storage\.k8s\.io|admissionregistration\.k8s\.io|apiextensions\.k8s\.io|scheduling\.k8s\.io|coordination\.k8s\.io|discovery\.k8s\.io|node\.k8s\.io|flowcontrol\.apiserver\.k8s\.io|certificates\.k8s\.io|events\.k8s\.io|resource\.k8s\.io|apiregistration\.k8s\.io)$'
+BUILTIN_GROUPS='^(|apps|batch|autoscaling|policy|extensions|authentication\.k8s\.io|authorization\.k8s\.io|networking\.k8s\.io|rbac\.authorization\.k8s\.io|storage\.k8s\.io|admissionregistration\.k8s\.io|apiextensions\.k8s\.io|scheduling\.k8s\.io|coordination\.k8s\.io|discovery\.k8s\.io|node\.k8s\.io|flowcontrol\.apiserver\.k8s\.io|certificates\.k8s\.io|events\.k8s\.io|resource\.k8s\.io|apiregistration\.k8s\.io)$'
 kubeconform_config=(-strict -ignore-missing-schemas -kubernetes-version "${KUBERNETES_VERSION}" -schema-location default)
 if [[ ${run_kubeconform} -eq 1 ]]; then
   ensure_flux_schemas
