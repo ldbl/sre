@@ -143,6 +143,7 @@ spec:
   timeout: 10m0s
   dependsOn:
     - name: infrastructure
+    - name: cert-manager # the Barman Cloud plugin's certificates
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

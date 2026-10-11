@@ -57,6 +57,10 @@ rules:
       - backups
       - scheduledbackups
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["barmancloud.cnpg.io"] # where the backups go (Barman Cloud plugin)
+    resources:
+      - objectstores
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["kustomize.toolkit.fluxcd.io"]
     resources:
       - kustomizations

@@ -5,14 +5,16 @@ database and owner `app`, credentials in the Secret `app-postgres-app`.
 
 ## Backups
 
-- **Continuous WAL archiving and a daily base backup** (`scheduled-backup.yaml`), with the in-tree
-  `barmanObjectStore`, to `s3://${BACKUP_S3_BUCKET}/cnpg-backups/<namespace>/app-postgres`.
-  Retention: 7 days.
+- **Continuous WAL archiving and a daily base backup** (`scheduled-backup.yaml`), through the Barman
+  Cloud plugin (`cnpg-operator/plugin-barman-cloud.yaml`) to the ObjectStore `app-postgres-backups`
+  (`object-store.yaml`): `s3://${BACKUP_S3_BUCKET}/cnpg-backups/<namespace>/app-postgres`.
+  Retention: 7 days in develop, 14 in staging, 30 in production (the ObjectStore's `retentionPolicy`).
+  The plugin runs as a sidecar in the database pod; its resources are in the ObjectStore.
 - **Where:** MinIO inside the cluster on kind (bucket `sre`) - it does not survive the loss of the
   cluster; Hetzner Object Storage on the platform. The endpoint and bucket come from Terraform
   (ConfigMap substitution); the keys from the Secret `cnpg-backup-s3`.
-- **Known tech debt:** CNPG 1.29 removes the in-tree `barmanObjectStore`. The operator chart is pinned
-  (`cnpg-operator/release.yaml`) until the backups move to the Barman Cloud plugin.
+- **Moved from the in-tree `barmanObjectStore`** (deprecated since CNPG 1.26, removed in 1.31) with the
+  same path and server name, so the backups taken before the move still restore.
 - **Watched by** `PostgresWALArchivingFailing`, `PostgresBackupFailed`, `PostgresBackupTooOld` and
   `PostgresNeverBackedUp`
   (`observability/kube-prometheus-stack/monitoring/backup-alerts.yaml`).

@@ -1,4 +1,6 @@
-# Backup alerts for app-postgres (CNPG), from the instance's exporter (cnpg-podmonitor.yaml).
+# Backup alerts for app-postgres (CNPG), from the instance's exporter (cnpg-podmonitor.yaml). The backup
+# metrics come from the Barman Cloud plugin (barman_cloud_cloudnative_pg_io_*), served by the same exporter;
+# they replace the in-tree cnpg_collector_*_backup_* metrics.
 # Each one names an action:
 #   PostgresWALArchivingFailing - the newest WAL segment could not be archived: point-in-time
 #                                 restore stops at the last good segment, and WAL piles up on disk
@@ -29,11 +31,11 @@ spec:
             component: postgres
           annotations:
             summary: "{{ $labels.namespace }}: Postgres WAL archiving is failing - point-in-time restore stops at the last good segment"
-            description: "The newest WAL segment of {{ $labels.pod }} in {{ $labels.namespace }} failed to archive for 15 minutes. First check: the Cluster's ContinuousArchiving condition and the instance log (barman-cloud-wal-archive) - the backup store's credentials, endpoint or network policy."
+            description: "The newest WAL segment of {{ $labels.pod }} in {{ $labels.namespace }} failed to archive for 15 minutes. First check: the Cluster's ContinuousArchiving condition and the log of the Barman Cloud plugin sidecar in the instance pod - the backup store's credentials, endpoint or network policy."
             runbook_url: "https://safeops.work/members/chapter-12-backup-restore/runbook/"
 
         - alert: PostgresBackupFailed
-          expr: cnpg_collector_last_failed_backup_timestamp > cnpg_collector_last_available_backup_timestamp
+          expr: barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp > barman_cloud_cloudnative_pg_io_last_available_backup_timestamp
           for: 5m
           labels:
             severity: warning
@@ -48,8 +50,8 @@ spec:
           # a first backup that fails.
           # The age comes first, so that $value in the summary is the age, not the timestamp.
           expr: |
-            time() - cnpg_collector_last_available_backup_timestamp > 26 * 3600
-            and cnpg_collector_last_available_backup_timestamp > 0
+            time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp > 26 * 3600
+            and barman_cloud_cloudnative_pg_io_last_available_backup_timestamp > 0
           for: 15m
           labels:
             severity: warning
@@ -65,7 +67,7 @@ spec:
           # daily schedule; a restart starts the clock again (the alert then comes later, not never).
           expr: |
             time() - cnpg_pg_postmaster_start_time > 26 * 3600
-            and cnpg_collector_last_available_backup_timestamp == 0
+            and barman_cloud_cloudnative_pg_io_last_available_backup_timestamp == 0
           for: 15m
           labels:
             severity: warning
