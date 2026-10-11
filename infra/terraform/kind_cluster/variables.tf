@@ -193,10 +193,10 @@ variable "age_key_file" {
 # ─── Pinned versions: a rebuild gets the same cluster ────────────────────────
 
 variable "kind_node_image" {
-  description = "kindest/node image, pinned by digest. Kubernetes v1.36.4, the same minor as k3s on the Hetzner track."
+  description = "kindest/node image, pinned by digest. Kubernetes v1.37.0, the same minor as k3s on the Hetzner track."
   type        = string
   # renovate: datasource=docker depName=kindest/node
-  default = "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+  default = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 }
 
 variable "traefik_chart_version" {

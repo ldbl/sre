@@ -98,7 +98,7 @@ jobs:
 
       - name: Setup kubectl
         run: |
-          curl -sLO "https://dl.k8s.io/release/v1.36.5/bin/linux/amd64/kubectl"
+          curl -sLO "https://dl.k8s.io/release/v1.37.1/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       - name: Setup flux CLI
