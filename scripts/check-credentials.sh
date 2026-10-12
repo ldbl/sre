@@ -26,7 +26,8 @@
 # (.github/workflows/credential-rotation.yml): a date passes without a commit. Needs yq (v4).
 # The dates are SafeOps' own: in a fork (a learner's copy) its credentials are not the learner's to
 # rotate, so CI there runs with CHECK_CREDENTIALS_DATES=report - what is due is printed, not failed.
-# Everything else (descriptions, runbooks, unregistered SOPS keys) fails everywhere.
+# Everything else (descriptions, runbooks, unregistered SOPS keys) fails everywhere. Locally the mode
+# follows the clone: enforce in SafeOps' own (origin safeops-course/sre), report in a fork.
 # Usage: scripts/check-credentials.sh   (no arguments)
 #        TODAY=2026-10-11 scripts/check-credentials.sh   (tests: a fixed "today", UTC)
 #        CHECK_CREDENTIALS_DATES=report scripts/check-credentials.sh   (report due dates, do not fail)
@@ -42,7 +43,14 @@ REGISTRY="docs/credential-registry.yaml"
 WARN_DAYS=14
 MAX_ACCEPT_DAYS=30
 TODAY="${TODAY:-$(date -u +%F)}"
-DATES_MODE="${CHECK_CREDENTIALS_DATES:-enforce}"
+# Without CHECK_CREDENTIALS_DATES: enforce in SafeOps' own clone (origin safeops-course/sre), report in
+# any other - a learner's fork runs `pre-commit run --all-files` (Chapter 05), and SafeOps' dates are
+# not theirs to keep. CI sets the variable explicitly.
+if [[ -z "${CHECK_CREDENTIALS_DATES:-}" ]]; then
+  origin="$(git remote get-url origin 2>/dev/null || true)"
+  if [[ "${origin}" =~ safeops-course/sre(\.git)?/?$ ]]; then CHECK_CREDENTIALS_DATES=enforce; else CHECK_CREDENTIALS_DATES=report; fi
+fi
+DATES_MODE="${CHECK_CREDENTIALS_DATES}"
 [[ "${DATES_MODE}" == enforce || "${DATES_MODE}" == report ]] \
   || { echo "check-credentials: CHECK_CREDENTIALS_DATES must be enforce or report (got '${DATES_MODE}')" >&2; exit 1; }
 reported=()   # due dates in report mode: printed, not failed
@@ -237,8 +245,10 @@ while IFS= read -r secret; do
     [[ " ${declared[*]-} " == *" ${secret}:${key} "* ]] \
       || failures+=("${secret}: key ${key} is not in ${REGISTRY} - add the credential it holds")
   done <<<"${keys}"
-done < <(find flux/secrets -type f \( -name '*.yaml' -o -name '*.yml' \) \
-  ! -name 'kustomization.yaml' ! -name 'kustomization.yml' 2>/dev/null | sort)
+# flux/secrets/local/ is not here: the learner's own throw-away secrets, encrypted for their own key on
+# kind (Chapter 04) - not platform credentials (the registry's header says the same).
+done < <(find flux/secrets -path flux/secrets/local -prune -o -type f \( -name '*.yaml' -o -name '*.yml' \) \
+  ! -name 'kustomization.yaml' ! -name 'kustomization.yml' -print 2>/dev/null | sort)
 
 if [[ ${#failures[@]} -gt 0 ]]; then
   echo "check-credentials: ${#failures[@]} problem(s) (today ${TODAY}):" >&2

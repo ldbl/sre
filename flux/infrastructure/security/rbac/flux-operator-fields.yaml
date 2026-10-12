@@ -5,7 +5,8 @@
 # that group, an update may change only spec.suspend and the reconcile request annotations (what
 # flux suspend/resume/reconcile write). Everything else needs the break-glass kubeconfig.
 # Native ValidatingAdmissionPolicy (GA since Kubernetes 1.30), Deny from the start - it is part of
-# the access model, not a Chapter 16 Kyverno policy that starts in Audit.
+# the access model, so it must not depend on Kyverno, an engine that can be down (Chapter 16's
+# guardrails are Kyverno policies).
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:

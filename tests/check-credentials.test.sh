@@ -37,7 +37,7 @@ credentials:
 EOF
   [[ -z "${edit}" ]] || yq -i "${edit}" "${WORK}/repo/docs/credential-registry.yaml"
   [[ -z "${setup}" ]] || (cd "${WORK}/repo" && eval "${setup}")
-  if (cd "${WORK}/repo" && TODAY="${TODAY}" CHECK_CREDENTIALS_DATES="${DATES_MODE:-enforce}" scripts/check-credentials.sh >/dev/null 2>&1); then got=pass; else got=fail; fi
+  if (cd "${WORK}/repo" && TODAY="${TODAY}" CHECK_CREDENTIALS_DATES="${DATES_MODE-enforce}" scripts/check-credentials.sh >/dev/null 2>&1); then got=pass; else got=fail; fi
   if [[ "${got}" == "${expected}" ]]; then
     echo "ok   - ${name}"
   else
@@ -106,6 +106,11 @@ DATES_MODE=report run_case "report mode: accepted until passed is only reported"
 run_case "accepted until not a date" fail \
   "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"soon\", \"reason\": \"ingest only\"}"
 DATES_MODE=sometimes run_case "an unknown dates mode fails" fail ""
+# No CHECK_CREDENTIALS_DATES: the copy here is no clone of safeops-course/sre (no origin) - a fork, so report.
+DATES_MODE="" run_case "no mode set, not SafeOps' clone: an overdue token is only reported" pass "${E}.rotated = \"2026-06-01\""
+# flux/secrets/local/ is the learner's own (Chapter 04), not a platform credential.
+run_case "a SOPS file under flux/secrets/local/ needs no registry entry" pass "" \
+  "mkdir -p flux/secrets/local && printf 'kind: Secret\nstringData:\n  greeting: ENC[AES256_GCM,data:z]\n' > flux/secrets/local/lab-secret.yaml"
 # Described: what, where, who, how.
 run_case "no what" fail "del(${E}.what)"
 run_case "no used_by" fail "del(${E}.used_by)"
