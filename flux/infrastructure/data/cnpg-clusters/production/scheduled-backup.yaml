@@ -5,6 +5,9 @@ metadata:
   namespace: production
 spec:
   schedule: "0 0 1 * * *"
+  # The first backup as soon as the cluster exists: a new cluster writes a new, empty archive
+  # (serverName in cluster.yaml), and until a base backup lands there nothing can be restored.
+  immediate: true
   backupOwnerReference: self
   method: plugin
   pluginConfiguration:

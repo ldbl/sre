@@ -26,7 +26,7 @@ terraform apply
   on `localhost` (seen on the v1.36 -> v1.37 upgrade, 2026-10-11). So:
 
   ```bash
-  make kind-destroy                  # the lab's databases and MinIO data go with it; age.agekey stays
+  make kind-destroy                  # the lab's databases go with it; age.agekey and .minio-data (backups) stay
   make kind-plan && make kind-apply  # expect: everything to add, nothing to change or destroy
   ```
 

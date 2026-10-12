@@ -160,7 +160,8 @@ spec:
   wait: false
   postBuild:
     # BACKUP_S3_ENDPOINT / BACKUP_S3_BUCKET: written by Terraform from the same inputs
-    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub).
+    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub);
+    # BACKUP_CLUSTER_ID: when Terraform created this cluster - part of the archive's serverName.
     substituteFrom:
       - kind: ConfigMap
         name: backup-s3
@@ -217,7 +218,8 @@ spec:
   wait: false
   postBuild:
     # BACKUP_S3_ENDPOINT / BACKUP_S3_BUCKET: written by Terraform from the same inputs
-    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub).
+    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub);
+    # BACKUP_CLUSTER_ID: when Terraform created this cluster - part of the archive's serverName.
     substituteFrom:
       - kind: ConfigMap
         name: backup-s3
@@ -274,7 +276,8 @@ spec:
   wait: false
   postBuild:
     # BACKUP_S3_ENDPOINT / BACKUP_S3_BUCKET: written by Terraform from the same inputs
-    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub).
+    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub);
+    # BACKUP_CLUSTER_ID: when Terraform created this cluster - part of the archive's serverName.
     substituteFrom:
       - kind: ConfigMap
         name: backup-s3

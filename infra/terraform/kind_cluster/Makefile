@@ -37,7 +37,7 @@ destroy: ## Destroy cluster: delete the kind cluster, prove it is gone, then emp
 	@echo "==> Cleaning up Terraform state..."
 	@$(MAKE) --no-print-directory state-clean
 	@rm -f $(TF_DIR)/kubeconfig.yaml
-	@echo "==> Done. Cluster deleted and state emptied. The lab's databases and MinIO data are gone with it; age.agekey is kept."
+	@echo "==> Done. Cluster deleted and state emptied. The lab's databases are gone with it; age.agekey and the MinIO data (.minio-data, the backups) are kept."
 
 state-list: ## List all resources in state
 	$(TF) state list

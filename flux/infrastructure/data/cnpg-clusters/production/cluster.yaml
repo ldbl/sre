@@ -38,9 +38,13 @@ spec:
       isWALArchiver: true
       parameters:
         barmanObjectName: app-postgres-backups
-        # One archive per major version: 17's backups and WAL stay under app-postgres and still restore
-        # into a 17 cluster; 18 starts its own.
-        serverName: app-postgres-pg18
+        # One archive per major version AND per cluster: 17's backups and WAL stay under app-postgres
+        # and still restore into a 17 cluster; 18 starts its own. BACKUP_CLUSTER_ID is the day and time
+        # Terraform created this Kubernetes cluster (ConfigMap backup-s3): a rebuilt cluster starts an
+        # empty archive next to the old one - the plugin refuses to archive into a used one ("Expected
+        # empty archive") and the database runs without backups. The old archive stays for a restore
+        # (Chapter 22); retention prunes only the live cluster's own.
+        serverName: app-postgres-pg18-${BACKUP_CLUSTER_ID}
   resources:
     requests:
       cpu: 10m
