@@ -212,6 +212,33 @@ no role allows.
   Hetzner cluster is rebuilt each cycle, which replaces both; on a cluster that lives on, a lost admin
   kubeconfig means rotating the CA (k3s: `k3s certificate rotate-ca`) - plan it as an outage.
 
+## Prometheus Service Account Token
+
+kube-prometheus-stack creates a `kubernetes.io/service-account-token` Secret for Prometheus: the
+ServiceMonitors of the API server, the kubelets and CoreDNS can authenticate only through a Secret.
+The token in it never expires. The Hetzner cluster is rebuilt each cycle, which replaces it; on a
+cluster that lives on, replace it when it may have been seen.
+
+**Deleting the Secret is not a rotation.** The token names only the ServiceAccount (name and UID) and
+the Secret's name - no issue time, no Secret UID - so the Secret the chart creates again holds the same
+token, byte for byte, and the old copy is valid again (seen on kind, 2026-10-12). And while the Secret
+is missing, the operator drops the three ServiceMonitors from Prometheus' configuration: their targets
+disappear instead of turning down, so no `TargetDown` fires.
+
+A new token needs a new ServiceAccount:
+
+1. Delete the ServiceAccount - Kubernetes deletes its token Secret with it, and the old token stops
+   working at once:
+   `kubectl --context <name> -n observability delete serviceaccount kube-prometheus-stack-prometheus`.
+2. Let the chart create both again:
+   `flux --context <name> reconcile helmrelease kube-prometheus-stack -n observability --force`.
+3. Restart Prometheus: its pod still carries the old ServiceAccount's token, and its Kubernetes service
+   discovery gets `401` until it starts again. The prometheus-operator owns the StatefulSet, not Flux,
+   so deleting the pod is the restart:
+   `kubectl --context <name> -n observability delete pod prometheus-kube-prometheus-stack-prometheus-0`.
+4. Verify: every target is up again - the `apiserver`, `kubelet` and `coredns` jobs among them - and
+   `sum(rate(prometheus_sd_kubernetes_failures_total[5m]))` is `0`.
+
 ## Third-Party URLs and DSNs
 
 The Alertmanager heartbeat URL and the Uptrace DSN are secrets in a URL: whoever has the heartbeat URL
