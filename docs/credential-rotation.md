@@ -246,8 +246,8 @@ The Guardian's Gemini key (Chapter 14) is billed per request on the owner's Goog
 1. Create a new key in Google AI Studio, under the same project.
 2. `sops edit flux/secrets/observability/k8s-ai-monitor-secrets.yaml` (`gemini-api-key`) and, in the same
    pull request, the Guardian's annotation ([Restarting the Readers](#restarting-the-readers)). Merge.
-   For kind, set the new key in the owner's `.local` and run `make kind-plan` and `make kind-apply`.
-   kind rolls nothing by itself: delete its pod.
+   For kind, set `guardian_llm_api_key` in `infra/terraform/kind_cluster/terraform.tfvars` and run
+   `make kind-plan` and `make kind-apply`. kind rolls nothing by itself: delete its pod.
 3. Verify: the Guardian's log at start says `LLM check OK`.
 4. Delete the old key in AI Studio.
 
