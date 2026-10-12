@@ -99,4 +99,7 @@ jobs:
       - name: Run every hook on every file
         env:
           SKIP: master-branch-check
+          # The credential dates are SafeOps' own: a learner's fork cannot rotate them, and its pull
+          # requests must not fail the day one of them is due. There they are reported, not enforced.
+          CHECK_CREDENTIALS_DATES: ${{ github.repository == 'safeops-course/sre' && 'enforce' || 'report' }}
         run: pre-commit run --all-files --show-diff-on-failure
