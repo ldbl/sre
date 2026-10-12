@@ -63,6 +63,16 @@ spec:
       podDisruptionBudget:
         enabled: true
         minAvailable: 1
+      # ...and the two must be on different nodes for that. The chart already prefers one per node
+      # (podAntiAffinity on the hostname), but with one worker and a tainted control plane both ran on
+      # the worker: its reboot took both down, the fail-closed signature webhook refused every new app
+      # pod, and the ReplicaSets' retry backoff kept production down 18 minutes for a 5-minute reboot
+      # (Hetzner cycle 2026-10-12). Allowed on the control plane, one replica answers while the worker
+      # is away. Only the admission controller: the other Kyverno controllers can wait.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
     backgroundController:
       enabled: true
     cleanupController:
