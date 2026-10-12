@@ -11,12 +11,14 @@ location           = "hel1"
 load_balancer_type = "lb11"
 
 # ─── Server Types ────────────────────────────────────────────────────────────
-# Single-node: workloads run on control plane, no separate worker.
-control_plane_server_type         = "cx23"
+# One control plane (no workloads on it) and one worker. cpx (AMD) rather than cx: on 2026-10-12 a worker
+# create failed in hel1 with "error during placement (resource_unavailable)" for cx33 - cpx is the type
+# line with more capacity, and nothing here depends on the CPU vendor.
+control_plane_server_type         = "cpx22"
 control_plane_count               = 1
 allow_scheduling_on_control_plane = false
 
-workers_server_type = "cx33"
+workers_server_type = "cpx32"
 workers_count       = 1
 
 # ─── Autoscaling ─────────────────────────────────────────────────────────────
