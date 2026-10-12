@@ -19,13 +19,25 @@ spec:
         safeops.io/secrets-rotated: "2026-09-26T00:00:00Z"
     spec:
       serviceAccountName: k8s-ai-monitor
+      # Restricted Pod Security, like the apps: the image's user monitor (uid 1000), and fsGroup
+      # so that user can write the volume.
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       containers:
         - name: k8s-ai-monitor
           image: k8s-ai-monitor # registry and tag: images in kustomization.yaml (Flux image automation)
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8080
@@ -102,6 +114,9 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            # The root filesystem is read-only; SQLite puts its temporary files here.
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /healthz
@@ -125,3 +140,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: k8s-ai-monitor-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
