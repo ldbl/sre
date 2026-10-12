@@ -22,7 +22,8 @@
 # Why these fields:
 #   - barmanObjectName: app-postgres-backups - the ObjectStore that holds the path and the keys.
 #   - serverName: the archive the source writes to - its plugin parameter serverName (one per
-#     PostgreSQL major version: app-postgres-pg18), or the source cluster's name when it sets none;
+#     PostgreSQL major version and cluster: app-postgres-pg18-<BACKUP_CLUSTER_ID>), or the source
+#     cluster's name when it sets none;
 #     without it CNPG looks under the external cluster's name and finds nothing.
 #   - No WAL archiving for the restored cluster (no spec.plugins): it is for proving and inspecting the
 #     restore. Archiving it into the same store would need its own serverName.

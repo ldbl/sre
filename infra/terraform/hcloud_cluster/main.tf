@@ -471,8 +471,20 @@ resource "kubernetes_secret_v1" "sops_age" {
   depends_on = [kubernetes_namespace_v1.bootstrap]
 }
 
+# The day and time this cluster was created, for the CNPG archive's serverName (BACKUP_CLUSTER_ID in
+# the backup-s3 ConfigMap below): every new cluster writes an archive of its own, and the old one stays
+# for a restore. timestamp() is read once - ignore_changes keeps it; a new cluster gets a new one.
+# https://developer.hashicorp.com/terraform/language/resources/terraform-data
+resource "terraform_data" "cluster_id" {
+  input = formatdate("YYYYMMDD-hhmm", timestamp())
+
+  lifecycle {
+    ignore_changes = [input]
+  }
+}
+
 # Non-secret backup target for Flux. The cnpg-cluster-<env> Kustomizations read
-# BACKUP_S3_ENDPOINT and BACKUP_S3_BUCKET from this ConfigMap (postBuild.substituteFrom),
+# BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET and BACKUP_CLUSTER_ID from this ConfigMap (postBuild.substituteFrom),
 # so etcd snapshots, the cnpg-backup-s3 Secret and the CNPG clusters all use the same
 # Terraform inputs - there is no second copy of these values in Git.
 resource "kubernetes_config_map_v1" "backup_s3" {
@@ -484,6 +496,7 @@ resource "kubernetes_config_map_v1" "backup_s3" {
   data = {
     BACKUP_S3_ENDPOINT = var.backup_s3_endpoint
     BACKUP_S3_BUCKET   = var.backup_s3_bucket
+    BACKUP_CLUSTER_ID  = terraform_data.cluster_id.output
   }
 
   depends_on = [kubernetes_namespace_v1.bootstrap]

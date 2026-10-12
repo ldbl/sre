@@ -13,6 +13,11 @@ database and owner `app`, credentials in the Secret `app-postgres-app`.
 - **Where:** MinIO inside the cluster on kind (bucket `sre`) - it does not survive the loss of the
   cluster; Hetzner Object Storage on the platform. The endpoint and bucket come from Terraform
   (ConfigMap substitution); the keys from the Secret `cnpg-backup-s3`.
+- **One archive per cluster:** the server name is `app-postgres-pg18-<BACKUP_CLUSTER_ID>`, the day
+  and time Terraform created the Kubernetes cluster. A rebuilt cluster writes a new archive - the
+  plugin refuses a used one ("Expected empty archive": the database runs, without backups) - and the
+  old one stays for a restore (Chapter 22). Retention prunes only the live cluster's archive; old
+  ones are deleted by hand once no longer needed.
 - **Moved from the in-tree `barmanObjectStore`** (deprecated since CNPG 1.26, removed in 1.31) with the
   same path and server name, so the backups taken before the move still restore.
 - **Watched by** `PostgresWALArchivingFailing`, `PostgresBackupFailed`, `PostgresBackupTooOld` and
