@@ -82,6 +82,10 @@ spec:
           labelSelector:          # a spread counts pods in the kyverno namespace only
             matchLabels:
               app.kubernetes.io/component: admission-controller
+          # Count only this revision's pods: during a rolling update the old ones still occupy the
+          # worker, and both new ones landed on the control plane (seen on kind).
+          matchLabelKeys:
+            - pod-template-hash
     backgroundController:
       enabled: true
     cleanupController:
