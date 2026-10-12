@@ -23,9 +23,9 @@ Deploys `k8s-ai-monitor` in namespace `observability`: every signal becomes one 
 
 - **kind** (`local_profile = true`): Terraform creates the Secret - a random `internal-token` and the key
   from `guardian_llm_api_key` in `terraform.tfvars` (git-ignored). See `docs/local-dev.md`.
-- **Hetzner**: `flux/secrets/observability/k8s-ai-monitor-secrets.yaml` (SOPS) holds only
-  `internal-token`. To add an LLM key or a Slack webhook, `sops edit` it with the keys from
-  `k8s-ai-monitor-secrets.yaml.example`.
+- **Hetzner**: `flux/secrets/observability/k8s-ai-monitor-secrets.yaml` (SOPS) holds `internal-token`
+  and `gemini-api-key` (LLM_PROVIDER is gemini on both clusters). To add a Slack webhook, `sops edit` it
+  with the keys from `k8s-ai-monitor-secrets.yaml.example`.
 
 ### Rotating `internal-token`
 
