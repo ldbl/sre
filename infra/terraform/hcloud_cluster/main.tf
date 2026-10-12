@@ -477,6 +477,9 @@ resource "kubernetes_secret_v1" "sops_age" {
 # https://developer.hashicorp.com/terraform/language/resources/terraform-data
 resource "terraform_data" "cluster_id" {
   input = formatdate("YYYYMMDD-hhmm", timestamp())
+  # A new k3s cluster has a new certificate authority: a new id, even if the state was kept. Ordinary
+  # applies (a resized server, a new chart) keep the CA and the id.
+  triggers_replace = sha256(module.kube_hetzner.kubeconfig_data.cluster_ca_certificate)
 
   lifecycle {
     ignore_changes = [input]
