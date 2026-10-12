@@ -63,6 +63,6 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: minio-data
+            claimName: minio-host-data
         - name: tmp
           emptyDir: {}

@@ -10,8 +10,9 @@ database and owner `app`, credentials in the Secret `app-postgres-app`.
   (`object-store.yaml`): `s3://${BACKUP_S3_BUCKET}/cnpg-backups/<namespace>/app-postgres`.
   Retention: 7 days in develop, 14 in staging, 30 in production (the ObjectStore's `retentionPolicy`).
   The plugin runs as a sidecar in the database pod; its resources are in the ObjectStore.
-- **Where:** MinIO inside the cluster on kind (bucket `sre`) - it does not survive the loss of the
-  cluster; Hetzner Object Storage on the platform. The endpoint and bucket come from Terraform
+- **Where:** MinIO inside the cluster on kind (bucket `sre`), its data in a directory on the laptop
+  (`infra/terraform/kind_cluster/.minio-data`) - it survives `make kind-destroy`, not the loss of the
+  laptop; Hetzner Object Storage on the platform. The endpoint and bucket come from Terraform
   (ConfigMap substitution); the keys from the Secret `cnpg-backup-s3`.
 - **One archive per cluster:** the server name is `app-postgres-pg18-<BACKUP_CLUSTER_ID>`, the day
   and time Terraform created the Kubernetes cluster. A rebuilt cluster writes a new archive - the

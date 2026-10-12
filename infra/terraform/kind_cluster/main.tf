@@ -83,10 +83,28 @@ locals {
   ghcr_secret_enabled      = var.enable_ghcr && nonsensitive(var.ghcr_token != "")
 }
 
+# MinIO's data directory on this machine (git-ignored), mounted into the worker node below: the CNPG
+# backups survive `make kind-destroy`, so a rebuilt cluster can restore from them (Chapter 22).
+# Created before the cluster with mode 0777: Docker would create a missing mount source as root, and
+# MinIO runs as uid 1000. `rm -rf` it for a clean start - a new cluster writes a new archive anyway.
+locals {
+  minio_data_dir = abspath("${path.module}/.minio-data")
+}
+
+resource "terraform_data" "minio_data_dir" {
+  input = local.minio_data_dir
+
+  provisioner "local-exec" {
+    command = "mkdir -p \"${local.minio_data_dir}\" && chmod 0777 \"${local.minio_data_dir}\""
+  }
+}
+
 # The cluster. kind runs each node as a Docker container; the resource returns the
 # API address and client certificate that the providers above use.
 # https://registry.terraform.io/providers/tehcyx/kind/latest/docs/resources/cluster
 resource "kind_cluster" "sre" {
+  depends_on = [terraform_data.minio_data_dir]
+
   name            = "sre-control-plane"
   wait_for_ready  = true
   kubeconfig_path = local.kubeconfig_path
@@ -139,6 +157,12 @@ resource "kind_cluster" "sre" {
 
     node {
       role = "worker"
+
+      # MinIO's PersistentVolume (flux/infrastructure/data/minio/pvc.yaml) points at this path.
+      extra_mounts {
+        host_path      = local.minio_data_dir
+        container_path = "/var/local/minio-data"
+      }
     }
   }
 }
