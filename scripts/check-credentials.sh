@@ -13,17 +13,23 @@
 #   - expires (optional, the provider's own end date): fails WARN_DAYS before it too, and when it is
 #     later than the rotation due date - the provider's end is the backstop if our reminder fails;
 #   - exposed (optional): a value seen by someone who should not have it is due at once - fails until
-#     rotated is after that day;
-#   - accepted (optional) {until, reason}: holds back an overdue or exposed failure until `until`, at
-#     most MAX_ACCEPT_DAYS ahead. Accepting what is not failing fails - remove it.
+#     rotated is that day or later (a leak found and fixed on one day counts as fixed);
+#   - accepted (optional) {since, until, reason}: holds back an overdue or exposed failure from `since`
+#     (the day the debt was taken) until `until`, at most MAX_ACCEPT_DAYS after `since` - not after
+#     today, so moving `until` on cannot extend it quietly: a longer debt is a new `since`, a decision
+#     the diff shows. Accepting what is not failing fails - remove it.
 # And the other way round: every key of every SOPS file under flux/secrets/ (not *.example) is named
 # in some lives_in - "FILE (key, key)" names those keys, a bare "FILE" all of them - and every file and
 # key named there exists. A new Secret, or a new key in a listed one, cannot skip the registry.
 #
 # Runs in pre-commit when the registry, flux/secrets/ or this check changes, and every day on main
 # (.github/workflows/credential-rotation.yml): a date passes without a commit. Needs yq (v4).
+# The dates are SafeOps' own: in a fork (a learner's copy) its credentials are not the learner's to
+# rotate, so CI there runs with CHECK_CREDENTIALS_DATES=report - what is due is printed, not failed.
+# Everything else (descriptions, runbooks, unregistered SOPS keys) fails everywhere.
 # Usage: scripts/check-credentials.sh   (no arguments)
 #        TODAY=2026-10-11 scripts/check-credentials.sh   (tests: a fixed "today", UTC)
+#        CHECK_CREDENTIALS_DATES=report scripts/check-credentials.sh   (report due dates, do not fail)
 # Read-only. Exit 0 when every entry passes, 1 otherwise.
 set -euo pipefail
 
@@ -36,6 +42,10 @@ REGISTRY="docs/credential-registry.yaml"
 WARN_DAYS=14
 MAX_ACCEPT_DAYS=30
 TODAY="${TODAY:-$(date -u +%F)}"
+DATES_MODE="${CHECK_CREDENTIALS_DATES:-enforce}"
+[[ "${DATES_MODE}" == enforce || "${DATES_MODE}" == report ]] \
+  || { echo "check-credentials: CHECK_CREDENTIALS_DATES must be enforce or report (got '${DATES_MODE}')" >&2; exit 1; }
+reported=()   # due dates in report mode: printed, not failed
 
 # add_days DATE N - DATE + N days as YYYY-MM-DD; BSD date (macOS) and GNU date (Linux) differ here.
 add_days() {
@@ -78,7 +88,6 @@ secret_keys() {
 [[ -f "${REGISTRY}" ]] || { echo "check-credentials: ${REGISTRY} not found" >&2; exit 1; }
 
 SOON="$(add_days "${TODAY}" "${WARN_DAYS}")"
-ACCEPT_LIMIT="$(add_days "${TODAY}" "${MAX_ACCEPT_DAYS}")"
 failures=()
 names=()
 declared=()   # "FILE:key" for each key a lives_in names, "FILE:*" for a bare FILE
@@ -167,7 +176,7 @@ for ((i = 0; i < count; i++)); do
     if ! is_date "${expires}"; then
       failures+=("${where}: expires must be a real date, YYYY-MM-DD (got '${expires}')")
     elif [[ ! "${expires}" > "${SOON}" ]]; then
-      failures+=("${where}: the provider ends it on ${expires} - replace it before then")
+      due_now+=("${where}: the provider ends it on ${expires} - replace it before then")
     elif [[ -n "${due}" && "${expires}" > "${due}" ]]; then
       # The provider's end is the backstop when our own reminder fails (a disabled scheduled workflow,
       # a missed e-mail): it must not outlive the rotation date.
@@ -177,22 +186,24 @@ for ((i = 0; i < count; i++)); do
   if [[ -n "${exposed}" ]]; then
     if ! is_date "${exposed}" || [[ "${exposed}" > "${TODAY}" ]]; then
       failures+=("${where}: exposed must be a real date, not in the future (got '${exposed}')")
-    elif [[ -z "${rotated}" || ! "${rotated}" > "${exposed}" ]]; then
+    elif [[ -z "${rotated}" || "${rotated}" < "${exposed}" ]]; then
       due_now+=("${where}: exposed on ${exposed} and not replaced since - due at once")
     fi
   fi
 
   # Debt taken on purpose: holds back due_now until a date, never for long, never for nothing.
+  since="$(field accepted.since)"
   until="$(field accepted.until)"
   reason="$(field accepted.reason)"
   if [[ -n "$(yq ".credentials[${i}] | has(\"accepted\")" "${REGISTRY}" | grep true || true)" ]]; then
     if [[ ${#due_now[@]} -eq 0 ]]; then
       failures+=("${where}: accepted, but nothing is due - remove accepted")
+    elif ! is_date "${since}" || [[ "${since}" > "${TODAY}" ]]; then
+      failures+=("${where}: accepted needs since - the day the debt was taken, not in the future (got '${since}')")
     elif ! is_date "${until}" || [[ "${until}" < "${TODAY}" ]]; then
-      failures+=("${due_now[@]}")
-      failures+=("${where}: accepted until '${until}' - not a date, or passed")
-    elif [[ "${until}" > "${ACCEPT_LIMIT}" ]]; then
-      failures+=("${where}: accepted until ${until}, more than ${MAX_ACCEPT_DAYS} days ahead (latest ${ACCEPT_LIMIT})")
+      due_now+=("${where}: accepted until '${until}' - not a date, or passed")
+    elif [[ "${until}" > "$(add_days "${since}" "${MAX_ACCEPT_DAYS}")" ]]; then
+      failures+=("${where}: accepted from ${since} until ${until} - more than ${MAX_ACCEPT_DAYS} days (latest $(add_days "${since}" "${MAX_ACCEPT_DAYS}"))")
     elif [[ -z "${reason}" ]]; then
       failures+=("${where}: accepted needs a reason")
     else
@@ -200,7 +211,14 @@ for ((i = 0; i < count; i++)); do
       due_now=()
     fi
   fi
-  [[ ${#due_now[@]} -eq 0 ]] || failures+=("${due_now[@]}")
+  # Due dates fail - or, in report mode (a fork), are only printed.
+  if [[ ${#due_now[@]} -gt 0 ]]; then
+    if [[ "${DATES_MODE}" == report ]]; then
+      reported+=("${due_now[@]}")
+    else
+      failures+=("${due_now[@]}")
+    fi
+  fi
 done
 
 # Every key of every SOPS file under flux/secrets/ is somebody's lives_in.
@@ -224,5 +242,11 @@ if [[ ${#failures[@]} -gt 0 ]]; then
   echo "check-credentials: ${#failures[@]} problem(s) (today ${TODAY}):" >&2
   printf '  - %s\n' "${failures[@]}" >&2
   exit 1
+fi
+if [[ ${#reported[@]} -gt 0 ]]; then
+  echo "check-credentials: ${#reported[@]} due date(s) reported, not enforced (CHECK_CREDENTIALS_DATES=report):"
+  printf '  - %s\n' "${reported[@]}"
+  echo "check-credentials: ${count} credential(s) described and registered (today ${TODAY})"
+  exit 0
 fi
 echo "check-credentials: ${count} credential(s) OK (today ${TODAY}; nothing due before ${SOON})"
