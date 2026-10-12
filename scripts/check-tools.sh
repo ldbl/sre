@@ -79,7 +79,7 @@ hint() {
     promtool:*)        echo "https://github.com/prometheus/prometheus/releases (prometheus-<version>.linux-amd64.tar.gz: promtool) | https://prometheus.io/download/" ;;
     kyverno:*)         echo "https://github.com/kyverno/kyverno/releases (kyverno-cli_v<version>_linux_x86_64.tar.gz) | https://kyverno.io/docs/kyverno-cli/install/" ;;
     kubeconform:Darwin) echo "brew install kubeconform  | https://github.com/yannh/kubeconform#installation" ;;
-    kubeconform:*)     echo "https://github.com/yannh/kubeconform/releases (kubeconform-linux-amd64.tar.gz)" ;;
+    kubeconform:*)     echo "https://github.com/yannh/kubeconform/releases (kubeconform-linux-<arch>.tar.gz: amd64 or arm64)" ;;
     helm:Darwin)       echo "brew install helm  | https://helm.sh/docs/intro/install/" ;;
     helm:*)            echo "https://helm.sh/docs/intro/install/ (the release archive or the install script)" ;;
     *)                 echo "" ;;

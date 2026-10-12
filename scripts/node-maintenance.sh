@@ -102,9 +102,16 @@ fi
 # load balancer kept sending requests to a rebooting node until its health check failed - about 22 s
 # of timeouts on Hetzner (2026-10-11), with no application pod left on the node. This label tells
 # the cloud controller to drop the node from every Service of type LoadBalancer.
-echo "== out of the load balancer (${lb_label}), then ${lb_settle_s}s for it to take effect"
-kube label node "${node}" "${lb_label}=true" --overwrite
-sleep "${lb_settle_s}"
+# A node someone took out of the load balancer on purpose stays out: the label is removed at the end
+# only if this run added it.
+lb_label_was_set="$(kube get node "${node}" -o jsonpath="{.metadata.labels['${lb_label//./\\.}']}")"
+if [[ -n "${lb_label_was_set}" ]]; then
+  echo "== already out of the load balancer (${lb_label}=${lb_label_was_set}) - left as it is"
+else
+  echo "== out of the load balancer (${lb_label}), then ${lb_settle_s}s for it to take effect"
+  kube label node "${node}" "${lb_label}=true"
+  sleep "${lb_settle_s}"
+fi
 
 echo "== cordon and drain"
 kube cordon "${node}"
@@ -142,7 +149,9 @@ done
 
 echo "== uncordon, back into the load balancer"
 kube uncordon "${node}"
-kube label node "${node}" "${lb_label}-"
-sleep "${lb_settle_s}"
+if [[ -z "${lb_label_was_set}" ]]; then
+  kube label node "${node}" "${lb_label}-"
+  sleep "${lb_settle_s}"
+fi
 trap - ERR
 echo "done: ${node} updated and back. Check the platform before the next node (Flux Ready, smoke test)."
