@@ -137,8 +137,8 @@ scripts/             # Pre-commit hooks, automation scripts
   no /api/token, no pprof, chaos as expected, bounded /delay, no wildcard CORS).
 
 ### Resource Management
-- ResourceQuotas per namespace: requests 1 CPU / 1Gi everywhere; limits 2 CPU / 2Gi in develop, 3 CPU / 3Gi
-  in staging and production (the worst case - HPA max + rolling surge + Postgres - must fit)
+- ResourceQuotas per namespace: requests 1 CPU / 1Gi (production 1 CPU / 1.5Gi); limits 2 CPU / 2Gi in develop,
+  3 CPU / 3Gi in staging, 3 CPU / 4Gi in production (two Postgres instances there) (the worst case - HPA max + rolling surge + Postgres - must fit)
 - App resources: staging = production >= develop (backend production/staging 100m/128Mi requests,
   250m/256Mi limits). Enforced with the quota budget by `scripts/check-app-resources.sh` (pre-commit + Flux Diff)
 - LimitRange sets defaults (10m/64Mi request) — cert-manager ACME solver needs min 10m CPU

@@ -6,9 +6,14 @@ metadata:
   annotations:
     cnpg.io/validation: "disabled"
 spec:
-  instances: 1
+  # A primary and one streaming replica (Chapter 22): when the primary's pod or disk is lost, CNPG
+  # promotes the replica (24 s after a crash on kind), and an update restarts the replica first, then
+  # switches over. Replication is asynchronous: transactions the replica had not received yet are
+  # lost with the primary. On Hetzner both run on the one worker - this survives a lost pod, not a
+  # lost node.
+  instances: 2
   # Pinned to a minor and its digest: the major tag (:17) moved to every new PostgreSQL minor by
-  # itself. Changing this restarts the instance once - with one instance, a short outage.
+  # itself. Changing this restarts the replica, then switches the primary over to it.
   # The minimal Debian trixie image: the in-tree barman tools of the old "system" image are not needed
   # with the Barman Cloud plugin (its sidecar brings them).
   # A new MAJOR version here is an offline in-place upgrade: CNPG stops the instance and runs

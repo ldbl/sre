@@ -1,0 +1,31 @@
+# Streaming replication between the instances of one Postgres cluster (Chapter 22): a replica - and
+# the job that clones it - connects to the primary on 5432, and after a failover the old primary
+# follows the new one the same way. The pods of a cluster only reach each other; default-deny-all
+# would drop it silently and the replica would never become ready.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-replication
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: app-postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: app-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: app-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
