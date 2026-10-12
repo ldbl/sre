@@ -99,6 +99,12 @@ DATES_MODE=report run_case "report mode: an overdue token passes" pass "${E}.rot
 DATES_MODE=report run_case "report mode: exposed, not replaced, passes" pass "${E}.exposed = \"2026-09-20\""
 DATES_MODE=report run_case "report mode: a missing description still fails" fail "${E}.rotated = \"2026-06-01\" | del(${E}.what)"
 DATES_MODE=report run_case "report mode: an unlisted SOPS file still fails" fail "" "printf 'kind: Secret\n' > flux/secrets/develop/new.yaml"
+DATES_MODE=report run_case "report mode: accepted until not a date still fails" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"soon\", \"reason\": \"ingest only\"}"
+DATES_MODE=report run_case "report mode: accepted until passed is only reported" pass \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-01\", \"until\": \"2026-10-10\", \"reason\": \"ingest only\"}"
+run_case "accepted until not a date" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"soon\", \"reason\": \"ingest only\"}"
 DATES_MODE=sometimes run_case "an unknown dates mode fails" fail ""
 # Described: what, where, who, how.
 run_case "no what" fail "del(${E}.what)"

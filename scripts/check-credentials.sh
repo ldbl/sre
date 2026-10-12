@@ -200,8 +200,10 @@ for ((i = 0; i < count; i++)); do
       failures+=("${where}: accepted, but nothing is due - remove accepted")
     elif ! is_date "${since}" || [[ "${since}" > "${TODAY}" ]]; then
       failures+=("${where}: accepted needs since - the day the debt was taken, not in the future (got '${since}')")
-    elif ! is_date "${until}" || [[ "${until}" < "${TODAY}" ]]; then
-      due_now+=("${where}: accepted until '${until}' - not a date, or passed")
+    elif ! is_date "${until}"; then
+      failures+=("${where}: accepted until must be a real date, YYYY-MM-DD (got '${until}')")
+    elif [[ "${until}" < "${TODAY}" ]]; then
+      due_now+=("${where}: accepted until ${until} - passed")
     elif [[ "${until}" > "$(add_days "${since}" "${MAX_ACCEPT_DAYS}")" ]]; then
       failures+=("${where}: accepted from ${since} until ${until} - more than ${MAX_ACCEPT_DAYS} days (latest $(add_days "${since}" "${MAX_ACCEPT_DAYS}"))")
     elif [[ -z "${reason}" ]]; then
