@@ -45,7 +45,7 @@ jobs:
     # COURSE_REPO_PAT and nothing to publish to, so the job is skipped there instead of failing
     # every push. In this repository a missing secret still fails loudly (next step).
     if: github.repository == 'safeops-course/sre'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Require COURSE_REPO_PAT
         env:
@@ -57,12 +57,12 @@ jobs:
           fi
 
       - name: Checkout sre repo
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: sre
 
       - name: Checkout sre-course repo
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: safeops-course/sre-course
           token: ${{ secrets.COURSE_REPO_PAT }}

@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   preflight:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Required secrets and variables are set
         env:
@@ -63,7 +63,7 @@ jobs:
           exit "$missing"
 
   e2e:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: preflight
     timeout-minutes: 120
     # Approval: the "production" environment requires a reviewer (Settings > Environments). The job
@@ -94,7 +94,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup kubectl
         run: |

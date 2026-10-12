@@ -20,7 +20,7 @@
 #   scripts/lab-pod.sh -n develop -l app=backend -i postgres:17 -u 999 -s app-postgres-app -- \
 #     sh -c 'PGPASSWORD="$SECRET_password" psql -h app-postgres-rw -U app -d app -c "SELECT 1"'
 #
-# Defaults: image busybox:1.36, uid 65532, read-only root filesystem with a
+# Defaults: image busybox:1.38, uid 65532, read-only root filesystem with a
 # writable /tmp (16Mi); CPU and memory come from the namespace LimitRange
 # defaults. Pods are deleted after a one-off run; --daemon pods stay until
 # you delete them.
@@ -38,7 +38,7 @@
 set -euo pipefail
 
 NAMESPACE=""
-IMAGE="busybox:1.36"
+IMAGE="busybox:1.38"
 UID_NUM="65532"
 LABELS=()
 SECRET=""
