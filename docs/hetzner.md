@@ -175,7 +175,7 @@ dependency updates" issue, and that issue is the reminder to run this too.
 
 ```bash
 scripts/node-maintenance.sh hetzner-sre-control-plane <node>                  # dry run: what a drain would evict, what blocks it
-scripts/node-maintenance.sh hetzner-sre-control-plane <node> --apply          # cordon, drain, transactional-update, reboot, uncordon
+scripts/node-maintenance.sh hetzner-sre-control-plane <node> --apply          # out of the LB, cordon, drain, transactional-update, reboot, uncordon, back into the LB
 ```
 
 With one worker a drain cannot complete: the pods have nowhere to go, and CloudNativePG's
