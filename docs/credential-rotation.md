@@ -239,6 +239,18 @@ A new token needs a new ServiceAccount:
 4. Verify: every target is up again - the `apiserver`, `kubelet` and `coredns` jobs among them - and
    `sum(rate(prometheus_sd_kubernetes_failures_total[5m]))` is `0`.
 
+## Guardian LLM Key
+
+The Guardian's Gemini key (Chapter 14) is billed per request on the owner's Google account.
+
+1. Create a new key in Google AI Studio, under the same project.
+2. `sops edit flux/secrets/observability/k8s-ai-monitor-secrets.yaml` (`gemini-api-key`) and, in the same
+   pull request, the Guardian's annotation ([Restarting the Readers](#restarting-the-readers)). Merge.
+   For kind, set `guardian_llm_api_key` in `infra/terraform/kind_cluster/terraform.tfvars` and run
+   `make kind-plan` and `make kind-apply`. kind rolls nothing by itself: delete its pod.
+3. Verify: the Guardian's log at start says `LLM check OK`.
+4. Delete the old key in AI Studio.
+
 ## Third-Party URLs and DSNs
 
 The Alertmanager heartbeat URL and the Uptrace DSN are secrets in a URL: whoever has the heartbeat URL
