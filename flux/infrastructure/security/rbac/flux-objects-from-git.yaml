@@ -1,0 +1,51 @@
+---
+# Flux objects come from Git - never from an OIDC sign-in.
+# develop-admin.yaml binds the built-in admin role in develop, and Flux aggregates its own edit roles
+# (flux-edit-*, flux-operator-edit) into admin. So RBAC alone lets every member create a Kustomization,
+# HelmRelease or ResourceSet in develop - and kustomize-/helm-controller apply it with cluster-admin
+# rights (no serviceAccountName, no multi-tenancy lockdown): one object, and the whole cluster.
+# This policy refuses every create, update and delete of a Flux object by the OIDC groups, in every
+# namespace. The one exception is what oidc-flux-operator.yaml grants on purpose: admins updating a
+# Kustomization or HelmRelease in flux-system - and oidc-flux-operator-fields limits that update to
+# spec.suspend and the reconcile annotations. Native ValidatingAdmissionPolicy, Deny, for the same reason as that one:
+# the access model must not depend on Kyverno.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: oidc-flux-objects-from-git
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - source.toolkit.fluxcd.io
+          - kustomize.toolkit.fluxcd.io
+          - helm.toolkit.fluxcd.io
+          - notification.toolkit.fluxcd.io
+          - image.toolkit.fluxcd.io
+          - fluxcd.controlplane.io
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["*"]
+  matchConditions:
+    - name: oidc-groups
+      expression: >-
+        has(request.userInfo.groups) && request.userInfo.groups.exists(g, g.startsWith('safeops-course:'))
+  validations:
+    - expression: >-
+        request.operation == 'UPDATE'
+        && request.namespace == 'flux-system'
+        && request.resource.resource in ['kustomizations', 'helmreleases']
+        && 'safeops-course:admins' in request.userInfo.groups
+      messageExpression: >-
+        'Flux objects come from Git: OIDC users may not ' + request.operation.lowerAscii() + ' '
+        + request.resource.resource + ' in ' + request.namespace
+        + ' (admins may only suspend or reconcile a Kustomization or HelmRelease in flux-system)'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: oidc-flux-objects-from-git
+spec:
+  policyName: oidc-flux-objects-from-git
+  validationActions: [Deny]

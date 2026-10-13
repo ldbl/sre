@@ -113,7 +113,9 @@ scripts/             # Pre-commit hooks, automation scripts
   `safeops-course:admins` (Dex never sends the bare org). Both: admin in develop, read-only in staging,
   production, flux-system, kube-system (no Secrets/exec). Admins also patch Kustomizations/HelmReleases
   in flux-system, limited by the ValidatingAdmissionPolicy `oidc-flux-operator-fields` (Deny) to
-  spec.suspend + reconcile annotations; GitRepositories stay read-only. Writing elsewhere = the
+  spec.suspend + reconcile annotations; GitRepositories stay read-only. Every other create/update/delete
+  of a Flux object by these groups is refused by `oidc-flux-objects-from-git` (Deny) - the develop `admin`
+  role includes Flux's aggregated edit roles, and Flux applies with cluster-admin rights. Writing elsewhere = the
   Terraform break-glass kubeconfig. Enforced by `scripts/check-oidc-rbac.sh` (pre-commit + Flux Diff).
   kubectl login: `kubectl oidc-login setup --oidc-issuer-url=https://dex.safeops.work --oidc-client-id=kubernetes
   --oidc-extra-scope=email --oidc-extra-scope=groups` (int128/kubelogin; the API server maps the user from
