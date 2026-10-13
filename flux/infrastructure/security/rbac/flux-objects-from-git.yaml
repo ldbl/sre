@@ -6,8 +6,8 @@
 # rights (no serviceAccountName, no multi-tenancy lockdown): one object, and the whole cluster.
 # This policy refuses every create, update and delete of a Flux object by the OIDC groups, in every
 # namespace. The one exception is what oidc-flux-operator.yaml grants on purpose: admins updating a
-# Kustomization or HelmRelease - and oidc-flux-operator-fields limits that update to spec.suspend and
-# the reconcile annotations. Native ValidatingAdmissionPolicy, Deny, for the same reason as that one:
+# Kustomization or HelmRelease in flux-system - and oidc-flux-operator-fields limits that update to
+# spec.suspend and the reconcile annotations. Native ValidatingAdmissionPolicy, Deny, for the same reason as that one:
 # the access model must not depend on Kyverno.
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
@@ -34,11 +34,13 @@ spec:
   validations:
     - expression: >-
         request.operation == 'UPDATE'
+        && request.namespace == 'flux-system'
         && request.resource.resource in ['kustomizations', 'helmreleases']
         && 'safeops-course:admins' in request.userInfo.groups
       messageExpression: >-
         'Flux objects come from Git: OIDC users may not ' + request.operation.lowerAscii() + ' '
-        + request.resource.resource + ' (admins may only suspend or reconcile a Kustomization or HelmRelease)'
+        + request.resource.resource + ' in ' + request.namespace
+        + ' (admins may only suspend or reconcile a Kustomization or HelmRelease in flux-system)'
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
