@@ -14,6 +14,7 @@ KIND_VERSION := 0.33.0
 FLUX_VERSION := 2.9.6
 
 .PHONY: help check-tools versions tf install-hooks pre-commit fmt validate smoke-test \
+	capstone-fault capstone-check \
 	kind-plan kind-apply kind-drift kind-destroy \
 	hcloud-plan hcloud-apply hcloud-drift hcloud-destroy \
 	terraform-hcloud-init terraform-hcloud-plan terraform-hcloud-apply terraform-hcloud-destroy
@@ -90,6 +91,13 @@ KUBE_CONTEXT ?= kind-sre-control-plane
 
 smoke-test: ## Smoke tests against KUBE_CONTEXT (default: the local kind cluster)
 	KUBE_CONTEXT=$(KUBE_CONTEXT) bash tests/smoke-test.sh
+
+# --- Chapter 23 capstone ---------------------------------------------------
+capstone-fault: ## Capstone: a colleague's pull request, merged in your repository (one random fault)
+	@scripts/capstone-fault.sh
+
+capstone-check: ## Capstone: each acceptance criterion against Git and KUBE_CONTEXT (read-only)
+	@KUBE_CONTEXT=$(KUBE_CONTEXT) scripts/capstone-check.sh
 
 validate: ## Validate every Terraform module (no backend, no credentials)
 	@# The same script as the pre-commit hook: a throw-away data dir per module (a real .terraform
