@@ -14,7 +14,7 @@
 # with KUBE_CONTEXT=hetzner-sre-control-plane.
 # What it checks: Flux (every Kustomization Ready and none suspended), the backend and frontend in
 # develop, a request to the backend, the generated secrets, cert-manager Certificates (skipped where
-# cert-manager is not installed, as on kind) and the CNPG clusters. A check that cannot read its
+# cert-manager is not installed) and the CNPG clusters. A check that cannot read its
 # objects, or finds none, fails - an empty answer is never "all healthy". It changes nothing in the cluster except
 # one short-lived probe pod (smoke-curl-<time>-<random> in develop), which it deletes again.
 set -Eeuo pipefail
@@ -136,7 +136,8 @@ certificates_ready() {
   # by SIGPIPE would make the pipeline fail - which `!` would turn into "healthy".
   ! grep -qvx True <<< "$states"
 }
-# cert-manager runs only on the Hetzner cluster (the local profile has no public address).
+# cert-manager runs on both clusters: on Hetzner for the sites' certificates, on kind only for the
+# Barman Cloud plugin's (flux/bootstrap/profiles/local/kustomization.yaml).
 # Discovery must succeed first: a failing API is a failed check, not "cert-manager is not installed".
 if ! api_resources="$(k api-resources -o name 2>/dev/null)"; then
   fail "cert-manager Certificate resources are Ready (API discovery failed)"
