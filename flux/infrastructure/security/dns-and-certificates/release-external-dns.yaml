@@ -9,7 +9,7 @@ spec:
   chart:
     spec:
       chart: external-dns
-      version: "1.20.0"
+      version: "1.23.0"
       sourceRef:
         kind: HelmRepository
         name: external-dns
@@ -36,7 +36,7 @@ spec:
     extraArgs:
       - --annotation-filter=cloudflare-proxied=enabled
       - --cloudflare-proxied
-      - --request-timeout=60s
+      - --kube-api-request-timeout=60s
       - --cloudflare-dns-records-per-page=500
     domainFilters:
       - safeops.work

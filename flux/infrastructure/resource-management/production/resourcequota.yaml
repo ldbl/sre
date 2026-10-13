@@ -7,10 +7,11 @@ spec:
   # limits.* must cover the worst case: every app at HPA maxReplicas + 1 surge pod of a rolling
   # update, plus the Postgres instances. scripts/check-app-resources.sh computes it from the
   # rendered manifests and fails when it does not fit (2Gi was exactly full before the backend got
-  # the same 256Mi limit as develop).
+  # the same 256Mi limit as develop). Production's second Postgres instance (Chapter 22) and its Barman
+  # sidecar add 192Mi of requests and 768Mi of limits: 1Gi / 3Gi were then too small.
   hard:
     requests.cpu: "1"
-    requests.memory: 1Gi
+    requests.memory: 1536Mi
     limits.cpu: "3"
-    limits.memory: 3Gi
+    limits.memory: 4Gi
     pods: "15"

@@ -121,7 +121,7 @@ variable "load_balancer_type" {
 variable "control_plane_server_type" {
   description = "Hetzner server type for the control plane."
   type        = string
-  default     = "cx23"
+  default     = "cpx22"
 }
 
 variable "control_plane_count" {
@@ -139,7 +139,7 @@ variable "allow_scheduling_on_control_plane" {
 variable "workers_server_type" {
   description = "Hetzner server type for worker nodes."
   type        = string
-  default     = "cx23"
+  default     = "cpx32"
 }
 
 variable "workers_count" {
@@ -184,6 +184,19 @@ variable "k3s_version" {
 
 variable "auto_upgrade_k3s" {
   description = "Automatically upgrade K3s when a new patch appears on the selected channel. Off: k3s moves only when k3s_version changes in a reviewed pull request."
+  type        = bool
+  default     = false
+}
+
+variable "k3s_upgrade_eviction" {
+  description = <<-EOT
+    Evict pods (respecting PodDisruptionBudgets) when the system-upgrade-controller drains a node for a k3s
+    upgrade. Off: pods are deleted. Each database runs one instance whose budget allows no disruption, so
+    with eviction the drain waits forever - the node stays cordoned and the upgrade never finishes (Hetzner
+    cycle 2026-10-11, even with two workers). Off, the upgrade is a short planned outage of those pods,
+    as node maintenance already is (scripts/node-maintenance.sh --accept-outage). Turn it on with highly
+    available databases.
+  EOT
   type        = bool
   default     = false
 }

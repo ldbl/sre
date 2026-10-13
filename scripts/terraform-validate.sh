@@ -20,6 +20,12 @@ set -e
 # ~/.terraform.d/plugin-cache) and linked from there. Without it every run downloaded every provider
 # of all three modules again - half a minute per commit, and one flaky download from GitHub failed
 # the hook (found in the Chapter 05 lab, 2026-10-04).
+# A git hook runs with GIT_INDEX_FILE (and GIT_DIR, GIT_WORK_TREE) set to the commit's own - with
+# `git commit -a` a temporary index. terraform init downloads registry modules with git clone, which
+# inherits them: kube-hetzner's files landed in the commit's index and the commit failed ("invalid
+# object ... for '.claude/skills/debug-node/SKILL.md'"). The modules' git must see its own repository.
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_PREFIX
+
 export TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-${HOME}/.terraform.d/plugin-cache}"
 mkdir -p "${TF_PLUGIN_CACHE_DIR}"
 

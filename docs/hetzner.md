@@ -5,7 +5,7 @@ This runbook is the authoritative path for provisioning and validating the Hetzn
 ## MVP Decisions (As Of 2026-02-16)
 
 - Runtime: `kube-hetzner` (k3s) via Terraform.
-- Topology: `1x cx23` control-plane + `1x cx23` worker.
+- Topology: `1x cpx22` control-plane + `1x cpx32` worker (cpx since 2026-10-12: cx33 hit `resource_unavailable` in hel1).
 - Environments: `develop`, `staging`, `production` namespaces in one cluster.
 - GitOps: Flux with sync path `./flux/bootstrap/flux-system`.
 - Flux Git auth model (MVP): **public GitHub repo over HTTPS** (no Git token required by default).
@@ -175,7 +175,7 @@ dependency updates" issue, and that issue is the reminder to run this too.
 
 ```bash
 scripts/node-maintenance.sh hetzner-sre-control-plane <node>                  # dry run: what a drain would evict, what blocks it
-scripts/node-maintenance.sh hetzner-sre-control-plane <node> --apply          # cordon, drain, transactional-update, reboot, uncordon
+scripts/node-maintenance.sh hetzner-sre-control-plane <node> --apply          # out of the LB, cordon, drain, transactional-update, reboot, uncordon, back into the LB
 ```
 
 With one worker a drain cannot complete: the pods have nowhere to go, and CloudNativePG's

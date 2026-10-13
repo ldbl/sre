@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# OS updates for one node of the Hetzner cluster, at a time we choose: cordon, drain, install the
-# updates (transactional-update), reboot, wait for the new boot, uncordon.
+# OS updates for one node of the Hetzner cluster, at a time we choose: out of the load balancer,
+# cordon, drain, install the updates (transactional-update), reboot, wait for the new boot, uncordon,
+# back into the load balancer.
 #
 # Why by hand: the platform turns off the nodes' automatic updates and kured (auto_upgrade_os,
 # kured_enabled in infra/terraform/hcloud_cluster). With one worker, every reboot is an outage; one
@@ -43,6 +44,12 @@ ssh_user="${SSH_USER:-root}"
 ssh_port="${SSH_PORT:-22}"
 drain_timeout="${DRAIN_TIMEOUT:-10m}"
 reboot_timeout_s="${REBOOT_TIMEOUT_S:-900}"
+# How long to wait after taking the node out of (and back into) the load balancer. The script cannot
+# see the load balancer: this covers the cloud controller updating its targets and the LB's own
+# health check (Hetzner: every 15 s, 10 s timeout, 3 tries). A wait, not a proof - the proof is a
+# probe from outside during the maintenance (Chapter 20).
+lb_settle_s="${LB_SETTLE_S:-60}"
+lb_label="node.kubernetes.io/exclude-from-external-load-balancers"
 
 # kube <args> - kubectl against the given context; the only way this script talks to a cluster.
 kube() { kubectl --context "${context}" "$@"; }
@@ -54,7 +61,7 @@ on_node() {
 }
 
 # Fail loudly with the step that failed - the node may be left cordoned; the message says so.
-trap 'echo "error: stopped at line ${LINENO} - ${node} may still be cordoned: kubectl --context ${context} uncordon ${node} once it is healthy" >&2' ERR
+trap 'echo "error: stopped at line ${LINENO} - ${node} may still be cordoned and out of the load balancer: kubectl --context ${context} uncordon ${node} and kubectl --context ${context} label node ${node} ${lb_label}- once it is healthy" >&2' ERR
 
 boot_id="$(kube get node "${node}" -o jsonpath='{.status.nodeInfo.bootID}')"
 address="$(kube get node "${node}" -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}')"
@@ -84,12 +91,27 @@ else
 fi
 
 if [[ "${apply}" != true ]]; then
-  echo "dry run only - nothing changed. Run again with --apply to cordon, drain, update and reboot ${node}."
+  echo "dry run only - nothing changed. Run again with --apply to take ${node} out of the load balancer, cordon, drain, update and reboot it."
   exit 0
 fi
 
 # A kind node is a container: no ExternalIP and no OS of its own - the dry run works there, --apply not.
 [[ -n "${address}" ]] || { echo "error: ${node} has no ExternalIP to ssh to - --apply needs a real node" >&2; exit 1; }
+
+# Out of the load balancer first. A cordon no longer removes a node from it (Kubernetes 1.21+): the
+# load balancer kept sending requests to a rebooting node until its health check failed - about 22 s
+# of timeouts on Hetzner (2026-10-11), with no application pod left on the node. This label tells
+# the cloud controller to drop the node from every Service of type LoadBalancer.
+# A node someone took out of the load balancer on purpose stays out: the label is removed at the end
+# only if this run added it.
+lb_label_was_set="$(kube get node "${node}" -o jsonpath="{.metadata.labels['${lb_label//./\\.}']}")"
+if [[ -n "${lb_label_was_set}" ]]; then
+  echo "== already out of the load balancer (${lb_label}=${lb_label_was_set}) - left as it is"
+else
+  echo "== out of the load balancer (${lb_label}), then ${lb_settle_s}s for it to take effect"
+  kube label node "${node}" "${lb_label}=true"
+  sleep "${lb_settle_s}"
+fi
 
 echo "== cordon and drain"
 kube cordon "${node}"
@@ -125,7 +147,11 @@ while :; do
   sleep 10
 done
 
-echo "== uncordon"
+echo "== uncordon, back into the load balancer"
 kube uncordon "${node}"
+if [[ -z "${lb_label_was_set}" ]]; then
+  kube label node "${node}" "${lb_label}-"
+  sleep "${lb_settle_s}"
+fi
 trap - ERR
 echo "done: ${node} updated and back. Check the platform before the next node (Flux Ready, smoke test)."

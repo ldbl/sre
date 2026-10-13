@@ -92,6 +92,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: capstone-fault-test
+        name: capstone fault tests (throw-away copy, no cluster, no GitHub)
+        entry: tests/capstone-fault.test.sh
+        language: script
+        files: ^(scripts/capstone-fault\.sh|tests/capstone-fault\.test\.sh|scripts/check-app-(security|resources)\.sh|flux/apps/backend/(base/deployment|develop/kustomization)\.yaml|flux/infrastructure/network-policies/base/allow-(backend-egress|postgres-ingress)-(postgres|backend)\.yaml)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: check-credentials-test
         name: credential registry check tests (throw-away copy, no secrets)
         entry: tests/check-credentials.test.sh
@@ -246,7 +254,7 @@ repos:
         stages: [pre-commit]
 
   - repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.10.0
+    rev: v0.11.0
     hooks:
       - id: shellcheck
         files: \.sh$
@@ -254,7 +262,7 @@ repos:
         stages: [pre-commit]
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         files: \.ya?ml$

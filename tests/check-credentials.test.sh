@@ -37,7 +37,7 @@ credentials:
 EOF
   [[ -z "${edit}" ]] || yq -i "${edit}" "${WORK}/repo/docs/credential-registry.yaml"
   [[ -z "${setup}" ]] || (cd "${WORK}/repo" && eval "${setup}")
-  if (cd "${WORK}/repo" && TODAY="${TODAY}" scripts/check-credentials.sh >/dev/null 2>&1); then got=pass; else got=fail; fi
+  if (cd "${WORK}/repo" && TODAY="${TODAY}" CHECK_CREDENTIALS_DATES="${DATES_MODE-enforce}" scripts/check-credentials.sh >/dev/null 2>&1); then got=pass; else got=fail; fi
   if [[ "${got}" == "${expected}" ]]; then
     echo "ok   - ${name}"
   else
@@ -71,19 +71,46 @@ run_case "a key may expire up to 180 days after rotation" pass "${E}.class = \"k
 # A leaked value is due at once - unless replaced after the leak.
 run_case "exposed, not replaced since" fail "${E}.exposed = \"2026-09-20\""
 run_case "exposed, replaced after" pass "${E}.exposed = \"2026-08-20\""
+run_case "exposed and replaced the same day" pass "${E}.exposed = \"2026-09-01\""
 run_case "exposed in the future" fail "${E}.exposed = \"2026-10-20\""
 # Accepted debt: only for what fails, for at most 30 days, with a reason.
 run_case "exposed, accepted for 20 days with a reason" pass \
-  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"until\": \"2026-10-31\", \"reason\": \"ingest only\"}"
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"2026-10-31\", \"reason\": \"ingest only\"}"
 run_case "accepted for 40 days" fail \
-  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"until\": \"2026-11-20\", \"reason\": \"ingest only\"}"
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"2026-11-20\", \"reason\": \"ingest only\"}"
 run_case "accepted until yesterday" fail \
-  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"until\": \"2026-10-10\", \"reason\": \"ingest only\"}"
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-01\", \"until\": \"2026-10-10\", \"reason\": \"ingest only\"}"
 run_case "accepted without a reason" fail \
-  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"until\": \"2026-10-31\"}"
-run_case "accepted, but nothing is due" fail "${E}.accepted = {\"until\": \"2026-10-31\", \"reason\": \"just in case\"}"
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"2026-10-31\"}"
+run_case "accepted without since" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"until\": \"2026-10-31\", \"reason\": \"ingest only\"}"
+run_case "accepted since a day in the future" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-12\", \"until\": \"2026-10-31\", \"reason\": \"ingest only\"}"
+# The old limit was today + 30: moving `until` on every few weeks kept a debt forever. Counted from
+# since, 60 days fail even though the end is less than 30 days from today.
+run_case "accepted 60 days, the end moved on" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-09-01\", \"until\": \"2026-10-31\", \"reason\": \"ingest only\"}"
+run_case "accepted, but nothing is due" fail "${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"2026-10-31\", \"reason\": \"just in case\"}"
 run_case "overdue, accepted" pass \
-  "${E}.rotated = \"2026-06-01\" | ${E}.accepted = {\"until\": \"2026-10-31\", \"reason\": \"provider outage\"}"
+  "${E}.rotated = \"2026-06-01\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"2026-10-31\", \"reason\": \"provider outage\"}"
+
+# Report mode - a fork: SafeOps' dates are printed, not failed; everything else still fails.
+DATES_MODE=report run_case "report mode: an overdue token passes" pass "${E}.rotated = \"2026-06-01\""
+DATES_MODE=report run_case "report mode: exposed, not replaced, passes" pass "${E}.exposed = \"2026-09-20\""
+DATES_MODE=report run_case "report mode: a missing description still fails" fail "${E}.rotated = \"2026-06-01\" | del(${E}.what)"
+DATES_MODE=report run_case "report mode: an unlisted SOPS file still fails" fail "" "printf 'kind: Secret\n' > flux/secrets/develop/new.yaml"
+DATES_MODE=report run_case "report mode: accepted until not a date still fails" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"soon\", \"reason\": \"ingest only\"}"
+DATES_MODE=report run_case "report mode: accepted until passed is only reported" pass \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-01\", \"until\": \"2026-10-10\", \"reason\": \"ingest only\"}"
+run_case "accepted until not a date" fail \
+  "${E}.exposed = \"2026-09-20\" | ${E}.accepted = {\"since\": \"2026-10-11\", \"until\": \"soon\", \"reason\": \"ingest only\"}"
+DATES_MODE=sometimes run_case "an unknown dates mode fails" fail ""
+# No CHECK_CREDENTIALS_DATES: the copy here is no clone of safeops-course/sre (no origin) - a fork, so report.
+DATES_MODE="" run_case "no mode set, not SafeOps' clone: an overdue token is only reported" pass "${E}.rotated = \"2026-06-01\""
+# flux/secrets/local/ is the learner's own (Chapter 04), not a platform credential.
+run_case "a SOPS file under flux/secrets/local/ needs no registry entry" pass "" \
+  "mkdir -p flux/secrets/local && printf 'kind: Secret\nstringData:\n  greeting: ENC[AES256_GCM,data:z]\n' > flux/secrets/local/lab-secret.yaml"
 # Described: what, where, who, how.
 run_case "no what" fail "del(${E}.what)"
 run_case "no used_by" fail "del(${E}.used_by)"

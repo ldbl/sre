@@ -23,3 +23,6 @@ override.tf.json
 # CLI configuration files
 .terraformrc
 terraform.rc
+
+# MinIO's data (CNPG backups) - mounted into the kind worker, kept across kind-destroy
+.minio-data/

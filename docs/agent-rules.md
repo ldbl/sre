@@ -83,7 +83,7 @@ included, while it still shows `READY True`.
 
 | Rule for the agent | What enforces it |
 |---|---|
-| A fix to an object Flux manages goes into Git, through a pull request - never `kubectl edit`, `patch` or `apply` on that object. | On Hetzner the OIDC roles are read-only in `staging` and `production`; in `flux-system` too, except that `safeops-course:admins` may patch Kustomizations and HelmReleases to change `spec.suspend` or the reconcile annotations - nothing else. In `develop` and on kind a hand change is allowed, and Flux sets it back at the next reconcile - that undoes it, it does not stop it: instruction only. |
+| A fix to an object Flux manages goes into Git, through a pull request - never `kubectl edit`, `patch` or `apply` on that object. | On Hetzner the OIDC roles are read-only in `staging` and `production`; in `flux-system` too, except that `safeops-course:admins` may patch Kustomizations and HelmReleases to change `spec.suspend` or the reconcile annotations - nothing else. No OIDC user may create, change or delete any other Flux object, in any namespace - `develop` included (`oidc-flux-objects-from-git`). In `develop` and on kind a hand change is allowed, and Flux sets it back at the next reconcile - that undoes it, it does not stop it: instruction only. |
 | Never `flux suspend` on your own. If a suspend looks necessary, stop and report: who would suspend what, why, and when it is resumed. | On Hetzner only the `safeops-course:admins` group may suspend, resume or reconcile (`flux/infrastructure/security/rbac`); an agent signed in as an admin can, so for it this is an instruction. On kind: instruction only. |
 | Never report the cluster as healthy from `READY` alone: read the `SUSPENDED` column too. | `make smoke-test` fails on a suspended Kustomization. |
 | Before proposing a change to a shared `base`, run `flux diff kustomization` for every environment the base feeds, and report every `deleted`. An exit code above `1` means the preview failed, not that nothing changes. | Instruction only. The Flux Diff CI job builds and validates the manifests; it does not compare them with a cluster. |
@@ -280,7 +280,8 @@ requests while sparing the probes - a release can look healthy to every health c
 
 ## Chapter 16 - A guardrail refuses; an exception is narrow, owned and from Git
 
-Five Kyverno ClusterPolicies (`flux/infrastructure/policy/packs/admission-guardrails/`) enforce in
+Five Kyverno guardrails (`flux/infrastructure/policy/packs/admission-guardrails/`, each a pair of
+ValidatingPolicies: `<name>-enforce` and `<name>-audit`) enforce in
 `develop`, `staging` and `production` - the API server refuses a pod or Deployment that breaks them -
 and audit everywhere else (PolicyReports). An exception for one workload is a `PolicyException` in
 `flux/infrastructure/policy/exceptions/`; Kyverno reads no other namespace, and only Flux may write one.
@@ -288,7 +289,7 @@ and audit everywhere else (PolicyReports). An exception for one workload is a `P
 | Rule for the agent | What enforces it |
 |---|---|
 | When admission refuses a change, fix the manifest - never weaken the policy, switch it to Audit or narrow its namespaces to get one workload through. | Review of the policy diff; `tests/kyverno-policies.test.sh` (pre-commit and CI) fails when a rule's verdicts change. |
-| An exception names one policy rule, one namespace and the resources by name, with `safeops.io/owner`, `safeops.io/reason` and `safeops.io/expires` (at most 90 days) - and goes in through a pull request. | `scripts/check-policy-exceptions.sh` (pre-commit and CI); the ValidatingAdmissionPolicy `policy-exceptions-only-from-git` refuses any writer but Flux. |
+| An exception (`policies.kyverno.io/v1`) names one policy, and one namespace and one workload in the fixed `matchConditions` form, with `safeops.io/owner`, `safeops.io/reason` and `spec.expiresAt` (at most 90 days) - and goes in through a pull request. | `scripts/check-policy-exceptions.sh` (pre-commit and CI); the ValidatingAdmissionPolicy `policy-exceptions-only-from-git` refuses any writer but Flux. |
 | Never `kubectl apply` a policy, a mode change or an exception by hand, and never delete the `policy-exceptions-only-from-git` binding - that is break-glass for the owner, when Flux itself is broken. | The ValidatingAdmissionPolicy for exceptions; Flux reverts hand changes to policies (Chapter 03). |
 | Before proposing Enforce for a new rule or namespace, show the evidence: the PolicyReports of that namespace with no failures, and the occasional workloads (lab pods, Jobs) checked too. | Review of the pull request. |
 

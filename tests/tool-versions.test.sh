@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Do the tools the tests run match what the cluster runs? The policy tests use the Kyverno CLI and
+# Do the tools the tests run match what Git asks the cluster to run? The policy tests use the Kyverno CLI and
 # the alert tests use promtool - both pinned in .github/workflows/pre-commit.yml. The cluster gets
 # Kyverno and Prometheus from Helm charts pinned in flux/. A chart bump without the matching tool
 # bump - or the other way round - and the tests verify against an engine the cluster does not run:
 # in 2026-10 the policy tests ran Kyverno 1.19 while the cluster ran 1.17 (chart 3.7.1), and a
 # passing test said nothing about admission (Chapter 20).
+# It reads the charts pinned in Git, not the cluster: after a failed upgrade that was rolled back, the
+# cluster still runs the old version while this check is green. What runs is read from the cluster
+# (flux get helmreleases, the image of the Deployment) after every upgrade.
 #
 # For each pair it asks Helm what the pinned chart installs (`helm show`) and compares:
 #   Kyverno CLI  KYVERNO_VERSION     == appVersion of the kyverno chart in flux/infrastructure/policy/kyverno
@@ -36,12 +39,15 @@ chart_of() {
 }
 
 failed=0
-# compare WHAT TOOL_VERSION CLUSTER_VERSION - equal once a leading v is dropped.
+# compare WHAT TOOL_VERSION CLUSTER_VERSION - equal once a leading v and an image variant suffix
+# (v3.15.0-distroless) are dropped.
 compare() {
-  if [[ "${2#v}" == "${3#v}" ]]; then
-    echo "ok   $1: tests ${2#v} = cluster ${3#v}"
+  local tool="${2#v}" cluster="${3#v}"
+  cluster="${cluster%%-*}"
+  if [[ "${tool}" == "${cluster}" ]]; then
+    echo "ok   $1: tests ${tool} = chart in Git ${cluster}"
   else
-    echo "FAIL $1: the tests run ${2#v}, the cluster runs ${3#v} - bump them together" >&2
+    echo "FAIL $1: the tests run ${tool}, the chart in Git installs ${cluster} - bump them together" >&2
     failed=1
   fi
 }

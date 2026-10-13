@@ -2,8 +2,9 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
     "Dependency updates on our own schedule (Chapter 20): Renovate opens no pull requests. It keeps one",
-    "issue - the dependency dashboard - listing what is out of date; updates are made by hand, all in one",
-    "pull request, after reading the release notes and testing against the version the cluster runs.",
+    "issue - the dependency dashboard - listing what is out of date; updates are made by hand once a month,",
+    "after reading the release notes: patch versions together in one pull request, every minor or major",
+    "version in one per component (the chart with the tool that tests it).",
     "Versions outside a standard file carry a '# renovate: datasource=... depName=...' comment above them.",
     "Vulnerability alerts stay with GitHub's own alerts (on for the repository); the workflow token cannot read them."
   ],
@@ -42,6 +43,20 @@
       "description": "The platform's own images are updated by Flux image automation, not here.",
       "matchPackageNames": [
         "/^ghcr\\.io/safeops-course//"
+      ],
+      "enabled": false
+    },
+    {
+      "description": [
+        "origin-ca-issuer's CRDs come from its Git repository pinned by commit (flux/bootstrap/flux-system/infrastructure.yaml).",
+        "Renovate would follow the default branch's HEAD, not the release tags; the chart version (helm datasource) is the signal",
+        "for a new release, and the CRD commit is moved to that release's tag by hand, in the same pull request."
+      ],
+      "matchDatasources": [
+        "git-refs"
+      ],
+      "matchPackageNames": [
+        "https://github.com/cloudflare/origin-ca-issuer"
       ],
       "enabled": false
     }

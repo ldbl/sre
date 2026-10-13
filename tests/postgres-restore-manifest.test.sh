@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/postgres-restore-manifest.sh against a stub kubectl - no cluster.
 # Run: tests/postgres-restore-manifest.test.sh   (pre-commit runs it when the script or this test changes)
-# The stub answers the two reads the script makes (the source Cluster, the backup Secret) and logs
+# The stub answers the two reads the script makes (the source Cluster, its ObjectStore) and logs
 # every call, so a case can check the printed manifest, the exit code and the --context used.
 # Needs yq (v4) to parse the manifest. Exit 0 when every case passes, 1 otherwise.
 set -euo pipefail
@@ -12,17 +12,21 @@ FAILED=0
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
-# The stub kubectl: logs its arguments; returns a source Cluster as JSON, or one key of the backup
-# Secret base64-encoded. STUB_NO_BUCKET=1 makes the Secret lack BUCKET.
+# The stub kubectl: logs its arguments; returns a source Cluster as JSON, or the ObjectStore's name.
+# STUB_NO_STORE=1 makes the ObjectStore missing.
 mkdir -p "${WORK}/bin"
 cat > "${WORK}/bin/kubectl" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >> "${STUB_LOG}"
 case "$*" in
   *"get cluster.postgresql.cnpg.io app-postgres -o json"*)
-    echo '{"spec":{"imageName":"ghcr.io/cloudnative-pg/postgresql:17","storage":{"size":"10Gi"},"resources":{"limits":{"memory":"512Mi"}}}}' ;;
-  *"jsonpath={.data.BUCKET}"*) [ "${STUB_NO_BUCKET:-0}" = 1 ] || printf '%s' bkt | base64 ;;
-  *"jsonpath={.data.ENDPOINT}"*) printf '%s' http://minio:9000 | base64 ;;
+    if [ "${STUB_SERVER:-}" ]; then
+      echo '{"spec":{"imageName":"ghcr.io/cloudnative-pg/postgresql:18","storage":{"size":"10Gi"},"resources":{},"plugins":[{"name":"barman-cloud.cloudnative-pg.io","parameters":{"barmanObjectName":"app-postgres-backups","serverName":"'"${STUB_SERVER}"'"}}]}}'
+    else
+      echo '{"spec":{"imageName":"ghcr.io/cloudnative-pg/postgresql:17","storage":{"size":"10Gi"},"resources":{"limits":{"memory":"512Mi"}}}}'
+    fi ;;
+  *"get objectstores.barmancloud.cnpg.io app-postgres-backups -o name"*)
+    [ "${STUB_NO_STORE:-0}" = 1 ] && exit 1; echo objectstore.barmancloud.cnpg.io/app-postgres-backups ;;
   *) exit 1 ;;
 esac
 EOF
@@ -44,8 +48,10 @@ run() {
 run -n develop
 check "full restore: exit 0" '[ "${RC}" = 0 ]'
 check "full restore: valid YAML, kind Cluster" '[ "$(yq ".kind" "${WORK}/out.yaml")" = Cluster ]'
-check "serverName is the source cluster" '[ "$(yq ".spec.externalClusters[0].barmanObjectStore.serverName" "${WORK}/out.yaml")" = app-postgres ]'
-check "destinationPath from the Secret's bucket and the namespace" '[ "$(yq ".spec.externalClusters[0].barmanObjectStore.destinationPath" "${WORK}/out.yaml")" = s3://bkt/cnpg-backups/develop/app-postgres ]'
+check "read through the Barman Cloud plugin" '[ "$(yq ".spec.externalClusters[0].plugin.name" "${WORK}/out.yaml")" = barman-cloud.cloudnative-pg.io ]'
+check "serverName is the source cluster when it sets none" '[ "$(yq ".spec.externalClusters[0].plugin.parameters.serverName" "${WORK}/out.yaml")" = app-postgres ]'
+check "the environment's ObjectStore" '[ "$(yq ".spec.externalClusters[0].plugin.parameters.barmanObjectName" "${WORK}/out.yaml")" = app-postgres-backups ]'
+check "no in-tree barmanObjectStore" '[ "$(yq ".spec.externalClusters[0].barmanObjectStore" "${WORK}/out.yaml")" = null ]'
 check "image copied from the source" '[ "$(yq ".spec.imageName" "${WORK}/out.yaml")" = ghcr.io/cloudnative-pg/postgresql:17 ]'
 check "resources copied from the source" '[ "$(yq ".spec.resources.limits.memory" "${WORK}/out.yaml")" = 512Mi ]'
 check "name is app-postgres-restore (the policies allow it)" '[ "$(yq ".metadata.name" "${WORK}/out.yaml")" = app-postgres-restore ]'
@@ -68,7 +74,9 @@ check "-t without a value is refused: exit 1, says why" '[ "${RC}" = 1 ] && grep
 run -n -c some-ctx
 check "an option where a value belongs is refused: exit 1, says why" '[ "${RC}" = 1 ] && grep -q -- "-n needs a value" "${WORK}/err.txt"'
 
-STUB_NO_BUCKET=1 run -n develop
-check "a Secret without BUCKET fails loudly" '[ "${RC}" != 0 ]'
+STUB_SERVER=app-postgres-pg18 run -n develop
+check "serverName from the source's plugin parameter (one archive per major)" '[ "$(yq ".spec.externalClusters[0].plugin.parameters.serverName" "${WORK}/out.yaml")" = app-postgres-pg18 ]'
+STUB_NO_STORE=1 run -n develop
+check "a missing ObjectStore fails loudly" '[ "${RC}" != 0 ] && grep -q "cannot read ObjectStore" "${WORK}/err.txt"'
 
 exit "${FAILED}"

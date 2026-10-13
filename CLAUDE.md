@@ -113,7 +113,9 @@ scripts/             # Pre-commit hooks, automation scripts
   `safeops-course:admins` (Dex never sends the bare org). Both: admin in develop, read-only in staging,
   production, flux-system, kube-system (no Secrets/exec). Admins also patch Kustomizations/HelmReleases
   in flux-system, limited by the ValidatingAdmissionPolicy `oidc-flux-operator-fields` (Deny) to
-  spec.suspend + reconcile annotations; GitRepositories stay read-only. Writing elsewhere = the
+  spec.suspend + reconcile annotations; GitRepositories stay read-only. Every other create/update/delete
+  of a Flux object by these groups is refused by `oidc-flux-objects-from-git` (Deny) - the develop `admin`
+  role includes Flux's aggregated edit roles, and Flux applies with cluster-admin rights. Writing elsewhere = the
   Terraform break-glass kubeconfig. Enforced by `scripts/check-oidc-rbac.sh` (pre-commit + Flux Diff).
   kubectl login: `kubectl oidc-login setup --oidc-issuer-url=https://dex.safeops.work --oidc-client-id=kubernetes
   --oidc-extra-scope=email --oidc-extra-scope=groups` (int128/kubelogin; the API server maps the user from
@@ -137,8 +139,8 @@ scripts/             # Pre-commit hooks, automation scripts
   no /api/token, no pprof, chaos as expected, bounded /delay, no wildcard CORS).
 
 ### Resource Management
-- ResourceQuotas per namespace: requests 1 CPU / 1Gi everywhere; limits 2 CPU / 2Gi in develop, 3 CPU / 3Gi
-  in staging and production (the worst case - HPA max + rolling surge + Postgres - must fit)
+- ResourceQuotas per namespace: requests 1 CPU / 1Gi (production 1 CPU / 1.5Gi); limits 2 CPU / 2Gi in develop,
+  3 CPU / 3Gi in staging, 3 CPU / 4Gi in production (two Postgres instances there) (the worst case - HPA max + rolling surge + Postgres - must fit)
 - App resources: staging = production >= develop (backend production/staging 100m/128Mi requests,
   250m/256Mi limits). Enforced with the quota budget by `scripts/check-app-resources.sh` (pre-commit + Flux Diff)
 - LimitRange sets defaults (10m/64Mi request) — cert-manager ACME solver needs min 10m CPU
@@ -159,6 +161,10 @@ scripts/             # Pre-commit hooks, automation scripts
   `guard-terraform-plan.sh`, apply applies only that plan (refused when older than `TF_MAX_AGE`, default 60 min)
 - `make hcloud-plan` / `hcloud-apply` / `hcloud-destroy` — the same for Hetzner (aliases of
   `terraform-hcloud-plan|apply|destroy`; CI calls `terraform-hcloud-destroy`); `make hcloud-drift` - drift check
+- `make capstone-fault` — Chapter 23: a colleague's pull request with one random fault (f1 sign-up limit,
+  f2 database network policies, f3 backend CPU), merged in the learner's repository; `scripts/capstone-fault.sh --local` commits only
+  (tests/capstone-fault.test.sh). `make capstone-check` — the capstone's acceptance criteria against Git and
+  the cluster, PROVEN / NOT PROVEN YET (read-only but for the smoke test's probe pod)
 
 ### hcloud_cluster / kind_cluster Makefiles
 - `make init` / `make plan` (saved, via the guard) / `make apply` (that plan only) / `make destroy`

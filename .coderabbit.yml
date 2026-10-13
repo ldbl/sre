@@ -71,7 +71,7 @@ reviews:
         Strategic-merge patches, partial by design: do not ask for securityContext, probes or resources that come from base/.
     - path: "flux/infrastructure/policy/packs/**"
       instructions: |
-        Kyverno ClusterPolicies. *.example.yaml are teaching examples, not in kustomization.yaml - do not ask to include them.
+        Kyverno ValidatingPolicies and ImageValidatingPolicies (CEL), each in an enforce/audit pair that must stay identical but for name, title, action, failurePolicy and namespace operator. *.example.yaml are teaching examples, not in kustomization.yaml - do not ask to include them.
         Flag a policy switched from Audit to Enforce (or back) without a note in the PR description.
     - path: ".github/workflows/**"
       instructions: |

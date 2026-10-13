@@ -1,6 +1,6 @@
 # unsigned-demo (Chapter 17)
 
-`ghcr.io/safeops-course/unsigned-demo:1.0` - busybox, built by CI and pushed **without** a cosign
+`ghcr.io/safeops-course/unsigned-demo:1.1` - busybox, built by CI and pushed **without** a cosign
 signature, an SBOM attestation or build provenance. It exists to be refused:
 
 - In `develop`, `staging` and `production` the supply-chain policy refuses it at admission.

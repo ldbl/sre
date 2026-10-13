@@ -78,6 +78,8 @@ hint() {
     promtool:Darwin)   echo "brew install prometheus  | https://prometheus.io/download/ (promtool is in the archive)" ;;
     promtool:*)        echo "https://github.com/prometheus/prometheus/releases (prometheus-<version>.linux-amd64.tar.gz: promtool) | https://prometheus.io/download/" ;;
     kyverno:*)         echo "https://github.com/kyverno/kyverno/releases (kyverno-cli_v<version>_linux_x86_64.tar.gz) | https://kyverno.io/docs/kyverno-cli/install/" ;;
+    kubeconform:Darwin) echo "brew install kubeconform  | https://github.com/yannh/kubeconform#installation" ;;
+    kubeconform:*)     echo "https://github.com/yannh/kubeconform/releases (kubeconform-linux-<arch>.tar.gz: amd64 or arm64)" ;;
     helm:Darwin)       echo "brew install helm  | https://helm.sh/docs/intro/install/" ;;
     helm:*)            echo "https://helm.sh/docs/intro/install/ (the release archive or the install script)" ;;
     *)                 echo "" ;;
@@ -135,6 +137,7 @@ check kyverno    "$MIN_KYVERNO"   "kyverno version"     # the admission policy t
 check cosign     "$MIN_COSIGN"    "cosign version"      # verify image signatures and SBOMs (Chapter 17)
 check promtool   "$MIN_PROMTOOL"  "promtool --version"  # the platform alert tests in pre-commit
 check helm       "$MIN_HELM"      "helm version --short"  # the tool-versions test in pre-commit (Chapter 20)
+check kubeconform ""              "kubeconform -v"      # manifests against the next Kubernetes version (Chapter 20)
 
 # docker buildx is a Docker CLI plugin, not a command on PATH, so `check` cannot find it.
 # Chapter 10 compares image digests in the registry with `docker buildx imagetools inspect`.

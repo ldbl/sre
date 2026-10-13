@@ -32,18 +32,23 @@ if [[ -f "$DEFAULT_KCFG" ]]; then
   # names in the copy of the old one, so only entries that are really there get deleted.
   names() { kubectl config view --kubeconfig "$NEW_KCFG" -o jsonpath="$1" | tr ' ' '\n' | sed '/^$/d'; }
   existing() { kubectl config view --kubeconfig "$TMP_OLD" -o jsonpath="$1" | tr ' ' '\n'; }
+  # has LIST NAME - NAME is a line of LIST. The list is read into a variable first, not piped into
+  # grep -q: grep -q exits at the first match, the writer gets SIGPIPE, and under pipefail the whole
+  # pipeline then fails - "not found" for a name that is there. GNU tr usually finished writing first;
+  # uutils tr (Ubuntu 26.04) lost the race, and the old entries were kept.
+  has() { grep -qxF -- "$2" <<<"$1"; }
   for ctx in $(names '{.contexts[*].name}'); do
-    if existing '{.contexts[*].name}' | grep -qxF "$ctx"; then
+    if has "$(existing '{.contexts[*].name}')" "$ctx"; then
       kubectl config delete-context "$ctx" --kubeconfig "$TMP_OLD" >/dev/null
     fi
   done
   for cl in $(names '{.clusters[*].name}'); do
-    if existing '{.clusters[*].name}' | grep -qxF "$cl"; then
+    if has "$(existing '{.clusters[*].name}')" "$cl"; then
       kubectl config delete-cluster "$cl" --kubeconfig "$TMP_OLD" >/dev/null
     fi
   done
   for u in $(names '{.users[*].name}'); do
-    if existing '{.users[*].name}' | grep -qxF "$u"; then
+    if has "$(existing '{.users[*].name}')" "$u"; then
       kubectl config delete-user "$u" --kubeconfig "$TMP_OLD" >/dev/null
     fi
   done

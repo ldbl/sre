@@ -1,21 +1,28 @@
 # Policy Exceptions
 
-A Kyverno `PolicyException` lets one named resource past one rule of one policy - everything else
-stays under the guardrail. This directory is the only way one reaches the cluster:
+A Kyverno `PolicyException` (`policies.kyverno.io/v1`) lets one named workload past one policy -
+everything else stays under the guardrail. This directory is the only way one reaches the cluster:
 
 - Kyverno reads exceptions only from the `policy-exceptions` namespace
   (`features.policyExceptions` in `../kyverno/release.yaml`).
 - `only-from-git.yaml` (a native ValidatingAdmissionPolicy) lets only Flux's kustomize-controller
   create or change them - `kubectl apply` is refused, cluster-admin included.
+- Kyverno stops applying an exception at its `spec.expiresAt`.
 - `scripts/check-policy-exceptions.sh` (pre-commit and CI) requires on each one:
   - `metadata.namespace: policy-exceptions`;
-  - the annotations `safeops.io/owner`, `safeops.io/reason` (a link to the issue or incident) and
-    `safeops.io/expires` (`YYYY-MM-DD`, at most 90 days ahead);
-  - one policy and one rule (`ruleNames` may add its `autogen-<rule>` variants, which a Deployment
-    needs), no `*`;
-  - one literal namespace (no `*` or `?`) and at least one resource name that is not only wildcards
-    in every `match` entry - no exception for a whole
-    namespace or the whole cluster.
+  - the annotations `safeops.io/owner` and `safeops.io/reason` (a link to the issue or incident);
+  - `spec.expiresAt` (`2026-12-31T00:00:00Z`, UTC), in the future and at most 90 days ahead;
+  - one `policyRefs` entry naming a guardrail policy that exists in `../packs/admission-guardrails/` -
+    the copy that judges the namespace (`<name>-enforce` for `develop`/`staging`/`production`). The
+    supply-chain policies (Chapter 17) take no exceptions: an unverifiable image is rebuilt;
+  - one `matchConditions` entry in this form, and nothing else in `spec`:
+    ```
+    object.metadata.namespace == 'develop' && object.metadata.name == 'vendor-agent'
+    object.metadata.namespace == 'develop' && object.metadata.name.startsWith('vendor-agent')
+    ```
+    One literal namespace and one workload. The prefix form covers a Deployment and its pods
+    (`vendor-agent-<hash>-<id>`). CEL could say anything; the fixed form keeps the exception
+    reviewable - no exception for a whole namespace, by label, or for the whole cluster.
   It also fails every pull request once an exception has expired, until it is removed or renewed
   on purpose.
 

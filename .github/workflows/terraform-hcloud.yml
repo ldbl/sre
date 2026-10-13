@@ -39,12 +39,12 @@ jobs:
   # Does this run concern the Hetzner Terraform? Pushes to main come here only through the path filter
   # above and manual runs always do; a pull request does when it changes these paths.
   changes:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       terraform: ${{ steps.diff.outputs.terraform }}
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -71,7 +71,7 @@ jobs:
   plan:
     needs: changes
     if: needs.changes.outputs.terraform == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Job-level, not workflow-level: a pull request without Terraform changes must not wait in the
     # queue that the plans, the applies, the destroy and the e2e check share (never two runs on the
     # same state).
@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup kubectl
         run: |
@@ -242,7 +242,7 @@ jobs:
           retention-days: 1
 
   apply:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: plan
     if: github.event_name == 'workflow_dispatch' && inputs.apply && github.ref == 'refs/heads/main' && needs.plan.outputs.has_changes == 'true'
     # Approval: the "production" environment requires a reviewer (Settings > Environments). The job
@@ -261,7 +261,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup kubectl
         run: |
@@ -340,7 +340,7 @@ jobs:
   terraform-plan-gate:
     needs: [changes, plan]
     if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Plan result
         env:

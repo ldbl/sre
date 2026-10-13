@@ -63,9 +63,42 @@ spec:
       podDisruptionBudget:
         enabled: true
         minAvailable: 1
+      # ...and the two must be on different nodes for that. With one worker and a tainted control
+      # plane both ran on the worker: its reboot took both down, the fail-closed signature webhook
+      # refused every new app pod, and the ReplicaSets' retry backoff kept production down 18 minutes
+      # for a 5-minute reboot (Hetzner cycle 2026-10-12). So the admission controller may run on the
+      # control plane, and must be spread one per node: the chart's own anti-affinity is only a
+      # preference, and on kind both replicas then went to the control plane. A spread, not a required
+      # anti-affinity: with two nodes a rolling update can still place its new pod (skew 1). Only the
+      # admission controller: the other Kyverno controllers can wait for the worker.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:          # a spread counts pods in the kyverno namespace only
+            matchLabels:
+              app.kubernetes.io/component: admission-controller
+          # Count only this revision's pods: during a rolling update the old ones still occupy the
+          # worker, and both new ones landed on the control plane (seen on kind).
+          matchLabelKeys:
+            - pod-template-hash
     backgroundController:
       enabled: true
     cleanupController:
       enabled: true
     reportsController:
       enabled: true
+      # The admission guardrails (Chapter 16) also match pods/ephemeralcontainers - kubectl debug
+      # writes there - and Kyverno marks a policy "not ready for reporting" until this controller may
+      # read every resource the policy matches (RBACPermissionsGranted=False, seen on kind with
+      # 1.19.1). Read-only; the pod spec it returns is the one the controller already reads.
+      rbac:
+        clusterRole:
+          extraResources:
+            - apiGroups: [""]
+              resources: [pods/ephemeralcontainers]
+              verbs: [get, list, watch]

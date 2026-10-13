@@ -1,5 +1,6 @@
 # Resources for tests/kyverno-policies.test.sh - one object per case, named after what it breaks.
-# 'good' passes every policy. Pods are in develop, where the guardrails enforce.
+# 'good' passes every policy. Most cases are in develop, where the enforce copies judge; the last
+# ones are in staging and observability.
 ---
 apiVersion: v1
 kind: Pod
@@ -117,7 +118,7 @@ spec:
       type: RuntimeDefault
   containers:
     - name: a
-      image: busybox:1.36
+      image: busybox:1.38
       securityContext:
         allowPrivilegeEscalation: false
         capabilities:
@@ -571,3 +572,151 @@ spec:
       resources:
         requests: {cpu: 10m, memory: 32Mi}
         limits: {cpu: 100m, memory: 64Mi}
+---
+# kubectl debug --profile=sysadmin: a privileged ephemeral container added to a compliant pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-ephemeral
+  namespace: develop
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: ghcr.io/safeops-course/backend:develop-v0.0.0-abc1234-1791000000
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests: {cpu: 50m, memory: 64Mi}
+        limits: {cpu: 200m, memory: 128Mi}
+  ephemeralContainers:
+    - name: debugger
+      image: busybox:1.37
+      securityContext:
+        privileged: true
+---
+# The same checks through a CronJob: the pod spec sits three levels deeper (jobTemplate).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob-latest
+  namespace: develop
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: job
+              image: busybox
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests: {cpu: 10m, memory: 32Mi}
+                limits: {cpu: 100m, memory: 64Mi}
+---
+# The excepted workload as a Deployment: the exception matches it by name prefix, so the Deployment
+# and the pods it creates (vendor-agent-<hash>-<id>) are both let through.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vendor-agent
+  namespace: develop
+spec:
+  selector:
+    matchLabels:
+      app: vendor-agent
+  template:
+    metadata:
+      labels:
+        app: vendor-agent
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: quay.io/example/agent:1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+---
+# The same image under the same name prefix in another namespace: the exception names develop only.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vendor-agent-elsewhere
+  namespace: staging
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: quay.io/example/agent:1.0
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests: {cpu: 50m, memory: 64Mi}
+        limits: {cpu: 200m, memory: 128Mi}
+---
+# Outside the application namespaces the audit copies judge: a compliant pod passes...
+apiVersion: v1
+kind: Pod
+metadata:
+  name: good-observability
+  namespace: observability
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: ghcr.io/safeops-course/backend:develop-v0.0.0-abc1234-1791000000
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests: {cpu: 50m, memory: 64Mi}
+        limits: {cpu: 200m, memory: 128Mi}
+---
+# ...and a pod that breaks all five fails each audit copy (a PolicyReport entry, not a refusal).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-observability
+  namespace: observability
+spec:
+  containers:
+    - name: app
+      image: nginx
+      securityContext:
+        privileged: true

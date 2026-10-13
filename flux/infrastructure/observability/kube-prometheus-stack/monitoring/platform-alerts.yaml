@@ -46,3 +46,20 @@ spec:
             description: >-
               Find what it is doing before giving it more: its logs, its own metrics, what changed
               in its configuration. Scaling a component that loops only makes the loop bigger.
+
+        # A node left cordoned. Maintenance (scripts/node-maintenance.sh) uncordons within minutes; a
+        # k3s upgrade whose drain is refused by a PodDisruptionBudget retries forever and leaves the
+        # node cordoned - seen on Hetzner in 2026-10 with nothing alerting (Chapter 20). New pods
+        # cannot land there, and with one worker nothing new can start at all.
+        - alert: NodeCordonedTooLong
+          expr: kube_node_spec_unschedulable == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.node }} has been cordoned for more than 30 minutes"
+            description: >-
+              A maintenance or an upgrade did not finish. kubectl get plans.upgrade.cattle.io -n
+              system-upgrade and the upgrade job's log ("Cannot evict pod") for a k3s upgrade; the
+              node-maintenance run's output otherwise. kubectl uncordon {{ $labels.node }} once the
+              node is healthy.

@@ -1,11 +1,36 @@
+# MinIO's data lives on the laptop, not in the cluster: kind mounts infra/terraform/kind_cluster/
+# .minio-data (git-ignored) into the worker node at /var/local/minio-data (extra_mounts in
+# kind_cluster/main.tf), and this PersistentVolume points there. The backups survive
+# `make kind-destroy`; a rebuilt cluster's MinIO finds them again (Chapter 22). kind runs workloads
+# on its one worker only (the control plane is tainted), so the path is always on that node.
+# A hostPath volume in a pod is refused by Pod Security restricted; a PersistentVolume is not a pod
+# field - only the cluster admin (Flux) creates it.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: minio-host-data
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    namespace: minio
+    name: minio-host-data
+  hostPath:
+    path: /var/local/minio-data
+    type: Directory
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: minio-data
+  name: minio-host-data
   namespace: minio
 spec:
   accessModes: ["ReadWriteOnce"]
+  storageClassName: ""
+  volumeName: minio-host-data
   resources:
     requests:
       storage: 10Gi

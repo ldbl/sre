@@ -16,7 +16,8 @@
 # Usage: scripts/flux-kustomize-validate.sh [changed files...]   (pre-commit passes the changed files)
 #        FLUX_VALIDATE_KUBERNETES_VERSION=1.37.0 scripts/flux-kustomize-validate.sh
 #          - before a Kubernetes upgrade: every manifest against the version you upgrade TO; an object
-#            whose API that version removed fails (Chapter 20)
+#            whose API that version removed fails (Chapter 20). Needs kubeconform: without it nothing
+#            would be checked against that version, so the run fails instead of passing on a build.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -55,6 +56,13 @@ elif [[ "${DISABLE_SCHEMA_DOWNLOAD}" != "1" ]] && ! command -v curl >/dev/null 2
   exit 1
 fi
 
+# Asked for a check against a Kubernetes version, but nothing to check with: building alone would
+# end in a green summary that checked no API at all.
+if [[ -n "${FLUX_VALIDATE_KUBERNETES_VERSION:-}" && ${run_kubeconform} -eq 0 ]]; then
+  echo "[flux-validate] FLUX_VALIDATE_KUBERNETES_VERSION is set but kubeconform is not installed - nothing would be checked against ${FLUX_VALIDATE_KUBERNETES_VERSION} (make check-tools)" >&2
+  exit 1
+fi
+
 if [[ ! -d "${FLUX_ROOT}" ]]; then
   echo "[flux-validate] flux/ directory not found at ${FLUX_ROOT}" >&2
   exit 1
@@ -68,7 +76,7 @@ contains_kustomization() {
 
 # has_local_flux_schemas - true when the Flux CRD schemas were already downloaded (cached in /tmp).
 has_local_flux_schemas() {
-  [[ -d "${SCHEMA_DIR}" ]] && find "${SCHEMA_DIR}" -type f -name '*.json' -print -quit | grep -q .
+  [[ -d "${SCHEMA_DIR}" ]] && [[ -n "$(find "${SCHEMA_DIR}" -type f -name '*.json' -print -quit)" ]]
 }
 
 # download_flux_schemas - fetch the Flux CRD JSON schemas of the pinned Flux release and unpack them.
@@ -259,7 +267,7 @@ validated=0
 skipped=0
 
 for dir in ${TARGET_DIRS[@]+"${TARGET_DIRS[@]}"}; do
-  rel_dir="${dir#${REPO_ROOT}/}"
+  rel_dir="${dir#"${REPO_ROOT}"/}"
   echo "[flux-validate] kustomize ${rel_dir}"
 
   set +e
@@ -299,5 +307,6 @@ for dir in ${TARGET_DIRS[@]+"${TARGET_DIRS[@]}"}; do
   validated=$((validated + 1))
 done
 
-echo "[flux-validate] summary: validated=${validated} skipped=${skipped}"
+if [[ ${run_kubeconform} -eq 1 ]]; then schemas="checked"; else schemas="NOT checked (no kubeconform)"; fi
+echo "[flux-validate] summary: validated=${validated} skipped=${skipped} schemas=${schemas}"
 exit "${failed}"

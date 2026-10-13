@@ -143,6 +143,7 @@ spec:
   timeout: 10m0s
   dependsOn:
     - name: infrastructure
+    - name: cert-manager # the Barman Cloud plugin's certificates
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -159,7 +160,8 @@ spec:
   wait: false
   postBuild:
     # BACKUP_S3_ENDPOINT / BACKUP_S3_BUCKET: written by Terraform from the same inputs
-    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub).
+    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub);
+    # BACKUP_CLUSTER_ID: when Terraform created this cluster - part of the archive's serverName.
     substituteFrom:
       - kind: ConfigMap
         name: backup-s3
@@ -216,7 +218,8 @@ spec:
   wait: false
   postBuild:
     # BACKUP_S3_ENDPOINT / BACKUP_S3_BUCKET: written by Terraform from the same inputs
-    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub).
+    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub);
+    # BACKUP_CLUSTER_ID: when Terraform created this cluster - part of the archive's serverName.
     substituteFrom:
       - kind: ConfigMap
         name: backup-s3
@@ -273,7 +276,8 @@ spec:
   wait: false
   postBuild:
     # BACKUP_S3_ENDPOINT / BACKUP_S3_BUCKET: written by Terraform from the same inputs
-    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub).
+    # as the cnpg-backup-s3 Secret and the etcd snapshots (BACKUP_S3_* in GitHub);
+    # BACKUP_CLUSTER_ID: when Terraform created this cluster - part of the archive's serverName.
     substituteFrom:
       - kind: ConfigMap
         name: backup-s3

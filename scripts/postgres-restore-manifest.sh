@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # postgres-restore-manifest.sh - print the CNPG Cluster that restores app-postgres side by side,
-# as app-postgres-restore in the same namespace, from the backups in the object store.
+# as app-postgres-restore in the same namespace, from the backups in the object store (through the
+# Barman Cloud plugin and the environment's ObjectStore app-postgres-backups).
 #
 # The restore never touches app-postgres: it is a new cluster, bootstrapped from the base backup
 # and the archived WAL. Without -t it replays every archived segment; with -t it stops at that
@@ -14,13 +15,18 @@
 #   scripts/postgres-restore-manifest.sh -n develop -t 2026-10-05T09:30:00Z > restore.yaml
 #
 # The cluster: -c, else $KUBE_CONTEXT, else kind-sre-control-plane. The script only reads there
-# (the source Cluster and the backup Secret cnpg-backup-s3); it prints, you apply.
+# (the source Cluster and its ObjectStore); it prints, you apply.
 #
 # (Lines 2-17 above are also the --help text: usage() prints them. Keep notes for readers below.)
 # Run by hand from the runbook and the Chapter 12 lab. Needs: kubectl and jq.
 # Why these fields:
-#   - serverName: app-postgres - the archive lives under the SOURCE cluster's name; without it CNPG
-#     looks under the external cluster's name and finds nothing.
+#   - barmanObjectName: app-postgres-backups - the ObjectStore that holds the path and the keys.
+#   - serverName: the archive the source writes to - its plugin parameter serverName (one per
+#     PostgreSQL major version and cluster: app-postgres-pg18-<BACKUP_CLUSTER_ID>), or the source
+#     cluster's name when it sets none;
+#     without it CNPG looks under the external cluster's name and finds nothing.
+#   - No WAL archiving for the restored cluster (no spec.plugins): it is for proving and inspecting the
+#     restore. Archiving it into the same store would need its own serverName.
 #   - imageName, storage, resources copied from the source - a physical restore needs the same
 #     Postgres major version, and the namespace quota has to fit it.
 #   - database/owner/secret: the restored database keeps the app's credentials (app-postgres-app),
@@ -34,6 +40,7 @@ TARGET_TIME=""
 CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
 SOURCE="app-postgres"
 RESTORE="app-postgres-restore"
+OBJECT_STORE="app-postgres-backups"
 
 # usage - print the header comment of this file (lines 2-17) as help, then exit 1.
 usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
@@ -63,12 +70,12 @@ k() { kubectl --context "$CONTEXT" -n "$NAMESPACE" "$@"; }
 
 source_json=$(k get cluster.postgresql.cnpg.io "$SOURCE" -o json) \
   || { echo "cannot read Cluster $SOURCE in $NAMESPACE ($CONTEXT)" >&2; exit 1; }
-# b64 - one key of the backup Secret, decoded; fails loudly when the key is missing.
-b64() { k get secret cnpg-backup-s3 -o "jsonpath={.data.$1}" | base64 -d; }
-bucket=$(b64 BUCKET); endpoint=$(b64 ENDPOINT)
-[ -n "$bucket" ] && [ -n "$endpoint" ] || { echo "cnpg-backup-s3 in $NAMESPACE has no BUCKET or ENDPOINT" >&2; exit 1; }
+# The ObjectStore must exist: without it the restore has nowhere to read from.
+k get objectstores.barmancloud.cnpg.io "$OBJECT_STORE" -o name >/dev/null \
+  || { echo "cannot read ObjectStore $OBJECT_STORE in $NAMESPACE ($CONTEXT)" >&2; exit 1; }
 
 image=$(jq -r '.spec.imageName' <<<"$source_json")
+server=$(jq -r --arg s "$SOURCE" '[.spec.plugins[]? | select(.name == "barman-cloud.cloudnative-pg.io") | .parameters.serverName // empty][0] // $s' <<<"$source_json")
 size=$(jq -r '.spec.storage.size' <<<"$source_json")
 resources=$(jq -c '.spec.resources // {}' <<<"$source_json")
 
@@ -96,15 +103,9 @@ spec:
         name: app-postgres-app$target
   externalClusters:
     - name: origin
-      barmanObjectStore:
-        serverName: $SOURCE
-        destinationPath: s3://$bucket/cnpg-backups/$NAMESPACE/$SOURCE
-        endpointURL: $endpoint
-        s3Credentials:
-          accessKeyId:
-            name: cnpg-backup-s3
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: cnpg-backup-s3
-            key: ACCESS_SECRET_KEY
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: $OBJECT_STORE
+          serverName: $server
 EOF

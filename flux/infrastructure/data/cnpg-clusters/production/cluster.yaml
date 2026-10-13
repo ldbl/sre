@@ -6,11 +6,22 @@ metadata:
   annotations:
     cnpg.io/validation: "disabled"
 spec:
-  instances: 1
+  # A primary and one streaming replica (Chapter 22): when the primary's pod or disk is lost, CNPG
+  # promotes the replica (24 s after a crash on kind), and an update restarts the replica first, then
+  # switches over. Replication is asynchronous: transactions the replica had not received yet are
+  # lost with the primary. On Hetzner both run on the one worker - this survives a lost pod, not a
+  # lost node.
+  instances: 2
   # Pinned to a minor and its digest: the major tag (:17) moved to every new PostgreSQL minor by
-  # itself. Changing this restarts the instance once - with one instance, a short outage.
+  # itself. Changing this restarts the replica, then switches the primary over to it.
+  # The minimal Debian trixie image: the in-tree barman tools of the old "system" image are not needed
+  # with the Barman Cloud plugin (its sidecar brings them).
+  # A new MAJOR version here is an offline in-place upgrade: CNPG stops the instance and runs
+  # pg_upgrade --link in a job - old and new image on the same distribution. Take a backup first; give
+  # the archive a new serverName below in the same change (point-in-time restore does not cross major
+  # versions); take a base backup right after (Chapter 12).
   # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.11@sha256:70664ebcfa1100361b5bdc28bbf06fdbe08db2dc4ad7bd14de33c5e05fe8ea8e
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie@sha256:37ade18dbdddba430858c72725aceeec66f33fa5333e82ea1df4942f6c1c83a3
   primaryUpdateStrategy: unsupervised
   bootstrap:
     initdb:
@@ -20,18 +31,20 @@ spec:
         name: app-postgres-app
   storage:
     size: 30Gi
-  backup:
-    retentionPolicy: "30d"
-    barmanObjectStore:
-      destinationPath: s3://${BACKUP_S3_BUCKET}/cnpg-backups/production/app-postgres
-      endpointURL: ${BACKUP_S3_ENDPOINT}
-      s3Credentials:
-        accessKeyId:
-          name: cnpg-backup-s3
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: cnpg-backup-s3
-          key: ACCESS_SECRET_KEY
+  # Base backups and the WAL archive go through the Barman Cloud plugin to the ObjectStore
+  # app-postgres-backups (object-store.yaml); retention lives there too.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: app-postgres-backups
+        # One archive per major version AND per cluster: 17's backups and WAL stay under app-postgres
+        # and still restore into a 17 cluster; 18 starts its own. BACKUP_CLUSTER_ID is the day and time
+        # Terraform created this Kubernetes cluster (ConfigMap backup-s3): a rebuilt cluster starts an
+        # empty archive next to the old one - the plugin refuses to archive into a used one ("Expected
+        # empty archive") and the database runs without backups. The old archive stays for a restore
+        # (Chapter 22); retention prunes only the live cluster's own.
+        serverName: app-postgres-pg18-${BACKUP_CLUSTER_ID}
   resources:
     requests:
       cpu: 10m

@@ -20,16 +20,16 @@ permissions:
 
 jobs:
   hooks:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: "3.15"
 
       # The versions the Makefile pins for the workstation (TERRAFORM_VERSION, KUBECTL_VERSION).
       - name: Setup Terraform
@@ -38,9 +38,14 @@ jobs:
           terraform_version: "1.16.5"
           terraform_wrapper: false
 
+      # kubectl, pinned and checked against the release's sha256 (dl.k8s.io/.../kubectl.sha256) - like Helm.
       - name: Setup kubectl
+        env:
+          KUBECTL_VERSION: "v1.37.1"
+          KUBECTL_SHA256: "65691ff77eb6fa44c908b77a1082c9f092c3b9733b5cefabec0d1104890e21a8"
         run: |
-          curl -sLO "https://dl.k8s.io/release/v1.37.1/bin/linux/amd64/kubectl"
+          curl -sSLfO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          echo "${KUBECTL_SHA256}  kubectl" | sha256sum -c -
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       # Helm for the tool-versions-test hook: it asks the pinned charts what they install (helm show).
@@ -77,8 +82,8 @@ jobs:
       - name: Setup promtool
         env:
           # renovate: datasource=github-releases depName=prometheus/prometheus
-          PROMETHEUS_VERSION: "3.11.0"
-          PROMETHEUS_SHA256: "ff799c3e4c318e17dec14aaaa406a4da328fabb4578336b36d96d893870c3b76"
+          PROMETHEUS_VERSION: "3.15.0"
+          PROMETHEUS_SHA256: "2a542df32eac02ee17b9d844fb2aa1de00dafa5476579ba8a3ba862e9d572ea0"
         run: |
           archive="prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
           curl -sSLfO "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/${archive}"
@@ -89,9 +94,12 @@ jobs:
 
       # checkov: the terraform-security hook fails without it (it is a required tool, not optional).
       - name: Install pre-commit and checkov
-        run: pip install pre-commit==4.6.2 checkov==3.3.20
+        run: pip install pre-commit==4.6.2 checkov==3.3.27
 
       - name: Run every hook on every file
         env:
           SKIP: master-branch-check
+          # The credential dates are SafeOps' own: a learner's fork cannot rotate them, and its pull
+          # requests must not fail the day one of them is due. There they are reported, not enforced.
+          CHECK_CREDENTIALS_DATES: ${{ github.repository == 'safeops-course/sre' && 'enforce' || 'report' }}
         run: pre-commit run --all-files --show-diff-on-failure
