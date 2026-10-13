@@ -10,6 +10,9 @@
 #     the Chapter 01 incident)
 #   - a role that may patch Kustomizations/HelmReleases comes with the field-limiting admission
 #     policy oidc-flux-operator-fields in Deny (RBAC alone would allow spec.sourceRef/patches/values)
+#   - a write role in develop comes with oidc-flux-objects-from-git in Deny: Flux aggregates its edit
+#     roles into admin/edit, so without it a member could create a Kustomization there that Flux
+#     applies with cluster-admin rights
 #
 # Runs in pre-commit (rbac/ and dex/) and in the Flux Diff workflow. Needs kubectl (for `kubectl kustomize`) and yq (v4).
 # Usage: scripts/check-oidc-rbac.sh   (no arguments)
@@ -84,6 +87,18 @@ field_policy_deny="$(yq -N 'select(.kind == "ValidatingAdmissionPolicyBinding")
   | select(.spec.validationActions | any_c(test("^Deny$"))) | .metadata.name' <<<"${rendered}")" \
   || die "cannot read the admission policy bindings"
 
+flux_objects_policy_deny="$(yq -N 'select(.kind == "ValidatingAdmissionPolicyBinding")
+  | select(.spec.policyName == "oidc-flux-objects-from-git")
+  | select(.spec.validationActions | any_c(test("^Deny$"))) | .metadata.name' <<<"${rendered}")" \
+  || die "cannot read the admission policy bindings"
+flux_objects_policy="$(yq -N 'select(.kind == "ValidatingAdmissionPolicy")
+  | select(.metadata.name == "oidc-flux-objects-from-git") | .metadata.name' <<<"${rendered}")" \
+  || die "cannot read the admission policies"
+
+develop_write_bindings="$(yq -N 'select(.kind == "RoleBinding" and .metadata.namespace == "develop")
+  | select(.roleRef.name == "admin" or .roleRef.name == "edit")
+  | .metadata.name' <<<"${rendered}")" || die "cannot read the develop bindings"
+
 # 1. Dex teams = the fixed allowlist; every Group subject on it.
 [[ "${dex_groups}" == "${allowed_groups}" ]] \
   || failures+=("Dex teams ($(tr '\n' ' ' <<<"${dex_groups}")) differ from the allowlist ($(tr '\n' ' ' <<<"${allowed_groups}"))")
@@ -111,6 +126,11 @@ if [[ -n "${flux_patch_roles}" ]]; then
     || failures+=("role(s) $(tr '\n' ' ' <<<"${flux_patch_roles}")may write Flux objects, but the ValidatingAdmissionPolicy oidc-flux-operator-fields is missing")
   [[ -n "${field_policy_deny}" ]] \
     || failures+=("role(s) $(tr '\n' ' ' <<<"${flux_patch_roles}")may write Flux objects, but no binding puts oidc-flux-operator-fields in Deny")
+fi
+
+# 5. A write role in develop also writes Flux objects (aggregated) - only with the policy that refuses it.
+if [[ -n "${develop_write_bindings}" ]] && [[ -z "${flux_objects_policy}" || -z "${flux_objects_policy_deny}" ]]; then
+  failures+=("develop binding(s) $(tr '\n' ' ' <<<"${develop_write_bindings}")grant admin/edit, which Flux extends to its own objects, but oidc-flux-objects-from-git is missing or not in Deny")
 fi
 
 if ((${#failures[@]} > 0)); then

@@ -10,4 +10,5 @@ resources:
   - flux-system-readonly.yaml
   - flux-operator.yaml
   - flux-operator-fields.yaml
+  - flux-objects-from-git.yaml
   - kube-system-readonly.yaml
