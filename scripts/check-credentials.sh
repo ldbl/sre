@@ -45,10 +45,11 @@ MAX_ACCEPT_DAYS=30
 TODAY="${TODAY:-$(date -u +%F)}"
 # Without CHECK_CREDENTIALS_DATES: enforce in SafeOps' own clone (origin safeops-course/sre), report in
 # any other - a learner's fork runs `pre-commit run --all-files` (Chapter 05), and SafeOps' dates are
-# not theirs to keep. CI sets the variable explicitly.
+# not theirs to keep. CI sets the variable explicitly. The owner is matched whole ([/:] before it), the
+# host is not: SafeOps clones may use an SSH host alias (git@<alias>:safeops-course/sre.git).
 if [[ -z "${CHECK_CREDENTIALS_DATES:-}" ]]; then
   origin="$(git remote get-url origin 2>/dev/null || true)"
-  if [[ "${origin}" =~ safeops-course/sre(\.git)?/?$ ]]; then CHECK_CREDENTIALS_DATES=enforce; else CHECK_CREDENTIALS_DATES=report; fi
+  if [[ "${origin}" =~ [/:]safeops-course/sre(\.git)?/?$ ]]; then CHECK_CREDENTIALS_DATES=enforce; else CHECK_CREDENTIALS_DATES=report; fi
 fi
 DATES_MODE="${CHECK_CREDENTIALS_DATES}"
 [[ "${DATES_MODE}" == enforce || "${DATES_MODE}" == report ]] \
