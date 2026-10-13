@@ -178,12 +178,16 @@ check_display_names_production() { check_display_names production; }
 # check_colleague_change - none of the colleague's three possible changes is in the cluster: sign-ups
 # not limited below the default, the database policies select the database pods, backend CPU not
 # below main's values. Every environment.
+# It names only the environments, never what is wrong in them: the script may run any time, and a
+# verdict that named the setting would hand over the diagnosis the capstone asks for.
 check_colleague_change() {
   local env value container request limit min_request min_limit postgres selected selected_in policy pod
+  local affected=()
   for env in "${ENVIRONMENTS[@]}"; do
+    local broken=0
     value="$(flag_value "${env}" AUTH_REGISTRATIONS_PER_MINUTE)"
     if [[ -n "${value}" ]] && ! { [[ "${value}" =~ ^[0-9]+$ ]] && (( value >= MIN_REGISTRATIONS_PER_MINUTE )); }; then
-      problem "${env}: AUTH_REGISTRATIONS_PER_MINUTE=${value} - fewer sign-ups a minute than the default ${MIN_REGISTRATIONS_PER_MINUTE}"
+      broken=1
     fi
 
     container="$(backend_json "${env}")"
@@ -191,43 +195,59 @@ check_colleague_change() {
     limit="$(millicores "$(jq -r '.resources.limits.cpu // ""' <<<"${container}")")"
     read -r min_request min_limit <<<"$(min_cpu "${env}")"
     if [[ -z "${request}" ]] || (( request < min_request )) || [[ -z "${limit}" ]] || (( limit < min_limit )); then
-      problem "${env}: backend CPU ${request:-no}m request / ${limit:-no}m limit - below ${min_request}m / ${min_limit}m"
+      broken=1
     fi
 
     postgres="$(k -n "${env}" get pods -l cnpg.io/cluster=app-postgres -o name)"
     if [[ -z "${postgres}" ]]; then
-      problem "${env}: no database pods (cnpg.io/cluster=app-postgres) to check the policies against"
+      problem "${env}: no database pods (cnpg.io/cluster=app-postgres) to check against"
       continue
     fi
-    # The backend's way out: the egress policy's destinations must include every database pod.
-    if ! policy="$(k -n "${env}" get networkpolicy allow-backend-egress-postgres -o json 2>/dev/null)"; then
-      problem "${env}: no NetworkPolicy allow-backend-egress-postgres"
-      continue
+    # The backend's way out: the egress policy's destinations must include every database pod;
+    # the database's way in: the ingress policy must apply to every database pod. A missing policy
+    # counts as broken too.
+    if policy="$(k -n "${env}" get networkpolicy allow-backend-egress-postgres -o json 2>/dev/null)"; then
+      selected="$(jq -c '.spec.egress[].to[] | .podSelector // empty' <<<"${policy}" \
+        | while IFS= read -r s; do pods_selected "${env}" "${s}"; done)"
+    else
+      selected=""
     fi
-    selected="$(jq -c '.spec.egress[].to[] | .podSelector // empty' <<<"${policy}" \
-      | while IFS= read -r s; do pods_selected "${env}" "${s}"; done)"
-    # The database's way in: the ingress policy must apply to every database pod.
-    if ! policy="$(k -n "${env}" get networkpolicy allow-postgres-ingress-backend -o json 2>/dev/null)"; then
-      problem "${env}: no NetworkPolicy allow-postgres-ingress-backend"
-      continue
+    if policy="$(k -n "${env}" get networkpolicy allow-postgres-ingress-backend -o json 2>/dev/null)"; then
+      selected_in="$(pods_selected "${env}" "$(jq -c '.spec.podSelector' <<<"${policy}")")"
+    else
+      selected_in=""
     fi
-    selected_in="$(pods_selected "${env}" "$(jq -c '.spec.podSelector' <<<"${policy}")")"
     for pod in ${postgres}; do
-      grep -qx "${pod}" <<<"${selected}" \
-        || problem "${env}: allow-backend-egress-postgres does not reach ${pod#pod/}"
-      grep -qx "${pod}" <<<"${selected_in}" \
-        || problem "${env}: allow-postgres-ingress-backend does not apply to ${pod#pod/}"
+      grep -qx "${pod}" <<<"${selected}" || broken=1
+      grep -qx "${pod}" <<<"${selected_in}" || broken=1
     done
+    (( broken == 0 )) || affected+=("${env}")
   done
+  if [[ ${#affected[@]} -gt 0 ]]; then
+    problem "not as main had it before the colleague's change, in: ${affected[*]}"
+  fi
 }
 
-# check_no_shortcut - nothing switched a guardrail off on the way: no PolicyException in the cluster,
-# and every egress rule of the application namespaces names its destinations and ports.
+# check_no_shortcut - the guardrails are still on, now: no PolicyException in the cluster; every
+# admission policy that denies (*-enforce) still denies, and none of them is gone (one per *-audit
+# policy); default-deny-all in every application namespace; and every egress rule there names its
+# destinations and ports. It checks the state, not the way there - a guardrail switched off and on
+# again, or a rule wider than its one path, is for the handover and the git log.
 check_no_shortcut() {
-  local exceptions env open
+  local exceptions policies audit enforce weak env open deny
   exceptions="$(k get policyexceptions.policies.kyverno.io -A -o name)"
   [[ -z "${exceptions}" ]] || problem "PolicyException in the cluster: ${exceptions//$'\n'/, }"
+  policies="$(k get validatingpolicies.policies.kyverno.io,imagevalidatingpolicies.policies.kyverno.io -o json)"
+  audit="$(jq '[.items[] | select(.metadata.name | endswith("-audit"))] | length' <<<"${policies}")"
+  enforce="$(jq '[.items[] | select(.metadata.name | endswith("-enforce"))] | length' <<<"${policies}")"
+  (( enforce >= audit )) || problem "${enforce} admission policies deny, ${audit} report - an *-enforce policy is gone"
+  weak="$(jq -r '.items[] | select(.metadata.name | endswith("-enforce"))
+    | select((.spec.validationActions // []) | index("Deny") | not) | .metadata.name' <<<"${policies}")"
+  [[ -z "${weak}" ]] || problem "admission policies that no longer deny: ${weak//$'\n'/, }"
   for env in "${ENVIRONMENTS[@]}"; do
+    deny="$(k -n "${env}" get networkpolicy -o json | jq -r '[.items[] | select(.metadata.name == "default-deny-all"
+      and .spec.podSelector == {} and (.spec.policyTypes | index("Ingress")) and (.spec.policyTypes | index("Egress")))] | length')"
+    (( deny == 1 )) || problem "${env}: no default-deny-all for ingress and egress of every pod"
     open="$(k -n "${env}" get networkpolicy -o json | jq -r '.items[]
       | select([(.spec.egress // [])[] | select((.to | not) or (.ports | not))] | length > 0)
       | .metadata.name')"
