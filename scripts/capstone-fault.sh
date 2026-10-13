@@ -162,7 +162,8 @@ run_github() {
   fi
   commit_fault
   # Pushed from the detached worktree: no local branch is left behind, so the same fault can run again.
-  git push -q origin "HEAD:refs/heads/${BRANCH}"
+  local pushed
+  pushed="$(git push -q origin "HEAD:refs/heads/${BRANCH}" 2>&1)" || die "the push failed: ${pushed}"
   pr="$(gh pr create --repo "${repo}" --base main --head "${BRANCH}" --title "${TITLE}" --body "${BODY}")"
   echo "capstone-fault: a colleague opened ${pr}"
 

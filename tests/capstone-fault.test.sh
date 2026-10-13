@@ -14,6 +14,17 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# This test guards the course repository: that each fault still applies to its main. In a learner's
+# fork it must not run - CI there runs every hook on every file, and during the capstone the fork's
+# main holds the fault itself (it cannot be made again) and the learner's own edits of those lines.
+# There it would fail every pull request, the colleague's included. Found in a real run on a fork.
+COURSE_REPOSITORY="safeops-course/sre"
+origin_url="$(git -C "${ROOT}" remote get-url origin 2>/dev/null || echo "none")"
+if [[ "${origin_url}" != *"${COURSE_REPOSITORY}"* ]]; then
+  echo "skip - not the course repository (origin: ${origin_url}); the faults are checked there"
+  exit 0
+fi
 # A git hook (pre-commit) exports GIT_INDEX_FILE and friends for this repository; the throw-away
 # repositories below must not inherit them - a worktree there would open this repository's index.
 unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
