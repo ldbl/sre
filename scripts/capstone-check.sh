@@ -257,7 +257,7 @@ criterion "No guardrail switched off on the way" \
 criterion "The smoke test passes" \
   "make smoke-test shows which check fails" check_smoke_test
 criterion "The handover is in Git" \
-  "copy handover-template.md to docs/handover.md, fill every TODO, merge it" check_handover
+  "cp docs/handover-template.md docs/handover.md, replace every TODO placeholder, merge it" check_handover
 
 echo
 echo "${PROVEN} of ${TOTAL} proven."
