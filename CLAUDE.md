@@ -161,6 +161,10 @@ scripts/             # Pre-commit hooks, automation scripts
   `guard-terraform-plan.sh`, apply applies only that plan (refused when older than `TF_MAX_AGE`, default 60 min)
 - `make hcloud-plan` / `hcloud-apply` / `hcloud-destroy` — the same for Hetzner (aliases of
   `terraform-hcloud-plan|apply|destroy`; CI calls `terraform-hcloud-destroy`); `make hcloud-drift` - drift check
+- `make capstone-fault` — Chapter 23: a colleague's pull request with one random fault (f1 sign-up limit,
+  f2 database network policies, f3 backend CPU), merged in the learner's repository; `scripts/capstone-fault.sh --local` commits only
+  (tests/capstone-fault.test.sh). `make capstone-check` — the capstone's acceptance criteria against Git and
+  the cluster, PROVEN / NOT PROVEN YET (read-only but for the smoke test's probe pod)
 
 ### hcloud_cluster / kind_cluster Makefiles
 - `make init` / `make plan` (saved, via the guard) / `make apply` (that plan only) / `make destroy`
