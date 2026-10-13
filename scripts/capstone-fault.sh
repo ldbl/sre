@@ -108,7 +108,12 @@ run_local() {
   cd "${repo_root}"
   [[ -z "$(git status --porcelain)" ]] || die "the working copy has uncommitted changes - commit or stash them first"
   make_fault
-  git switch -q -c "${BRANCH}"
+  # BRANCH is known only after the fault: when it exists already, undo the fault's edits (the tree
+  # was clean) so the checkout is left as it was.
+  if ! git switch -q -c "${BRANCH}" 2>/dev/null; then
+    git checkout -q -- .
+    die "branch ${BRANCH} exists already - delete it (git branch -D ${BRANCH}) or choose another fault"
+  fi
   commit_fault
   echo "capstone-fault: committed on branch ${BRANCH} (not pushed)"
 }
@@ -129,17 +134,24 @@ run_github() {
   git worktree add -q --detach "${work}" origin/main
   cd "${work}"
   make_fault
-  git switch -q -c "${BRANCH}"
   commit_fault
-  git push -q -u origin "${BRANCH}"
+  # Pushed from the detached worktree: no local branch is left behind, so the same fault can run again.
+  git push -q origin "HEAD:refs/heads/${BRANCH}"
   pr="$(gh pr create --base main --head "${BRANCH}" --title "${TITLE}" --body "${BODY}")"
   echo "capstone-fault: a colleague opened ${pr}"
 
   # Wait for the repository's checks, as you would for your own pull request (Chapter 05).
-  # gh pr checks exits non-zero while checks run, when one failed, and when there are none - only
-  # the last one means there is nothing to wait for.
-  sleep 15
-  if checks="$(gh pr checks "${pr}" 2>&1)" || ! grep -q 'no checks reported' <<<"${checks}"; then
+  # They take a few seconds to appear after the pull request; until then gh pr checks says "no checks
+  # reported". A fork whose Actions are off has none at all: then it merges as your own pull requests
+  # do there, and says so.
+  for _ in 1 2 3 4 5 6 7 8 9; do
+    sleep 10
+    if checks="$(gh pr checks "${pr}" 2>&1)"; then break; fi   # 0: there are checks, all passed
+    grep -q 'no checks reported' <<<"${checks}" || break
+  done
+  if grep -q 'no checks reported' <<<"${checks}"; then
+    echo "capstone-fault: no checks on ${pr} after 90 s - are Actions enabled in your fork? Merging without them."
+  else
     gh pr checks "${pr}" --watch >/dev/null || die "the pull request's checks failed - nothing merged: ${pr}"
   fi
   gh pr merge "${pr}" --merge --delete-branch >/dev/null

@@ -31,9 +31,14 @@ fresh_repo() {
   git -C "${repo}" commit -q -m base
 }
 
-# check NAME COMMAND... - one assertion: the command succeeds.
+# check NAME COMMAND... - one assertion: the command succeeds. A call without a command fails.
 check() {
   local name="$1"
+  if [[ $# -lt 2 ]]; then
+    echo "FAIL - ${name}: no command to check"
+    FAILED=1
+    return
+  fi
   shift
   if "$@" >/dev/null 2>&1; then
     echo "ok   - ${name}"
@@ -74,5 +79,14 @@ fresh_repo
 check "an unknown fault is refused" \
   bash -c "! CAPSTONE_FAULT=f9 '${WORK}/repo/scripts/capstone-fault.sh' --local"
 check "  - and nothing changed" test "$(git -C "${WORK}/repo" rev-list --count HEAD)" -eq 1
+
+# A branch that exists already is refused, and the checkout is left as it was.
+fresh_repo
+CAPSTONE_FAULT=f1 "${WORK}/repo/scripts/capstone-fault.sh" --local >/dev/null 2>&1
+git -C "${WORK}/repo" switch -q main
+check "an existing branch is refused" \
+  bash -c "! CAPSTONE_FAULT=f1 '${WORK}/repo/scripts/capstone-fault.sh' --local"
+check "  - and the checkout is clean, still on main" \
+  test "$(git -C "${WORK}/repo" status --porcelain)$(git -C "${WORK}/repo" branch --show-current)" = main
 
 exit "${FAILED}"

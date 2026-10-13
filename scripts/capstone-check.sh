@@ -15,7 +15,7 @@
 #        KUBE_CONTEXT=<context> scripts/capstone-check.sh   (default: kind-sre-control-plane)
 # Needs git, kubectl, flux, jq and an origin remote. Changes nothing, except `git fetch origin main`
 # and the smoke test's short-lived probe pod (tests/smoke-test.sh).
-# Exit 0 when every criterion is proven, 1 otherwise, 2 when the context is missing.
+# Exit 0 when every criterion is proven, 1 otherwise, 2 when the context is missing or does not answer.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,6 +24,10 @@ cd "${repo_root}"
 KUBE_CONTEXT="${KUBE_CONTEXT:-kind-sre-control-plane}"
 if ! kubectl config get-contexts "${KUBE_CONTEXT}" >/dev/null 2>&1; then
   echo "capstone-check: context '${KUBE_CONTEXT}' not found in the kubeconfig" >&2
+  exit 2
+fi
+if ! kubectl --context "${KUBE_CONTEXT}" get --raw /readyz >/dev/null 2>&1; then
+  echo "capstone-check: the API server of '${KUBE_CONTEXT}' does not answer - is the cluster running?" >&2
   exit 2
 fi
 
@@ -46,11 +50,21 @@ problem() { PROBLEMS+=("$1"); }
 
 # criterion NAME HINT CHECK_FUNCTION - run one criterion and print its verdict; on NOT PROVEN YET
 # also what is missing and the hint.
+# The check runs in a subshell with set -e, so a failed read (an object that is gone, the API server
+# busy) ends only that check - as a problem, never as a PROVEN from an empty answer - and every other
+# criterion still prints its verdict. set -e is ignored inside an if or ||, hence the set +e around it.
 criterion() {
-  local name="$1" hint="$2" check="$3" p
+  local name="$1" hint="$2" check="$3" p output rc
   PROBLEMS=()
   TOTAL=$((TOTAL + 1))
-  "${check}"
+  set +e
+  output="$(set -e; "${check}"; for p in ${PROBLEMS[@]+"${PROBLEMS[@]}"}; do echo "${p}"; done)"
+  rc=$?
+  set -e
+  if [[ -n "${output}" ]]; then
+    while IFS= read -r p; do PROBLEMS+=("${p}"); done <<<"${output}"
+  fi
+  [[ "${rc}" -eq 0 ]] || problem "a read from the cluster or Git failed (exit ${rc}, the error above) - run it again"
   if [[ ${#PROBLEMS[@]} -eq 0 ]]; then
     PROVEN=$((PROVEN + 1))
     printf '  %-15s %d. %s\n' "PROVEN" "${TOTAL}" "${name}"
